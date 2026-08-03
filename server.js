@@ -10,6 +10,16 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 
+/* 归档模块（独立于 server.js 中已有的 archive() 快照函数） */
+const archiveMod = require('./archive');
+
+/* 加载组织配置到全局（calc.js 依赖全局 TEAMS 等变量） */
+const _configSource = fs.readFileSync(path.join(__dirname, 'config.js'), 'utf8');
+const _configFn = new Function(_configSource + '\nreturn { TEAMS, PRODUCT_LINES, OTHER_CATEGORIES, LOCK_ROLES, LOCK_ROLE_TO_TEAM, OWNER_LINES, DEVIATION_TOLERANCE, IGNORED_TEAM_PATTERNS, RECONCILE_TOLERANCE };');
+const _CONFIG = _configFn();
+Object.assign(global, _CONFIG);
+const { compute } = require('./calc');
+
 /* 配置优先级：命令行参数 > 环境变量 > 默认值
    PORT           监听端口
    DATA_DIR       数据目录（部署时建议指向服务器上的持久化路径）
@@ -259,6 +269,92 @@ const server = http.createServer((req, res) => {
       clients = clients.filter(c => c !== res);
     });
     return;
+  }
+
+  /* ---------- 归档 API ---------- */
+
+  // GET /api/archive/list — 归档列表（仅元数据）
+  if (p === '/api/archive/list' && req.method === 'GET') {
+    return sendJson(res, 200, archiveMod.listArchives());
+  }
+
+  // POST /api/archive — 创建归档（归档本迭代）
+  if (p === '/api/archive' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => {
+      body += c;
+      if (body.length > 2 * 1024 * 1024) req.destroy();
+    });
+    req.on('end', () => {
+      let incoming;
+      try { incoming = JSON.parse(body); }
+      catch (e) { return sendJson(res, 400, { error: 'JSON 解析失败' }); }
+
+      const state = readState();
+      const computeResult = compute(state);
+      const result = archiveMod.createArchive(state, {
+        name: incoming.name || '',
+        note: incoming.note || '',
+        archivedBy: incoming.archivedBy || '未署名'
+      }, computeResult);
+
+      if (result.error) return sendJson(res, 409, result);
+
+      // 广播归档事件
+      broadcast(state.rev, `${incoming.archivedBy || '未署名'}(归档)`);
+      return sendJson(res, 200, result);
+    });
+    return;
+  }
+
+  // POST /api/archive/init-next — 初始化下一迭代
+  if (p === '/api/archive/init-next' && req.method === 'POST') {
+    const state = readState();
+    const newState = archiveMod.initNextIteration(state);
+
+    try { writeState(newState); }
+    catch (e) { return sendJson(res, 500, { error: '写入失败：' + e.message }); }
+
+    // 保存到 history
+    archive(newState);
+    // 广播 state 重置事件
+    broadcast(newState.rev, '系统(初始化新迭代)');
+
+    return sendJson(res, 200, {
+      ok: true,
+      cleared: ['totals', 'board', 'iterations'],
+      preserved: ['cycles', 'headcount', 'locked'],
+      newRev: newState.rev
+    });
+  }
+
+  // GET /api/archive/:id — 单条归档详情
+  if (/^\/api\/archive\/[\w.\-]+$/.test(p) && req.method === 'GET') {
+    const id = p.split('/').pop();
+    // 排除已由上面路由处理的路径
+    if (id === 'list' || id === 'init-next') {
+      // 不应走到这里，但以防万一
+    } else {
+      // 拒绝路径穿越
+      if (id.includes('..') || id.includes('/')) {
+        return sendJson(res, 400, { error: '无效的归档 ID' });
+      }
+      const data = archiveMod.getArchive(id);
+      if (!data) return sendJson(res, 404, { error: '归档不存在' });
+      return sendJson(res, 200, data);
+    }
+  }
+
+  // DELETE /api/archive/:id — 删除归档
+  if (/^\/api\/archive\/[\w.\-]+$/.test(p) && req.method === 'DELETE') {
+    const id = p.split('/').pop();
+    // 拒绝路径穿越
+    if (id.includes('..') || id.includes('/')) {
+      return sendJson(res, 400, { error: '无效的归档 ID' });
+    }
+    const result = archiveMod.deleteArchive(id);
+    if (result.error) return sendJson(res, 404, result);
+    return sendJson(res, 200, result);
   }
 
   serveStatic(req, res, p);

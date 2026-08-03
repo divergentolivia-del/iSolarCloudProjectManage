@@ -13,6 +13,7 @@
   <div class="cycle-label" id="cycleLabel">未设置版本周期</div>
   <div class="mode-badge" id="modeBadge"></div>
   <div class="actions">
+    <button id="btnArchive" class="btn archive-btn" title="归档本迭代数据">归档本迭代</button>
     <button id="btnSave" class="btn">保存草稿</button>
     <button id="btnExport" class="btn">导出 JSON</button>
     <label class="btn file">导入 JSON<input type="file" id="fileJson" accept=".json" hidden></label>
@@ -29,6 +30,7 @@
   <button class="tab" data-view="import">④ 工时数据导入</button>
   <button class="tab" data-view="iteration">⑤ 迭代口径</button>
   <button class="tab" data-view="analysis">⑥ 偏差分析</button>
+  <button class="tab" data-view="archiveHistory">⑦ 历史归档</button>
 </nav>
 
 <main>
@@ -38,7 +40,21 @@
   <section class="view hidden" id="view-import"></section>
   <section class="view hidden" id="view-iteration"></section>
   <section class="view hidden" id="view-analysis"></section>
+  <section class="view hidden" id="view-archiveHistory"></section>
 </main>
+
+<div id="archiveBanner" class="archive-banner hidden"></div>
+
+<div id="archiveModal" class="modal-overlay hidden">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3 id="archiveModalTitle">确认归档</h3>
+      <button class="modal-close" id="archiveModalClose">&times;</button>
+    </div>
+    <div class="modal-body" id="archiveModalBody"></div>
+    <div class="modal-footer" id="archiveModalFooter"></div>
+  </div>
+</div>
 
 <div id="toast" class="toast hidden"></div>
 

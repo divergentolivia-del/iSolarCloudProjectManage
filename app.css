@@ -115,3 +115,107 @@ input:focus, select:focus { outline: 0; border-color: var(--accent); }
 .row-actions { text-align: center; }
 .link { color: var(--accent); cursor: pointer; background: none; border: 0; font: inherit; }
 .note { color: var(--muted); font-size: 12px; line-height: 1.7; }
+
+
+/* ---------- Archive UI ---------- */
+
+/* Archive button in header */
+.archive-btn {
+  background: #52c41a !important; border-color: #52c41a !important;
+  color: #fff !important; font-weight: 600; font-size: 14px;
+  padding: 6px 16px;
+}
+.archive-btn:hover { opacity: .9; border-color: #52c41a !important; color: #fff !important; }
+.archive-btn:disabled {
+  background: #d9d9d9 !important; border-color: #d9d9d9 !important;
+  color: #999 !important; cursor: not-allowed; opacity: .7;
+}
+
+/* Modal overlay & dialog */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+.modal-overlay.hidden { display: none; }
+.modal-dialog {
+  background: #fff; border-radius: 8px; width: 480px; max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,.2);
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--line);
+}
+.modal-header h3 { margin: 0; font-size: 16px; }
+.modal-close {
+  background: none; border: 0; font-size: 22px; cursor: pointer;
+  color: var(--muted); line-height: 1;
+}
+.modal-close:hover { color: var(--text); }
+.modal-body { padding: 20px; font-size: 14px; line-height: 1.7; }
+.modal-footer {
+  padding: 12px 20px; border-top: 1px solid var(--line);
+  display: flex; gap: 8px; justify-content: flex-end;
+}
+.modal-footer .btn { min-width: 72px; }
+
+/* Archive read-only banner */
+.archive-banner {
+  padding: 10px 20px; font-size: 14px; font-weight: 500;
+  background: #e6f7ff; color: #0958d9; border-bottom: 1px solid #91caff;
+  display: flex; align-items: center; gap: 12px;
+  position: sticky; top: 53px; z-index: 21;
+}
+.archive-banner.hidden { display: none; }
+.archive-banner .btn {
+  background: #fff; border-color: #0958d9; color: #0958d9;
+  font-size: 12px; padding: 4px 10px;
+}
+.archive-banner .btn:hover { background: #e6f7ff; }
+/* Push tabs down when archive banner is visible */
+.archive-banner:not(.hidden) ~ .tabs { top: 95px; }
+
+/* Archive timeline cards */
+.archive-timeline { display: flex; flex-direction: column; gap: 12px; }
+.archive-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+  padding: 16px 20px; cursor: pointer; transition: border-color .15s, box-shadow .15s;
+}
+.archive-card:hover {
+  border-color: var(--accent); box-shadow: 0 2px 8px rgba(22,104,220,.12);
+}
+.archive-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.archive-card-title { font-size: 15px; font-weight: 600; }
+.archive-card-date { font-size: 12px; color: var(--muted); }
+.archive-card-meta { font-size: 13px; color: var(--muted); line-height: 1.6; }
+.archive-card-meta span { margin-right: 16px; }
+.archive-card-deviation {
+  display: inline-block; padding: 1px 7px; border-radius: 10px;
+  font-size: 12px; font-weight: 500;
+}
+.archive-card-deviation.positive { background: #fff2e8; color: var(--warn); }
+.archive-card-deviation.negative { background: #f6ffed; color: var(--ok); }
+
+/* Archive summary metrics in modal */
+.archive-metrics {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px;
+  background: #fafbfc; border: 1px solid var(--line); border-radius: 6px;
+  padding: 12px 16px; margin: 12px 0;
+}
+.archive-metrics dt { font-size: 12px; color: var(--muted); }
+.archive-metrics dd { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
+
+/* Read-only mode styles */
+body.archive-readonly input,
+body.archive-readonly select,
+body.archive-readonly textarea {
+  pointer-events: none; opacity: .7; background: #f5f5f5;
+}
+body.archive-readonly button:not(.tab):not(.modal-close):not(#archiveBannerBack):not(.archive-banner .btn) {
+  pointer-events: none; opacity: .5;
+}
+body.archive-readonly .drop { pointer-events: none; opacity: .5; }
+body.archive-readonly .archive-btn { display: none; }

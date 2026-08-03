@@ -743,6 +743,365 @@ RENDERERS.analysis = function () {
     ${matrixTable('版本规划工作量汇总', '产品线汇总 + 其他分类。「智慧能源产品中心」为部门级兜底分类，占比过高说明大量任务未打产线标签。', res.planRows, res.planTotal, '合计')}`;
 };
 
+/* ---------- 归档功能 (Archive UI) ---------- */
+
+/* 归档只读模式状态 */
+let archiveReadOnly = false;
+let archiveViewData = null;  // { meta, state } of the archive being viewed
+
+/* 模态框通用方法 */
+function showModal(title, bodyHtml, footerHtml) {
+  const modal = document.getElementById('archiveModal');
+  document.getElementById('archiveModalTitle').textContent = title;
+  document.getElementById('archiveModalBody').innerHTML = bodyHtml;
+  document.getElementById('archiveModalFooter').innerHTML = footerHtml;
+  modal.classList.remove('hidden');
+}
+function hideModal() {
+  document.getElementById('archiveModal').classList.add('hidden');
+}
+document.getElementById('archiveModalClose').addEventListener('click', hideModal);
+document.getElementById('archiveModal').addEventListener('click', function (e) {
+  if (e.target === this) hideModal();
+});
+
+/* 8.1: 归档本迭代按钮 — 确认对话框 */
+function showArchiveDialog() {
+  if (archiveReadOnly) return;
+  if (Sync.mode === 'server' && !Sync.online) {
+    toast('服务未连接，无法归档');
+    return;
+  }
+  const res = compute(state);
+  const c = res.cycle;
+  const overall = res.totals.capacity
+    ? ((res.totals.workload - res.totals.capacity) / res.totals.capacity * 100).toFixed(1) + '%'
+    : '—';
+
+  const bodyHtml = `
+    <p style="margin:0 0 12px"><b>确认归档当前迭代？</b></p>
+    <dl class="archive-metrics">
+      <dt>版本周期</dt><dd>${esc(c ? c.name + '：' + (c.online || '') : '未设置')}</dd>
+      <dt>开发周期</dt><dd>${res.days} 天</dd>
+      <dt>总工作量</dt><dd>${fmt(res.totals.workload)} 人天</dd>
+      <dt>总产能</dt><dd>${fmt(res.totals.capacity)} 人天</dd>
+      <dt>整体偏差</dt><dd style="color:${res.totals.workload > res.totals.capacity ? 'var(--warn)' : 'var(--ok)'}">${overall}</dd>
+      <dt>本期迭代</dt><dd style="font-size:12px">${res.iterations.length ? res.iterations.map(esc).join('、') : '未选择'}</dd>
+    </dl>
+    <p style="color:var(--muted);font-size:12px;margin:12px 0 0">
+      归档后本迭代数据将被永久保存，后续修改不影响已归档内容。
+    </p>`;
+
+  const footerHtml = `
+    <button class="btn" onclick="hideModal()">取消</button>
+    <button class="btn primary" id="confirmArchiveBtn">确认归档</button>`;
+
+  showModal('归档本迭代', bodyHtml, footerHtml);
+
+  document.getElementById('confirmArchiveBtn').addEventListener('click', doArchive);
+}
+
+/* 执行归档 */
+function doArchive() {
+  const btn = document.getElementById('confirmArchiveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '归档中…'; }
+
+  const c = activeCycle(state);
+  const name = (c && c.online)
+    ? new Date().getFullYear() + '年' + (new Date().getMonth() + 1) + '月迭代'
+    : '未命名迭代';
+
+  fetch('api/archive', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: name,
+      note: '',
+      archivedBy: Sync.whoami()
+    })
+  })
+    .then(r => r.json())
+    .then(result => {
+      hideModal();
+      if (result.error) {
+        toast('归档失败：' + result.error);
+        return;
+      }
+      toast('归档成功！本迭代数据已保存');
+      // 提示是否初始化下一迭代
+      setTimeout(showInitNextDialog, 600);
+    })
+    .catch(e => {
+      hideModal();
+      toast('归档请求失败：' + e.message);
+    });
+}
+
+/* 归档后提示初始化下一迭代 */
+function showInitNextDialog() {
+  const bodyHtml = `
+    <p style="margin:0 0 8px"><b>本迭代已成功归档！</b></p>
+    <p>是否初始化下一迭代？初始化将：</p>
+    <ul style="margin:8px 0;padding-left:20px;color:var(--muted);font-size:13px">
+      <li>清空工时数据（totals/board/iterations）</li>
+      <li>保留人头数和专项锁定项目</li>
+      <li>重置版本周期为非激活状态</li>
+    </ul>
+    <p style="color:var(--warn);font-size:12px;margin:8px 0 0">⚠ 此操作不可撤销</p>`;
+
+  const footerHtml = `
+    <button class="btn" onclick="hideModal()">稍后</button>
+    <button class="btn primary" id="confirmInitNextBtn">是，初始化下一迭代</button>`;
+
+  showModal('初始化下一迭代', bodyHtml, footerHtml);
+
+  document.getElementById('confirmInitNextBtn').addEventListener('click', showInitNextConfirm);
+}
+
+/* 初始化下一迭代需二次确认 */
+function showInitNextConfirm() {
+  const bodyHtml = `
+    <p style="margin:0;color:var(--warn)"><b>⚠ 再次确认</b></p>
+    <p>初始化后当前所有工时数据和迭代勾选将被清空，仅保留人头数和专项锁定。</p>
+    <p>确定要继续吗？</p>`;
+
+  const footerHtml = `
+    <button class="btn" onclick="hideModal()">取消</button>
+    <button class="btn" style="background:var(--warn);border-color:var(--warn);color:#fff" id="finalInitNextBtn">确认初始化</button>`;
+
+  showModal('二次确认', bodyHtml, footerHtml);
+
+  document.getElementById('finalInitNextBtn').addEventListener('click', doInitNext);
+}
+
+/* 执行初始化下一迭代 */
+function doInitNext() {
+  const btn = document.getElementById('finalInitNextBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '初始化中…'; }
+
+  fetch('api/archive/init-next', { method: 'POST' })
+    .then(r => r.json())
+    .then(result => {
+      hideModal();
+      if (result.error) {
+        toast('初始化失败：' + result.error);
+        return;
+      }
+      toast('已初始化下一迭代，工时数据已清空');
+      // 刷新当前状态
+      return fetch('api/state', { cache: 'no-store' }).then(r => r.json());
+    })
+    .then(remote => {
+      if (remote && remote.cycles) {
+        state = remote;
+        renderAll();
+      }
+    })
+    .catch(e => {
+      hideModal();
+      toast('初始化请求失败：' + e.message);
+    });
+}
+
+/* 归档按钮事件绑定 */
+document.getElementById('btnArchive').addEventListener('click', showArchiveDialog);
+
+/* 根据连接状态更新归档按钮可用性 */
+function updateArchiveButton() {
+  const btn = document.getElementById('btnArchive');
+  if (!btn) return;
+  if (archiveReadOnly) {
+    btn.style.display = 'none';
+    return;
+  }
+  btn.style.display = '';
+  if (Sync.mode === 'server' && !Sync.online) {
+    btn.disabled = true;
+    btn.title = '服务未连接，无法归档';
+  } else {
+    btn.disabled = false;
+    btn.title = '归档本迭代数据';
+  }
+}
+
+/* ---------- 8.2: 历史归档 Tab ---------- */
+
+RENDERERS.archiveHistory = function () {
+  const view = document.getElementById('view-archiveHistory');
+  view.innerHTML = `
+    <div class="card">
+      <h2>历史归档</h2>
+      <p class="hint">按时间降序展示所有归档迭代，点击卡片可查看完整数据。</p>
+      <div id="archiveListContainer">
+        <p style="color:var(--muted);text-align:center;padding:32px 0">加载中…</p>
+      </div>
+    </div>`;
+  loadArchiveList();
+};
+
+function loadArchiveList() {
+  fetch('api/archive/list', { cache: 'no-store' })
+    .then(r => r.json())
+    .then(list => {
+      const container = document.getElementById('archiveListContainer');
+      if (!container) return;
+      if (!list || !list.length) {
+        container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:32px 0">暂无归档记录</p>';
+        return;
+      }
+      const cards = list.map(item => {
+        const deviation = item.summary && item.summary.overallDeviation != null
+          ? (item.summary.overallDeviation * 100).toFixed(1) + '%'
+          : '—';
+        const devClass = item.summary && item.summary.overallDeviation > 0 ? 'positive' : 'negative';
+        const cycleInfo = item.cycle
+          ? '封版 ' + (item.cycle.seal || '—') + ' / 上线 ' + (item.cycle.online || '—')
+          : '';
+        return `
+          <div class="archive-card" data-archive-id="${esc(item.id)}">
+            <div class="archive-card-header">
+              <span class="archive-card-title">${esc(item.name || item.id)}</span>
+              <span class="archive-card-date">${esc(item.archivedAt || '')}</span>
+            </div>
+            <div class="archive-card-meta">
+              <span>${esc(cycleInfo)}</span>
+              <span>操作人：${esc(item.archivedBy || '未知')}</span>
+              <span class="archive-card-deviation ${devClass}">偏差 ${deviation}</span>
+            </div>
+            ${item.note ? '<div style="margin-top:6px;font-size:12px;color:var(--muted)">' + esc(item.note) + '</div>' : ''}
+          </div>`;
+      }).join('');
+      container.innerHTML = '<div class="archive-timeline">' + cards + '</div>';
+
+      // 绑定卡片点击事件
+      container.querySelectorAll('.archive-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const id = card.dataset.archiveId;
+          if (id) viewArchive(id);
+        });
+      });
+    })
+    .catch(e => {
+      const container = document.getElementById('archiveListContainer');
+      if (container) container.innerHTML = '<p style="color:var(--warn);text-align:center;padding:32px 0">加载失败：' + esc(e.message) + '</p>';
+    });
+}
+
+/* ---------- 8.3: 只读模式查看归档 ---------- */
+
+function viewArchive(id) {
+  fetch('api/archive/' + encodeURIComponent(id), { cache: 'no-store' })
+    .then(r => { if (!r.ok) throw new Error('归档不存在'); return r.json(); })
+    .then(data => {
+      archiveViewData = data;
+      archiveReadOnly = true;
+      enterArchiveReadOnlyMode(data);
+    })
+    .catch(e => toast('查看归档失败：' + e.message));
+}
+
+function enterArchiveReadOnlyMode(data) {
+  // 保存当前 state 引用（已在全局 state 中）
+  if (!window._savedState) window._savedState = state;
+  // 替换 state 为归档数据
+  state = data.state;
+
+  // 显示顶部横幅
+  const banner = document.getElementById('archiveBanner');
+  const dateLabel = data.meta.name || data.meta.id || '归档数据';
+  banner.innerHTML = `
+    <span>📋 正在查看「${esc(dateLabel)}」归档数据（${esc(data.meta.archivedAt || '')}）</span>
+    <button class="btn" id="archiveBannerBack">返回当前迭代</button>`;
+  banner.classList.remove('hidden');
+
+  // 启用只读样式
+  document.body.classList.add('archive-readonly');
+
+  // 更新归档按钮
+  updateArchiveButton();
+
+  // 切到第一个 Tab 并渲染
+  switchView('cycle');
+
+  // 绑定返回按钮
+  document.getElementById('archiveBannerBack').addEventListener('click', exitArchiveView);
+}
+
+function exitArchiveView() {
+  archiveReadOnly = false;
+  archiveViewData = null;
+
+  // 恢复原 state
+  if (window._savedState) {
+    state = window._savedState;
+    window._savedState = null;
+  } else {
+    // 从服务端重新拉取
+    if (Sync.mode === 'server') {
+      fetch('api/state', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(remote => { state = remote; renderAll(); })
+        .catch(() => {});
+    }
+  }
+
+  // 隐藏横幅
+  document.getElementById('archiveBanner').classList.add('hidden');
+
+  // 移除只读样式
+  document.body.classList.remove('archive-readonly');
+
+  // 更新归档按钮
+  updateArchiveButton();
+
+  // 重新渲染
+  renderAll();
+}
+
+/* ---------- 8.4: SSE 事件处理 ---------- */
+
+/* 增强 SSE：监听 archive-created 和 state-reset 事件
+   通过覆盖 Sync.init 中 onRemote 的基础上增加归档事件处理 */
+function handleArchiveSSEEvents() {
+  // 监听自定义 SSE 事件需要直接订阅 EventSource
+  // 由于 Sync 已订阅了 api/events，我们在 onRemote 回调中处理
+  // archive-created：更新归档列表
+  // state-reset：刷新界面
+
+  /* 归档相关的广播通过普通 message 事件发出（服务端 broadcast 函数），
+     我们通过检测 state 的变化来响应。当 state.rev 变化且 by 包含 '归档' 或 '初始化新迭代' 时，
+     判断为归档相关事件。 */
+}
+
+// 在原始 onRemote 中集成归档事件处理
+// 修改方式：包装原始 Sync 的 onRemote，使其也处理归档场景
+const _origSyncInit = Sync.init;
+
+/* 归档 SSE 事件检测由 onRemote 回调自行判断。
+   当收到 by 包含 '归档' 关键字时刷新归档列表；
+   当收到 by 包含 '初始化新迭代' 时刷新整个界面。 */
+function handleRemoteWithArchive(remote, by) {
+  if (archiveReadOnly) {
+    // 正在查看归档时，不自动切换状态，仅更新 _savedState
+    window._savedState = remote;
+    return;
+  }
+  state = remote;
+  renderAll();
+
+  if (by && by.includes('归档')) {
+    // 如果当前在历史归档 Tab，刷新列表
+    if (currentView === 'archiveHistory') {
+      loadArchiveList();
+    }
+    toast('有新的归档记录（' + (by || '') + '）');
+  } else if (by && by.includes('初始化新迭代')) {
+    toast('迭代已重置（' + (by || '') + '）');
+  } else {
+    toast('数据已更新（' + (by || '他人') + '）');
+  }
+}
+
 /* ---------- 导入导出 ---------- */
 function exportJson() {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
@@ -829,12 +1188,8 @@ window.addEventListener('beforeunload', e => {
 /* 服务端可用则以服务端数据为准；他人提交时自动刷新当前视图。
    断连时转本机暂存，恢复后由 onRecover 决定补交还是交由使用者裁决。 */
 Sync.init({
-  onRemote: (remote, by) => {
-    state = remote;
-    renderAll();
-    toast('数据已更新（' + (by || '他人') + '）');
-  },
-  onStatus: () => { updateModeBadge(); },
+  onRemote: handleRemoteWithArchive,
+  onStatus: () => { updateModeBadge(); updateArchiveButton(); },
   onStoreFail: () => {
     // 本机也存不下（配额满 / 隐私模式），此时数据只在内存里，刷新即失
     window.alert('本机暂存失败，浏览器存储空间可能已满。\n' +
@@ -848,4 +1203,5 @@ Sync.init({
     if (res.pending) onRecover(res.state, res.pending);
   }
   renderAll();
+  updateArchiveButton();
 });

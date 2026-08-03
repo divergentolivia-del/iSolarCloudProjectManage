@@ -1,0 +1,851 @@
+/* 界面与状态管理 */
+
+const STORE_KEY = 'cloud-capacity-workbench-v1';
+
+/* 最近一次合并中「两边都改过」的项，展示在顶部横幅供核对 */
+let lastConflicts = [];
+
+let state = load() || {
+  cycles: [
+    { name: '方案一', seal: '', online: '', workdays: 0, saturdays: 0, active: true, note: '' }
+  ],
+  headcount: {},
+  locked: [],
+  totals: [],      // 阳光云迭代工作量统计（权威口径）
+  board: [],       // 月底版本项目人力看板（产线分布）
+  iterations: [],  // 迭代清单与本期勾选状态
+  sources: {}      // { totals: {fileName, at, rows}, board: {...} }
+};
+
+function load() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)); } catch (e) { return null; }
+}
+/* 保存：server 模式提交到服务端并广播，local 模式落 localStorage。
+   server 模式下若服务端不可达，Sync 会把这次改动暂存到本机，恢复后自动合并补交。 */
+function save(silent) {
+  if (Sync.mode === 'server') {
+    Sync.push(() => state).then(r => {
+      if (r && r.offline) {
+        if (r.stored === false) toast('本机暂存失败，请立即导出 JSON 备份');
+        else if (!silent) toast('服务未连接，已暂存到本机');
+      }
+      else if (r && r.conflict) applyMerge(r.server, r.base, r.mine, '他人刚提交了修改');
+      else if (r && r.ok && !silent) toast('已提交，其他人会实时看到');
+      updateModeBadge();
+    }).catch(e => toast('提交失败：' + e.message));
+    return;
+  }
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  if (!silent) toast('已保存到本机浏览器');
+}
+
+/* ---------- 三方合并 ----------
+   多人各自离线填写后，若按整份数据二选一必然丢掉一边。
+   这里以「断连时的基线」为参照，分别算出我方和服务端相对基线各改了什么，
+   再按业务粒度（每组人头数、每条专项、每个迭代…）逐项叠加：
+     只有一方改过 → 采用那一方
+     两方都改成不同值 → 保留我方并记入冲突清单，交由使用者核对
+   这样各组填各组时全自动零丢失，只有真撞同一格才需要人工介入。 */
+
+function eq(a, b) { return JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b); }
+
+/* 按 key 归并一层对象（人头数：key 为组名，值为 {regular, outsource, owner}） */
+function mergeMap(baseM, serverM, mineM, label, conflicts) {
+  const out = {};
+  const keys = new Set([].concat(Object.keys(baseM || {}), Object.keys(serverM || {}), Object.keys(mineM || {})));
+  keys.forEach(k => {
+    const b = (baseM || {})[k], s = (serverM || {})[k], m = (mineM || {})[k];
+    const sChanged = !eq(b, s), mChanged = !eq(b, m);
+    if (mChanged && sChanged && !eq(s, m)) {
+      conflicts.push(label + ' · ' + k);
+      out[k] = m;                       // 撞车时暂用我方，并提示核对
+    } else if (mChanged) out[k] = m;
+    else out[k] = s;
+    if (out[k] === undefined) delete out[k];
+  });
+  return out;
+}
+
+/* 按标识字段归并数组（专项锁定：以名称为标识；迭代：以迭代名为标识） */
+function mergeList(baseL, serverL, mineL, idOf, label, conflicts) {
+  const index = l => {
+    const m = {};
+    (l || []).forEach(x => { m[idOf(x)] = x; });
+    return m;
+  };
+  const bi = index(baseL), si = index(serverL), mi = index(mineL);
+  const out = [];
+  const seen = new Set();
+  // 保持服务端顺序在前、我方新增追加在后，避免顺序抖动
+  const order = [].concat((serverL || []).map(idOf), (mineL || []).map(idOf));
+  order.forEach(k => {
+    if (seen.has(k)) return;
+    seen.add(k);
+    const b = bi[k], s = si[k], m = mi[k];
+    const sDel = b !== undefined && s === undefined;   // 服务端删了这条
+    const mDel = b !== undefined && m === undefined;   // 我方删了这条
+    if (sDel || mDel) return;                          // 任一方删除即视为删除
+    const sChanged = !eq(b, s), mChanged = !eq(b, m);
+    if (mChanged && sChanged && !eq(s, m)) {
+      conflicts.push(label + ' · ' + k);
+      out.push(m);
+    } else out.push(mChanged ? m : s);
+  });
+  return out.filter(x => x !== undefined);
+}
+
+/* 三方合并主入口。base 缺失时降级为二选一（只可能出现在极老的暂存数据上） */
+function mergeStates(base, server, mine) {
+  const conflicts = [];
+  if (!base) return { merged: mine, conflicts: ['基线缺失，无法自动合并'], degraded: true };
+
+  const pickWhole = (field, label) => {
+    const b = base[field], s = server[field], m = mine[field];
+    const sChanged = !eq(b, s), mChanged = !eq(b, m);
+    if (mChanged && sChanged && !eq(s, m)) { conflicts.push(label); return m; }
+    return mChanged ? m : s;
+  };
+
+  const merged = {
+    // 版本周期整体取用，撞车概率低且行内字段相互关联，不宜拆开合并
+    cycles: pickWhole('cycles', '版本周期'),
+    headcount: mergeMap(base.headcount, server.headcount, mine.headcount, '人头数', conflicts),
+    locked: mergeList(base.locked, server.locked, mine.locked,
+      x => (x && x.name) || '(未命名)', '专项锁定', conflicts),
+    // 工时源数据整份替换，谁后导入以谁为准；迭代勾选跟随同一来源，避免半新半旧
+    totals: pickWhole('totals', '工作量统计导入'),
+    board: pickWhole('board', '人力看板导入'),
+    sources: pickWhole('sources', '数据源信息'),
+    iterations: mergeList(base.iterations, server.iterations, mine.iterations,
+      x => (x && x.name) || '', '迭代勾选', conflicts),
+    iterDirty: mine.iterDirty || server.iterDirty,
+    showAllIterations: mine.showAllIterations
+  };
+  // 工时源被一方整份换掉时，迭代清单必须跟着那一方走，否则会出现清单里有已不存在的迭代
+  if (!eq(base.totals, merged.totals) || !eq(base.board, merged.board)) {
+    const src = !eq(base.totals, mine.totals) || !eq(base.board, mine.board) ? mine : server;
+    merged.iterations = src.iterations || [];
+  }
+  return { merged: merged, conflicts: conflicts, degraded: false };
+}
+
+/* 执行合并并提交。冲突不弹窗打断，改为列清单让人事后核对 ——
+   两边的填写都已保住，不存在必须当场做的取舍。 */
+function applyMerge(serverState, baseState, mineState, why) {
+  const r = mergeStates(baseState, serverState, mineState || state);
+  state = r.merged;
+  Sync.commitMerged(state).then(res => {
+    if (res && res.conflict) {
+      // 合并期间又有人提交，以新结果为基线再合一次（最多两轮，避免死循环）
+      const r2 = mergeStates(res.base, res.server, state);
+      state = r2.merged;
+      lastConflicts = r.conflicts.concat(r2.conflicts);
+      Sync.commitMerged(state);
+    } else {
+      lastConflicts = r.conflicts;
+    }
+    toast(r.conflicts.length
+      ? (why || '已合并') + '，其中 ' + r.conflicts.length + ' 处两边都改过，请核对'
+      : (why || '已合并') + '，双方修改已自动合并');
+    renderAll();
+  });
+}
+
+/* ---------- 断连提示与恢复裁决 ---------- */
+
+/* 顶部常驻横幅。服务不可用期间一直显示，避免使用者以为一切正常；
+   合并出现撞车时也用它列出待核对项。 */
+function renderBanner() {
+  const el = document.getElementById('banner');
+  if (!el) return;
+
+  if (Sync.mode === 'server' && !Sync.online) {
+    const p = Sync.pending;
+    const why = Sync.reason === 'shutdown' ? '协同服务已被管理员停止'
+      : Sync.reason === 'server' ? '协同服务写入异常'
+      : '与协同服务的连接中断';
+    el.className = 'banner off';
+    el.innerHTML = `
+      <b>⚠ ${why}</b> —— 你现在的填写<b>只保存在本机浏览器</b>，其他人看不到。
+      服务恢复后会自动与他人的修改合并补交，请不要关闭浏览器或清理缓存。
+      ${p ? `<span class="note">（本机已暂存 ${esc(p.at)} 的修改）</span>` : ''}
+      <button class="link" id="bannerExport">导出 JSON 备份</button>`;
+    const b = el.querySelector('#bannerExport');
+    if (b) b.addEventListener('click', exportJson);
+    return;
+  }
+
+  if (lastConflicts.length) {
+    el.className = 'banner warn';
+    el.innerHTML = `
+      <b>合并提示：以下 ${lastConflicts.length} 处你和他人都做过修改，已暂用你的值，请核对</b>
+      <span class="note">${lastConflicts.map(esc).join('；')}</span>
+      <button class="link" id="bannerAck">知道了</button>`;
+    const b = el.querySelector('#bannerAck');
+    if (b) b.addEventListener('click', () => { lastConflicts = []; renderBanner(); });
+    return;
+  }
+
+  el.className = 'banner hidden';
+  el.innerHTML = '';
+}
+
+/* 服务恢复后处理本机暂存 */
+function onRecover(remote, pending) {
+  if (!pending) {
+    state = remote;
+    toast('协同服务已恢复');
+    renderAll();
+    return;
+  }
+  const age = Date.now() - Number(pending.ts || 0);
+  if (age > Sync.pendingMaxAge) {
+    const keep = window.confirm(
+      '发现 ' + pending.at + ' 的本机暂存，距今已超过 7 天。\n\n' +
+      '【确定】把它合并进当前数据　【取消】丢弃这份暂存');
+    if (!keep) { Sync.clearPending(); state = remote; renderAll(); return; }
+  }
+  if (Number(remote.rev || 0) === Number(pending.baseRev || 0)) {
+    // 断连期间无人改过服务端，直接补交
+    state = pending.state;
+    Sync.commitMerged(state).then(r => {
+      toast(r && r.ok ? '服务已恢复，断连期间的填写已自动补交' : '服务已恢复，补交失败请手动点保存');
+      renderAll();
+    });
+    return;
+  }
+  applyMerge(remote, pending.base, pending.state, '服务已恢复，断连期间双方的填写');
+}
+
+function updateModeBadge() {
+  const el = document.getElementById('modeBadge');
+  if (!el) return;
+  if (Sync.mode === 'server') {
+    el.innerHTML = Sync.online
+      ? '<span class="tag ok">实时协同</span> ' +
+        '<span class="note">rev ' + Sync.rev +
+        (state.updatedBy ? ' · 最后更新 ' + esc(state.updatedBy) + ' ' + esc(state.updatedAt || '') : '') + '</span>'
+      : '<span class="tag warn">服务未连接</span> <span class="note">改动暂存本机，恢复后自动补交</span>';
+  } else {
+    el.innerHTML = '<span class="tag hold">单机模式</span> <span class="note">数据仅存本机，需导出 JSON 汇总</span>';
+  }
+  renderBanner();
+}
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => el.classList.add('hidden'), 2000);
+}
+function num(v) {
+  const n = Number(v);
+  return isFinite(n) ? n : 0;
+}
+function fmt(v, d) {
+  const n = num(v);
+  return n.toFixed(d == null ? 1 : d).replace(/\.0+$/, '');
+}
+function pct(v) { return (num(v) * 100).toFixed(1) + '%'; }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+}
+
+/* ---------- 视图切换 ---------- */
+let currentView = 'cycle';
+const RENDERERS = {};
+
+function switchView(name) {
+  currentView = name;
+  document.querySelectorAll('.tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.view === name));
+  document.querySelectorAll('.view').forEach(v =>
+    v.classList.toggle('hidden', v.id !== 'view-' + name));
+  RENDERERS[name]();
+}
+
+function renderAll() {
+  document.getElementById('cycleLabel').textContent = cycleLabelText();
+  updateModeBadge();
+  RENDERERS[currentView]();
+}
+
+function cycleLabelText() {
+  const c = activeCycle(state);
+  if (!c) return '未设置版本周期';
+  const days = cycleDays(c);
+  const online = c.online ? '上线 ' + c.online : '未填上线时间';
+  return c.name + '：' + online + ' · 开发周期 ' + days + ' 天';
+}
+
+document.querySelectorAll('.tab').forEach(t =>
+  t.addEventListener('click', () => switchView(t.dataset.view)));
+document.getElementById('btnSave').addEventListener('click', () => save());
+
+/* ---------- ① 版本周期 ---------- */
+RENDERERS.cycle = function () {
+  const rows = state.cycles.map((c, i) => `
+    <tr>
+      <td class="txt"><input type="text" data-c="${i}" data-f="name" value="${esc(c.name)}"></td>
+      <td class="txt"><input type="text" data-c="${i}" data-f="seal" value="${esc(c.seal)}" placeholder="如 8.1"></td>
+      <td class="txt"><input type="text" data-c="${i}" data-f="online" value="${esc(c.online)}" placeholder="如 8.13"></td>
+      <td><input type="number" step="0.5" data-c="${i}" data-f="workdays" value="${c.workdays}"></td>
+      <td><input type="number" step="0.5" data-c="${i}" data-f="saturdays" value="${c.saturdays}"></td>
+      <td>${cycleDays(c)}</td>
+      <td class="row-actions">
+        <input type="radio" name="activeCycle" data-c="${i}" data-f="active" ${c.active ? 'checked' : ''}>
+      </td>
+      <td class="txt"><input type="text" data-c="${i}" data-f="note" value="${esc(c.note)}" placeholder="备注"></td>
+      <td class="row-actions"><button class="link" data-del="${i}">删除</button></td>
+    </tr>`).join('');
+
+  document.getElementById('view-cycle').innerHTML = `
+    <div class="card">
+      <h2>版本上线时间与开发周期</h2>
+      <p class="hint">可并列维护多个候选方案（月中小版本、跨月合并等），勾选「采用」的方案参与产能计算。开发周期 = 工作日 + 周六天数。</p>
+      <div class="scroll"><table>
+        <thead><tr>
+          <th class="txt">方案</th><th class="txt">封版时间</th><th class="txt">上线时间</th>
+          <th>工作日</th><th>周六天数</th><th>开发周期</th><th>采用</th>
+          <th class="txt">备注</th><th>操作</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <p style="margin-top:12px"><button class="btn" id="addCycle">新增方案</button></p>
+    </div>`;
+
+  const view = document.getElementById('view-cycle');
+  view.querySelectorAll('input[data-c]').forEach(el => {
+    el.addEventListener('change', () => {
+      const c = state.cycles[+el.dataset.c], f = el.dataset.f;
+      if (f === 'active') {
+        state.cycles.forEach(x => { x.active = false; });
+        c.active = true;
+      } else if (f === 'workdays' || f === 'saturdays') {
+        c[f] = num(el.value);
+      } else {
+        c[f] = el.value;
+      }
+      save(true); renderAll();
+    });
+  });
+  view.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
+    if (state.cycles.length === 1) return toast('至少保留一个方案');
+    const removed = state.cycles.splice(+b.dataset.del, 1)[0];
+    if (removed.active && state.cycles[0]) state.cycles[0].active = true;
+    save(true); renderAll();
+  }));
+  view.querySelector('#addCycle').addEventListener('click', () => {
+    state.cycles.push({ name: '方案' + (state.cycles.length + 1), seal: '', online: '', workdays: 0, saturdays: 0, active: false, note: '' });
+    save(true); renderAll();
+  });
+};
+
+/* ---------- ② 人头数填报 ---------- */
+RENDERERS.headcount = function () {
+  const locked = lockedTotals(state);
+  let html = '', lastDept = '';
+  TEAMS.forEach(t => {
+    const h = state.headcount[t.key] || {};
+    const total = num(h.regular) + num(h.outsource);
+    if (t.dept !== lastDept) {
+      lastDept = t.dept;
+      html += `<tr class="dept-head"><td colspan="6">${esc(t.dept)}</td></tr>`;
+    }
+    html += `
+      <tr>
+        <td class="txt">${esc(t.key)}</td>
+        <td><input type="number" step="0.1" data-t="${esc(t.key)}" data-f="regular" value="${h.regular == null ? '' : h.regular}"></td>
+        <td><input type="number" step="0.1" data-t="${esc(t.key)}" data-f="outsource" value="${h.outsource == null ? '' : h.outsource}"></td>
+        <td>${fmt(total)}</td>
+        <td>${fmt(locked[t.key])}</td>
+        <td class="txt"><input type="text" data-t="${esc(t.key)}" data-f="owner" value="${esc(h.owner)}" placeholder="填报人"></td>
+      </tr>`;
+  });
+  const heads = headcountTotals(state);
+  const sum = TEAMS.reduce((s, t) => s + heads[t.key], 0);
+
+  document.getElementById('view-headcount').innerHTML = `
+    <div class="card">
+      <h2>各组可投入迭代人头数</h2>
+      <p class="hint">按组填写正式与外包人数，支持 0.5 等小数（部分投入）。可投入迭代人数 = 正式 + 外包，直接作为产能计算基数。「其中专项锁定」来自第③页，仅作参考展示。</p>
+      <div class="scroll"><table>
+        <thead><tr>
+          <th class="txt">组-方向</th><th>正式</th><th>外包</th>
+          <th>可投入迭代人数</th><th>其中专项锁定</th><th class="txt">填报人</th>
+        </tr></thead>
+        <tbody>${html}</tbody>
+        <tfoot><tr class="sum">
+          <td class="txt">合计</td><td colspan="2"></td>
+          <td>${fmt(sum)}</td><td colspan="2"></td>
+        </tr></tfoot>
+      </table></div>
+    </div>`;
+
+  document.querySelectorAll('#view-headcount input').forEach(el => {
+    el.addEventListener('change', () => {
+      const k = el.dataset.t, f = el.dataset.f;
+      if (!state.headcount[k]) state.headcount[k] = {};
+      state.headcount[k][f] = (f === 'owner') ? el.value : (el.value === '' ? null : num(el.value));
+      save(true); renderAll();
+    });
+  });
+};
+
+/* ---------- ③ 专项锁定人力 ---------- */
+RENDERERS.locked = function () {
+  const roleTh = LOCK_ROLES.map(r => `<th>${esc(r)}</th>`).join('');
+  const lineOpts = OWNER_LINES.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join('');
+
+  const rows = (state.locked || []).map((item, i) => {
+    const roles = item.roles || {};
+    const cells = LOCK_ROLES.map(r =>
+      `<td><input type="number" step="0.5" data-i="${i}" data-r="${esc(r)}" value="${roles[r] == null ? '' : roles[r]}"></td>`).join('');
+    const total = LOCK_ROLES.reduce((s, r) => s + num(roles[r]), 0);
+    return `
+      <tr>
+        <td class="txt"><input type="text" data-i="${i}" data-f="name" value="${esc(item.name)}" placeholder="项目名称"></td>
+        ${cells}
+        <td>${fmt(total)}</td>
+        <td class="txt"><select data-i="${i}" data-f="line"><option value=""></option>${lineOpts}</select></td>
+        <td class="txt"><input type="text" data-i="${i}" data-f="confirmer" value="${esc(item.confirmer)}" placeholder="确认人"></td>
+        <td class="row-actions"><input type="checkbox" data-i="${i}" data-f="confirmed" ${item.confirmed ? 'checked' : ''}></td>
+        <td class="txt"><input type="text" data-i="${i}" data-f="note" value="${esc(item.note)}"></td>
+        <td class="row-actions"><button class="link" data-del="${i}">删除</button></td>
+      </tr>`;
+  }).join('');
+
+  const totals = lockedTotals(state);
+  const sumCells = LOCK_ROLES.map(r =>
+    `<td>${fmt(totals[LOCK_ROLE_TO_TEAM[r]])}</td>`).join('');
+  const grand = LOCK_ROLES.reduce((s, r) => s + num(totals[LOCK_ROLE_TO_TEAM[r]]), 0);
+
+  document.getElementById('view-locked').innerHTML = `
+    <div class="card">
+      <h2>专项项目锁定人力</h2>
+      <p class="hint">登记被专项项目占用、不参与本迭代的人力。此处仅作登记与核对，不自动从第②页人头数中扣减 —— 第②页填的应当已是「可投入迭代」的净人数。</p>
+      <div class="scroll"><table>
+        <thead><tr>
+          <th class="txt">项目</th>${roleTh}<th>合计</th>
+          <th class="txt">所属产品线</th><th class="txt">确认人</th><th>已确认</th>
+          <th class="txt">备注</th><th>操作</th>
+        </tr></thead>
+        <tbody>${rows || `<tr><td colspan="${LOCK_ROLES.length + 8}" class="txt" style="color:#6b7280">暂无记录</td></tr>`}</tbody>
+        <tfoot><tr class="sum">
+          <td class="txt">项目投入合计</td>${sumCells}<td>${fmt(grand)}</td>
+          <td colspan="5"></td>
+        </tr></tfoot>
+      </table></div>
+      <p style="margin-top:12px"><button class="btn" id="addLock">新增项目</button></p>
+    </div>`;
+
+  const view = document.getElementById('view-locked');
+  (state.locked || []).forEach((item, i) => {
+    const sel = view.querySelector(`select[data-i="${i}"]`);
+    if (sel) sel.value = item.line || '';
+  });
+  view.querySelectorAll('input[data-r]').forEach(el => {
+    el.addEventListener('change', () => {
+      const item = state.locked[+el.dataset.i];
+      if (!item.roles) item.roles = {};
+      item.roles[el.dataset.r] = el.value === '' ? null : num(el.value);
+      save(true); renderAll();
+    });
+  });
+  view.querySelectorAll('[data-f]').forEach(el => {
+    el.addEventListener('change', () => {
+      const item = state.locked[+el.dataset.i], f = el.dataset.f;
+      item[f] = (f === 'confirmed') ? el.checked : el.value;
+      save(true); renderAll();
+    });
+  });
+  view.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
+    state.locked.splice(+b.dataset.del, 1); save(true); renderAll();
+  }));
+  view.querySelector('#addLock').addEventListener('click', () => {
+    state.locked.push({ name: '', roles: {}, line: '', confirmer: '', confirmed: false, note: '' });
+    save(true); renderAll();
+  });
+};
+
+/* ---------- ④ 工时数据导入 ---------- */
+
+/* 导入成功后重建迭代清单：完全跟随新数据，不保留旧勾选。
+   这样清单始终与当前导入文件一一对应，不会残留上月迭代。
+   代价是分两次导入（工作量统计 + 人力看板）时，第二次会清掉第一次的勾选，
+   故导入后在第⑤页标签上打红点提醒重新勾选。 */
+function rebuildIterations() {
+  const opts = iterationOptions(state.totals, state.board);
+  state.iterations = opts.map(o => ({ name: o.name, weight: o.weight, selected: false }));
+  state.iterDirty = true;
+}
+
+function handleImport(file) {
+  parseFile(file, res => {
+    if (res.kind === 'totals') {
+      state.totals = res.rows;
+      state.sources.totals = { fileName: res.fileName, at: new Date().toLocaleString('zh-CN'), rows: res.rows.length };
+    } else {
+      state.board = res.rows;
+      state.sources.board = { fileName: res.fileName, at: new Date().toLocaleString('zh-CN'), rows: res.rows.length };
+    }
+    rebuildIterations();
+    save(true); renderAll();
+    toast((res.kind === 'totals' ? '工作量统计' : '人力看板') + ' 已导入 ' + res.rows.length +
+      ' 行，迭代清单已重建，请到第⑤页重新勾选');
+  }, err => toast('导入失败：' + err.message));
+}
+
+function sourceCard(kind, title, hint) {
+  const s = state.sources[kind];
+  const imported = !!s;
+  return `
+    <div class="card" style="${imported ? 'border-left:4px solid var(--ok)' : ''}">
+      <h2>${esc(title)} ${imported ? '<span class="tag ok">✓ 已导入</span>' : '<span class="tag hold">待导入</span>'}</h2>
+      <p class="hint">${hint}</p>
+      ${imported ? `
+        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:12px;margin:12px 0">
+          <div style="font-weight:500;margin-bottom:4px">📄 ${esc(s.fileName)}</div>
+          <div style="font-size:13px;color:#16a34a">${s.rows} 行有效数据 · 导入于 ${esc(s.at)}</div>
+        </div>
+        <div class="drop" data-kind="${kind}" style="background:#fafafa;border-style:dashed">
+          点击或拖拽新文件以<b style="color:var(--warn)">覆盖</b>当前数据
+        </div>
+      ` : `
+        <div class="drop" data-kind="${kind}">
+          点击选择文件，或拖拽到此处（支持 .csv / .xlsx）
+        </div>
+      `}
+    </div>`;
+}
+
+RENDERERS.import = function () {
+  const res = compute(state);
+
+  document.getElementById('view-import').innerHTML = `
+    ${sourceCard('totals', '① 阳光云迭代工作量统计（必需）',
+      '各组工时总计，作为产能偏差计算的<b>唯一权威口径</b>。注意：「中后台工作量统计」与本表是同一份数据的两个导出视图（737 行键完全一致），两者相加会导致中后台工时翻倍，因此只需导入本表 —— 它含预估故事点列，是超集。')}
+
+    ${sourceCard('board', '② 月底版本项目人力看板（可选）',
+      '产线维度明细，仅用于「产品线版本工作量汇总」的分布展示，不参与产能偏差计算。不导入则分类分布表为空，偏差分析仍可正常使用。')}
+
+    ${res.unknownTeams.length ? `
+    <div class="card">
+      <h2>未识别的团队名 <span class="tag warn">${res.unknownTeams.length} 个</span></h2>
+      <p class="hint">以下团队既不在 TEAMS 白名单，也不在 IGNORED_TEAM_PATTERNS 忽略名单中，其工时未计入任何汇总。请确认是否为新组或命名变更，需要时在 config.js 补充。</p>
+      <div class="scroll"><table>
+        <thead><tr><th class="txt">团队名</th><th>记录数</th></tr></thead>
+        <tbody>${res.unknownTeams.map(u =>
+      `<tr><td class="txt">${esc(u.name)}</td><td>${u.count}</td></tr>`).join('')}</tbody>
+      </table></div>
+    </div>` : ''}
+
+    ${res.unmappedLines.length ? `
+    <div class="card">
+      <h2>未归类的分类值 <span class="tag warn">${res.unmappedLines.length} 个</span></h2>
+      <p class="hint">看板中出现但未归入产品线或其他分类的「所属项目(层级1)」值，其工时未计入分类分布表。请在 config.js 的 PRODUCT_LINES 或 OTHER_CATEGORIES 中补充。</p>
+      <div class="scroll"><table>
+        <thead><tr><th class="txt">分类值</th><th>工时（人天）</th></tr></thead>
+        <tbody>${res.unmappedLines.map(u =>
+      `<tr><td class="txt">${esc(u.name)}</td><td>${fmt(u.value, 2)}</td></tr>`).join('')}</tbody>
+      </table></div>
+    </div>` : ''}
+
+    <div class="card">
+      <h2>导入说明</h2>
+      <p class="note">
+        · 取数口径：测试部-应用软件测试-云服务取「预估故事点」，其余各组取「故事点」。<br>
+        · 团队名大小写自动归一（WEB开发 / Web开发 视为同一组）。<br>
+        · ECO 团队自身的组（APP开发-ECO、后端开发-ECO 等）不计入核算主体；而分类维度的「ECO」是阳光云团队投在 ECO 任务上的工时，仍然计入。<br>
+        · 站控、嵌入式、工具开发部等非阳光云团队自动忽略，不报未识别告警。<br>
+        · 全零行（故事点与预估均为 0）自动跳过，原始导出中这类行占多数。<br>
+        · 导入后请到第⑤页勾选本期迭代，否则所有工时为 0。
+      </p>
+    </div>`;
+
+  const view = document.getElementById('view-import');
+  view.querySelectorAll('.drop').forEach(drop => {
+    const pick = () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.csv,.xlsx,.xls';
+      input.addEventListener('change', () => {
+        if (input.files[0]) handleImport(input.files[0]);
+      });
+      input.click();
+    };
+    drop.addEventListener('click', pick);
+    ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => {
+      e.preventDefault(); drop.classList.add('hot');
+    }));
+    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => {
+      e.preventDefault(); drop.classList.remove('hot');
+    }));
+    drop.addEventListener('drop', e => {
+      const f = e.dataTransfer.files[0];
+      if (f) handleImport(f);
+    });
+  });
+};
+
+/* ---------- ⑤ 迭代口径 ---------- */
+RENDERERS.iteration = function () {
+  const list = state.iterations || [];
+  const selected = list.filter(i => i.selected);
+
+  // 默认只展示与本期相关的候选，避免 116 个迭代全部铺开
+  const showAll = !!state.showAllIterations;
+  const visible = showAll ? list : list.filter(i =>
+    i.selected || /2026年7月|2026-7月|2026年8月|2026-8月/.test(i.name));
+
+  const rows = visible.map(i => {
+    const gi = list.indexOf(i);
+    return `
+      <tr>
+        <td class="row-actions"><input type="checkbox" data-i="${gi}" ${i.selected ? 'checked' : ''}></td>
+        <td class="txt">${esc(i.name)}</td>
+        <td>${fmt(i.weight, 1)}</td>
+      </tr>`;
+  }).join('');
+
+  document.getElementById('view-iteration').innerHTML = `
+    <div class="card">
+      <h2>本期迭代口径 ${selected.length ? `<span class="tag ok">已选 ${selected.length} 个</span>` : '<span class="tag warn">未选择</span>'}</h2>
+      ${state.iterDirty ? '<p class="tag warn" style="display:inline-block">数据刚重新导入，迭代清单已按新文件重建，此前勾选已清空，请重新勾选</p>' : ''}
+      <p class="hint">勾选本期核算包含的迭代。阳光云版本通常需同时勾选<b>「阳光云2026-M月C版本迭代」和「中后台-2026年M月迭代」</b>—— 中台各组的工时挂在后者下。支持跨月合并：需要两月并算时同时勾选两个月份的迭代即可，配合第①页的开发周期天数使用。</p>
+      ${selected.length ? `<p class="note">当前口径：${selected.map(s => esc(s.name)).join(' ＋ ')}</p>` : ''}
+      <div class="scroll"><table>
+        <thead><tr><th>选择</th><th class="txt">迭代名称</th><th>工时权重</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="3" class="txt" style="color:#6b7280">请先在第④页导入数据</td></tr>'}</tbody>
+      </table></div>
+      <p style="margin-top:12px">
+        <button class="btn" id="toggleAll">${showAll ? '仅显示本期相关' : '显示全部 ' + list.length + ' 个迭代'}</button>
+      </p>
+    </div>`;
+
+  const view = document.getElementById('view-iteration');
+  view.querySelectorAll('input[data-i]').forEach(el => {
+    el.addEventListener('change', () => {
+      state.iterations[+el.dataset.i].selected = el.checked;
+      state.iterDirty = false;   // 已重新勾选，撤下提醒
+      save(true); renderAll();
+    });
+  });
+  view.querySelector('#toggleAll').addEventListener('click', () => {
+    state.showAllIterations = !showAll;
+    save(true); renderAll();
+  });
+};
+
+/* ---------- ⑥ 偏差分析 ---------- */
+function matrixTable(title, hint, rows, sumRow, sumLabel) {
+  const th = TEAMS.map(t => `<th>${esc(t.key)}</th>`).join('');
+  const body = rows.map(r => `
+    <tr>
+      <td class="txt">${esc(r.key)}</td>
+      ${TEAMS.map(t => `<td>${fmt(r.values[t.key])}</td>`).join('')}
+      <td>${fmt(rowTotal(r.values))}</td>
+    </tr>`).join('');
+  const foot = sumRow ? `
+    <tfoot><tr class="sum">
+      <td class="txt">${esc(sumLabel)}</td>
+      ${TEAMS.map(t => `<td>${fmt(sumRow[t.key])}</td>`).join('')}
+      <td>${fmt(rowTotal(sumRow))}</td>
+    </tr></tfoot>` : '';
+  return `
+    <div class="card">
+      <h2>${esc(title)}</h2>
+      <p class="hint">${esc(hint)}</p>
+      <div class="scroll"><table>
+        <thead><tr><th class="txt">分类</th>${th}<th>合计（人天）</th></tr></thead>
+        <tbody>${body}</tbody>
+        ${foot}
+      </table></div>
+    </div>`;
+}
+
+RENDERERS.analysis = function () {
+  const res = compute(state);
+  const c = res.cycle;
+  let warn = '';
+  if (!res.iterations.length)
+    warn += '<div class="card"><p class="tag warn">未选择本期迭代，所有工时为 0。请到第⑤页勾选。</p></div>';
+  if (res.days === 0)
+    warn += '<div class="card"><p class="tag warn">开发周期为 0 天，请先在第①页填写工作日与周六天数，否则产能全部为 0。</p></div>';
+
+  // 总计表 vs 看板 对账
+  const rec = res.reconcile.length ? `
+    <div class="card">
+      <h2>口径对账 <span class="tag warn">${res.reconcile.length} 处差异</span></h2>
+      <p class="hint">工作量统计表（权威口径，用于偏差计算）与人力看板（产线分布）按团队比对，差异超过 ${RECONCILE_TOLERANCE} 人天的列出。差异通常源于两份导出的时间差，或部分任务未挂产线标签。</p>
+      <div class="scroll"><table>
+        <thead><tr><th class="txt">团队</th><th>工作量统计表</th><th>人力看板</th><th>差异</th></tr></thead>
+        <tbody>${res.reconcile.map(r => `
+          <tr><td class="txt">${esc(r.team)}</td><td>${fmt(r.totals, 2)}</td>
+          <td>${fmt(r.board, 2)}</td><td style="color:var(--warn)">${r.diff > 0 ? '+' : ''}${fmt(r.diff, 2)}</td></tr>`).join('')}</tbody>
+      </table></div>
+    </div>` : '';
+
+  const devRows = res.deviation.map(d => {
+    const cls = d.verdict === '正常' ? 'ok' : (d.verdict === '产能富余' ? 'hold' : 'warn');
+    const ratio = Math.min(Math.abs(d.ratio), 1);
+    return `
+      <tr>
+        <td class="txt">${esc(d.team)}</td>
+        <td>${fmt(d.workload)}</td>
+        <td>${fmt(d.head)}</td>
+        <td>${fmt(d.capacity)}</td>
+        <td>${fmt(d.over)}</td>
+        <td>${d.capacity ? pct(d.ratio) : '—'}</td>
+        <td style="width:120px"><div class="bar"><i class="${d.over > 0 ? 'over' : ''}" style="width:${(ratio * 100).toFixed(0)}%"></i></div></td>
+        <td class="txt"><span class="tag ${cls}">${esc(d.verdict)}</span></td>
+      </tr>`;
+  }).join('');
+
+  const overall = res.totals.capacity ? (res.totals.workload - res.totals.capacity) / res.totals.capacity : 0;
+
+  document.getElementById('view-analysis').innerHTML = `
+    ${warn}
+    <div class="kpis">
+      <div class="kpi"><div class="k">采用方案</div><div class="v" style="font-size:16px">${esc(c ? c.name : '—')}</div></div>
+      <div class="kpi"><div class="k">开发周期（天）</div><div class="v">${res.days}</div></div>
+      <div class="kpi"><div class="k">可投入人数</div><div class="v">${fmt(res.totals.head)}</div></div>
+      <div class="kpi"><div class="k">版本工作量（人天）</div><div class="v">${fmt(res.totals.workload)}</div></div>
+      <div class="kpi"><div class="k">本期迭代</div><div class="v" style="font-size:13px;line-height:1.4">${res.iterations.length ? res.iterations.map(esc).join('<br>') : '—'}</div></div>
+      <div class="kpi"><div class="k">总产能（人天）</div><div class="v">${fmt(res.totals.capacity)}</div></div>
+      <div class="kpi"><div class="k">整体偏差</div><div class="v" style="color:${overall > 0 ? 'var(--warn)' : 'var(--ok)'}">${res.totals.capacity ? pct(overall) : '—'}</div></div>
+    </div>
+
+    <div class="card">
+      <h2>团队版本工作量与产能偏差分析</h2>
+      <p class="hint">超出工作量 = 版本工作量 − 总产能；总产能 = 可投入人数 × 开发周期。为正说明产能不足需裁剪需求，为负说明产能富余可继续导入需求，${(DEVIATION_TOLERANCE * 100).toFixed(0)}% 以内属正常偏差由团队自行消化。</p>
+      <div class="scroll"><table>
+        <thead><tr>
+          <th class="txt">团队</th><th>版本工作量<br>（人天）</th><th>可投入人数</th>
+          <th>总产能<br>（人天）</th><th>超出工作量</th><th>超出比例</th>
+          <th>偏差</th><th class="txt">结论</th>
+        </tr></thead>
+        <tbody>${devRows}</tbody>
+        <tfoot><tr class="sum">
+          <td class="txt">合计</td>
+          <td>${fmt(res.totals.workload)}</td><td>${fmt(res.totals.head)}</td>
+          <td>${fmt(res.totals.capacity)}</td>
+          <td>${fmt(res.totals.workload - res.totals.capacity)}</td>
+          <td>${res.totals.capacity ? pct(overall) : '—'}</td>
+          <td colspan="2"></td>
+        </tr></tfoot>
+      </table></div>
+    </div>
+
+    ${rec}
+    ${matrixTable('产品线版本工作量汇总', '各产品线在各组的工时分布，来自人力看板。', res.lineRows, res.lineSummary, '产品线汇总')}
+    ${matrixTable('版本规划工作量汇总', '产品线汇总 + 其他分类。「智慧能源产品中心」为部门级兜底分类，占比过高说明大量任务未打产线标签。', res.planRows, res.planTotal, '合计')}`;
+};
+
+/* ---------- 导入导出 ---------- */
+function exportJson() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const c = activeCycle(state);
+  a.download = '人力产能-' + ((c && c.online) || '未命名') + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+document.getElementById('btnExport').addEventListener('click', exportJson);
+
+document.getElementById('fileJson').addEventListener('change', function () {
+  const f = this.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data || !data.cycles) throw new Error('文件格式不符');
+      state = data;
+      save(true); renderAll();
+      toast('已载入');
+    } catch (err) { toast('载入失败：' + err.message); }
+  };
+  reader.readAsText(f);
+  this.value = '';
+});
+
+document.getElementById('btnExportXlsx').addEventListener('click', () => {
+  const res = compute(state);
+  const wb = XLSX.utils.book_new();
+
+  const head = ['分类'].concat(TEAMS.map(t => t.key)).concat(['合计（人天）']);
+  const toAoa = rows => [head].concat(rows.map(r =>
+    [r.key].concat(TEAMS.map(t => num(r.values[t.key]))).concat([rowTotal(r.values)])));
+
+  XLSX.utils.book_append_sheet(wb,
+    XLSX.utils.aoa_to_sheet(toAoa(res.lineRows.concat([{ key: '产品线汇总', values: res.lineSummary }]))),
+    '产品线工作量汇总');
+  XLSX.utils.book_append_sheet(wb,
+    XLSX.utils.aoa_to_sheet(toAoa(res.planRows.concat([{ key: '合计', values: res.planTotal }]))),
+    '版本规划工作量汇总');
+
+  const hc = [['组-方向', '正式', '外包', '可投入迭代人数', '填报人']];
+  TEAMS.forEach(t => {
+    const h = state.headcount[t.key] || {};
+    hc.push([t.key, num(h.regular), num(h.outsource), res.heads[t.key], h.owner || '']);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(hc), '人头数');
+
+  const dv = [['团队', '版本工作量（人天）', '可投入人数', '总产能（人天）', '超出工作量', '超出比例', '结论']];
+  res.deviation.forEach(d => dv.push([d.team, d.workload, d.head, d.capacity, d.over, d.ratio, d.verdict]));
+  dv.push(['合计', res.totals.workload, res.totals.head, res.totals.capacity,
+    res.totals.workload - res.totals.capacity,
+    res.totals.capacity ? (res.totals.workload - res.totals.capacity) / res.totals.capacity : 0, '']);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dv), '偏差分析');
+
+  const it = [['本期迭代']].concat(res.iterations.map(n => [n]));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(it), '迭代口径');
+
+  const cy = [['方案', '封版时间', '上线时间', '工作日', '周六天数', '开发周期', '是否采用', '备注']];
+  state.cycles.forEach(c => cy.push([c.name, c.seal, c.online, num(c.workdays), num(c.saturdays), cycleDays(c), c.active ? '是' : '', c.note || '']));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cy), '版本周期');
+
+  const c = activeCycle(state);
+  XLSX.writeFile(wb, '云平台人力产能-' + ((c && c.online) || '未命名') + '.xlsx');
+});
+
+/* 关页面前的兜底：
+   1) 正在编辑的输入框还没触发 change，先强制提交一次，避免最后填的那格丢掉
+   2) 断连期间有未补交的暂存时给出提醒，防止误以为已保存 */
+window.addEventListener('beforeunload', e => {
+  const el = document.activeElement;
+  if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) {
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  if (Sync.mode === 'server' && !Sync.online && Sync.pending) {
+    e.preventDefault();
+    e.returnValue = '有填写内容尚未同步到服务端，关闭后需等本机重新打开才能补交。确定离开？';
+    return e.returnValue;
+  }
+});
+/* 服务端可用则以服务端数据为准；他人提交时自动刷新当前视图。
+   断连时转本机暂存，恢复后由 onRecover 决定补交还是交由使用者裁决。 */
+Sync.init({
+  onRemote: (remote, by) => {
+    state = remote;
+    renderAll();
+    toast('数据已更新（' + (by || '他人') + '）');
+  },
+  onStatus: () => { updateModeBadge(); },
+  onStoreFail: () => {
+    // 本机也存不下（配额满 / 隐私模式），此时数据只在内存里，刷新即失
+    window.alert('本机暂存失败，浏览器存储空间可能已满。\n' +
+      '当前填写只存在于内存中，刷新页面会丢失，请立即点右上角「导出 JSON」备份。');
+  },
+  onRecover: onRecover
+}).then(res => {
+  if (res.mode === 'server' && res.state) {
+    state = res.state;
+    // 上次断连时暂存的改动（含关掉浏览器后重开的情况），恢复后一并处理
+    if (res.pending) onRecover(res.state, res.pending);
+  }
+  renderAll();
+});

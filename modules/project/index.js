@@ -84,9 +84,9 @@ const ProjectModule = (() => {
     const rows = projects.map(p => {
       const statusBadge = `<span class="badge ${STATUS_CLASSES[p.status] || ''}">${SharedUI.esc(STATUS_LABELS[p.status] || p.status)}</span>`;
       const priority = PRIORITY_LABELS[p.priority] || p.priority || '—';
-      const progress = p.resourceSummary
-        ? Math.round((p.resourceSummary.usedManDays || 0) / (p.resourceSummary.totalManDays || 1) * 100) + '%'
-        : '—';
+      const rs = p.resourceSummary || {};
+      const manDays = rs.totalManDays ? (rs.usedManDays || 0) + '/' + rs.totalManDays : '—';
+      const costStr = rs.totalCost ? (rs.usedCost || 0) + '/' + rs.totalCost + '万' : '—';
 
       return `<tr>
         <td><a href="#/project/detail/${SharedUI.esc(p.id)}" class="project-link">${SharedUI.esc(p.name || '')}</a></td>
@@ -95,7 +95,8 @@ const ProjectModule = (() => {
         <td>${SharedUI.esc(priority)}</td>
         <td>${SharedUI.esc(p.owner || '')}</td>
         <td>${SharedUI.esc(p.startDate || '')} ~ ${SharedUI.esc(p.endDate || '')}</td>
-        <td>${SharedUI.esc(progress)}</td>
+        <td>${SharedUI.esc(manDays)}</td>
+        <td>${SharedUI.esc(costStr)}</td>
       </tr>`;
     }).join('');
 
@@ -115,11 +116,12 @@ const ProjectModule = (() => {
                 <th>优先级</th>
                 <th>负责人</th>
                 <th>周期</th>
-                <th>进度</th>
+                <th>人力(已投入/总计)</th>
+                <th>成本(已使用/总预算)</th>
               </tr>
             </thead>
             <tbody>
-              ${rows || '<tr><td colspan="7" class="empty-hint">暂无项目数据</td></tr>'}
+              ${rows || '<tr><td colspan="8" class="empty-hint">暂无项目数据</td></tr>'}
             </tbody>
           </table>
         </div>
@@ -166,14 +168,22 @@ const ProjectModule = (() => {
     if (project.resourceSummary) {
       const rs = project.resourceSummary;
       const pct = rs.totalManDays ? Math.round(rs.usedManDays / rs.totalManDays * 100) : 0;
+      const costPct = rs.totalCost ? Math.round((rs.usedCost || 0) / rs.totalCost * 100) : 0;
       const teamRows = rs.teams ? Object.entries(rs.teams).map(([team, days]) =>
         `<tr><td>${SharedUI.esc(team)}</td><td>${days} 人天</td></tr>`
       ).join('') : '';
 
       resourceHtml = `
         <div class="detail-section">
-          <h4>资源概况</h4>
-          <p>总工时: ${rs.totalManDays || 0} 人天，已使用: ${rs.usedManDays || 0} 人天 (${pct}%)</p>
+          <h4>人力规划 & 成本预算</h4>
+          <div class="resource-grid">
+            <div class="resource-item"><span class="resource-item-label">预计总人力</span><span class="resource-item-value">${rs.totalManDays || 0} 人天</span></div>
+            <div class="resource-item"><span class="resource-item-label">已投入人力</span><span class="resource-item-value">${rs.usedManDays || 0} 人天 (${pct}%)</span></div>
+            <div class="resource-item"><span class="resource-item-label">预计总成本</span><span class="resource-item-value">${rs.totalCost || 0}万元</span></div>
+            <div class="resource-item"><span class="resource-item-label">已使用成本</span><span class="resource-item-value">${rs.usedCost || 0}万元 (${costPct}%)</span></div>
+            <div class="resource-item"><span class="resource-item-label">外包人数</span><span class="resource-item-value">${rs.outsourceCount || 0} 人</span></div>
+            <div class="resource-item"><span class="resource-item-label">预计工期</span><span class="resource-item-value">${rs.durationMonths || 0} 个月</span></div>
+          </div>
           <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(100, pct)}%"></div></div>
           ${teamRows ? `<table class="mini-table"><thead><tr><th>团队</th><th>投入</th></tr></thead><tbody>${teamRows}</tbody></table>` : ''}
         </div>
@@ -248,6 +258,8 @@ const ProjectModule = (() => {
       `<option value="${k}" ${k === proj.priority ? 'selected' : ''}>${v}</option>`
     ).join('');
 
+    const rs = proj.resourceSummary || {};
+
     return `
       <form id="projectForm" class="form-grid">
         <input type="hidden" id="pf-id" value="${SharedUI.esc(proj.id || '')}">
@@ -280,6 +292,40 @@ const ProjectModule = (() => {
           <input type="text" id="pf-endDate" value="${SharedUI.esc(proj.endDate || '')}" placeholder="YYYY-MM 或 YYYY-MM-DD">
         </div>
         <div class="form-row">
+          <label>— 人力规划 —</label>
+        </div>
+        <div class="form-row">
+          <label>预计总人力(人天)</label>
+          <input type="number" id="pf-totalManDays" value="${rs.totalManDays || ''}" min="0">
+        </div>
+        <div class="form-row">
+          <label>已投入人力(人天)</label>
+          <input type="number" id="pf-usedManDays" value="${rs.usedManDays || ''}" min="0">
+        </div>
+        <div class="form-row">
+          <label>涉及团队(逗号分隔)</label>
+          <input type="text" id="pf-teams" value="${SharedUI.esc(rs.teams ? Object.keys(rs.teams).join(',') : '')}" placeholder="APP开发-阳光云,后端开发-阳光云">
+        </div>
+        <div class="form-row">
+          <label>— 成本预算 —</label>
+        </div>
+        <div class="form-row">
+          <label>预计总成本(万元)</label>
+          <input type="number" id="pf-totalCost" value="${rs.totalCost || ''}" min="0" step="0.1">
+        </div>
+        <div class="form-row">
+          <label>已使用成本(万元)</label>
+          <input type="number" id="pf-usedCost" value="${rs.usedCost || ''}" min="0" step="0.1">
+        </div>
+        <div class="form-row">
+          <label>外包人数</label>
+          <input type="number" id="pf-outsourceCount" value="${rs.outsourceCount || ''}" min="0">
+        </div>
+        <div class="form-row">
+          <label>预计工期(月)</label>
+          <input type="number" id="pf-durationMonths" value="${rs.durationMonths || ''}" min="0">
+        </div>
+        <div class="form-row">
           <label>备注</label>
           <textarea id="pf-note" rows="3">${SharedUI.esc(proj.note || '')}</textarea>
         </div>
@@ -298,6 +344,15 @@ const ProjectModule = (() => {
     const endDate = document.getElementById('pf-endDate')?.value?.trim();
     const note = document.getElementById('pf-note')?.value?.trim();
 
+    // Resource fields
+    const totalManDays = Number(document.getElementById('pf-totalManDays')?.value) || 0;
+    const usedManDays = Number(document.getElementById('pf-usedManDays')?.value) || 0;
+    const teamsStr = (document.getElementById('pf-teams')?.value || '').trim();
+    const totalCost = Number(document.getElementById('pf-totalCost')?.value) || 0;
+    const usedCost = Number(document.getElementById('pf-usedCost')?.value) || 0;
+    const outsourceCount = Number(document.getElementById('pf-outsourceCount')?.value) || 0;
+    const durationMonths = Number(document.getElementById('pf-durationMonths')?.value) || 0;
+
     if (!name) {
       SharedUI.toast('项目名称不能为空', 'warning');
       return;
@@ -306,6 +361,26 @@ const ProjectModule = (() => {
     if (startDate && endDate && startDate > endDate) {
       SharedUI.toast('开始日期不能晚于结束日期', 'warning');
       return;
+    }
+
+    // Build resourceSummary
+    let resourceSummary = null;
+    if (totalManDays || totalCost || outsourceCount || durationMonths) {
+      const teams = {};
+      if (teamsStr) {
+        teamsStr.split(',').map(function (t) { return t.trim(); }).filter(Boolean).forEach(function (t) {
+          teams[t] = 0;
+        });
+      }
+      resourceSummary = {
+        totalManDays: totalManDays,
+        usedManDays: usedManDays,
+        totalCost: totalCost,
+        usedCost: usedCost,
+        outsourceCount: outsourceCount,
+        durationMonths: durationMonths,
+        teams: teams
+      };
     }
 
     const project = {
@@ -319,17 +394,24 @@ const ProjectModule = (() => {
       endDate: endDate || '',
       note: note || '',
       milestones: [],
-      resourceSummary: null,
+      resourceSummary: resourceSummary,
       iterations: []
     };
 
-    // 如果编辑，保留原有的 milestones 和 resourceSummary
+    // 如果编辑，保留原有的 milestones 和 iterations
     if (!isNew && state) {
       const existing = (state.projects || []).find(p => p.id === id);
       if (existing) {
         project.milestones = existing.milestones || [];
-        project.resourceSummary = existing.resourceSummary || null;
         project.iterations = existing.iterations || [];
+        // Merge team data from existing if not re-specified
+        if (resourceSummary && existing.resourceSummary && existing.resourceSummary.teams) {
+          Object.keys(existing.resourceSummary.teams).forEach(function (k) {
+            if (!(k in resourceSummary.teams)) {
+              resourceSummary.teams[k] = existing.resourceSummary.teams[k];
+            }
+          });
+        }
       }
     }
 

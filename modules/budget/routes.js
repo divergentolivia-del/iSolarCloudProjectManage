@@ -299,6 +299,11 @@ module.exports = {
           next.costConfig.outsourceRate = DEFAULT_OUTSOURCE_RATE;
         }
 
+        // Preserve projectBudgets if present
+        if (!next.projectBudgets) {
+          next.projectBudgets = [];
+        }
+
         // 验证预算数据
         const err = validateBudgetState(next);
         if (err) {

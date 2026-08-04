@@ -124,6 +124,33 @@ function validateProjects(projects) {
     if (p.startDate && p.endDate && p.startDate > p.endDate) {
       return `项目 "${p.id}" 开始日期(${p.startDate})不能晚于结束日期(${p.endDate})`;
     }
+
+    // resourceSummary 数值校验
+    if (p.resourceSummary) {
+      const rs = p.resourceSummary;
+      if (rs.totalManDays != null && (typeof rs.totalManDays !== 'number' || rs.totalManDays < 0)) {
+        return `项目 "${p.id}" totalManDays 必须为非负数`;
+      }
+      if (rs.usedManDays != null && (typeof rs.usedManDays !== 'number' || rs.usedManDays < 0)) {
+        return `项目 "${p.id}" usedManDays 必须为非负数`;
+      }
+      if (rs.totalCost != null && (typeof rs.totalCost !== 'number' || rs.totalCost < 0)) {
+        return `项目 "${p.id}" totalCost 必须为非负数`;
+      }
+      if (rs.usedCost != null && (typeof rs.usedCost !== 'number' || rs.usedCost < 0)) {
+        return `项目 "${p.id}" usedCost 必须为非负数`;
+      }
+      if (rs.outsourceCount != null && (typeof rs.outsourceCount !== 'number' || rs.outsourceCount < 0)) {
+        return `项目 "${p.id}" outsourceCount 必须为非负数`;
+      }
+      if (rs.durationMonths != null && (typeof rs.durationMonths !== 'number' || rs.durationMonths < 0)) {
+        return `项目 "${p.id}" durationMonths 必须为非负数`;
+      }
+      // teams should be an object if present
+      if (rs.teams != null && (typeof rs.teams !== 'object' || Array.isArray(rs.teams))) {
+        return `项目 "${p.id}" teams 必须为对象`;
+      }
+    }
   }
 
   return null; // valid

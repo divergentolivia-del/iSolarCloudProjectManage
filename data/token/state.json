@@ -1,0 +1,20 @@
+{
+  "rev": 0,
+  "updatedAt": "",
+  "updatedBy": "",
+  "summary": {
+    "totalTokens": 0,
+    "totalCost": 0,
+    "totalInvocations": 0,
+    "period": {
+      "from": "",
+      "to": ""
+    }
+  },
+  "agents": [],
+  "dailyLogs": [],
+  "budgetLimit": {
+    "monthly": 500,
+    "alertThreshold": 0.8
+  }
+}

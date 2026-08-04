@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>云平台管理工作台</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="platform.css">
+</head>
+<body>
+
+<!-- Top Navbar (48px) -->
+<header class="platform-navbar">
+  <div class="navbar-left">
+    <button class="hamburger-btn" id="hamburgerBtn" aria-label="菜单">☰</button>
+    <span class="navbar-brand">云平台管理工作台</span>
+  </div>
+  <div class="navbar-right">
+    <span class="navbar-user" id="navbarUser">用户</span>
+    <button class="navbar-icon" id="navbarNotify" title="通知">🔔</button>
+    <button class="navbar-icon" id="navbarSettings" title="设置">⚙</button>
+  </div>
+</header>
+
+<!-- Layout: Sidebar + Main Content -->
+<div class="platform-layout">
+
+  <!-- Sidebar (200px expanded / 56px collapsed / overlay on mobile) -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" title="折叠/展开">☰</button>
+      <span class="sidebar-title">云平台</span>
+    </div>
+    <nav class="sidebar-nav" id="sidebarNav">
+      <!-- Navigation items rendered by platform.js -->
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-divider"></div>
+      <a class="sidebar-nav-item" href="#/settings" data-module="settings">
+        <span class="nav-icon">⚙</span>
+        <span class="nav-label">系统设置</span>
+      </a>
+      <a class="sidebar-nav-item" href="#/help" data-module="help">
+        <span class="nav-icon">📖</span>
+        <span class="nav-label">使用帮助</span>
+      </a>
+    </div>
+  </aside>
+
+  <!-- Sidebar overlay backdrop (mobile) -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+  <!-- Main Content Area -->
+  <main class="main-content" id="mainContent">
+    <!-- Breadcrumb -->
+    <div class="breadcrumb-bar" id="breadcrumbBar"></div>
+
+    <!-- Module Containers (pre-created) -->
+    <div id="module-dashboard" class="module-view active"></div>
+    <div id="module-iteration" class="module-view hidden"></div>
+    <div id="module-project" class="module-view hidden"></div>
+  </main>
+
+</div>
+
+<!-- Toast notification -->
+<div id="toast" class="toast hidden"></div>
+
+<!-- Modal overlay -->
+<div id="modalOverlay" class="modal-overlay hidden">
+  <div class="modal-dialog">
+    <div class="modal-header">
+      <h3 id="modalTitle"></h3>
+      <button class="modal-close" id="modalClose">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter"></div>
+  </div>
+</div>
+
+<!-- Shared dependencies -->
+<script src="config.js"></script>
+<script src="calc.js"></script>
+<script src="sync.js"></script>
+
+<!-- Platform shell scripts -->
+<script src="shared-ui.js"></script>
+<script src="router.js"></script>
+<script src="platform.js"></script>
+</body>
+</html>

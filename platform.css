@@ -1,0 +1,976 @@
+/* ============================================================
+   Platform CSS — Multi-module platform layout styles
+   Reuses CSS variables from app.css
+   ============================================================ */
+
+:root {
+  --bg: #f5f6f8;
+  --panel: #fff;
+  --line: #e3e6ea;
+  --text: #1f2329;
+  --muted: #6b7280;
+  --accent: #1668dc;
+  --warn: #d4380d;
+  --ok: #237804;
+  --hold: #ad6800;
+
+  --navbar-height: 48px;
+  --sidebar-width: 200px;
+  --sidebar-collapsed-width: 56px;
+  --sidebar-transition: width 0.2s ease;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+}
+
+/* ============================================================
+   Top Navbar (48px)
+   ============================================================ */
+
+.platform-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--navbar-height);
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 100;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.navbar-brand {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.hamburger-btn {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.hamburger-btn:hover {
+  background: var(--bg);
+}
+
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.navbar-user {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.navbar-icon {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.navbar-icon:hover {
+  background: var(--bg);
+}
+
+/* ============================================================
+   Platform Layout (Sidebar + Main Content)
+   ============================================================ */
+
+.platform-layout {
+  display: flex;
+  padding-top: var(--navbar-height);
+  min-height: 100vh;
+}
+
+/* ============================================================
+   Sidebar
+   ============================================================ */
+
+.sidebar {
+  position: fixed;
+  top: var(--navbar-height);
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-width);
+  background: var(--panel);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  transition: var(--sidebar-transition);
+  z-index: 90;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  min-height: 48px;
+}
+
+.sidebar-collapse-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.sidebar-collapse-btn:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.sidebar-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 8px 0;
+  overflow-y: auto;
+}
+
+.sidebar-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  margin: 2px 8px;
+  border-radius: 6px;
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+  position: relative;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: background 0.15s;
+}
+
+.sidebar-nav-item:hover {
+  background: var(--bg);
+}
+
+.sidebar-nav-item.active {
+  background: #e8f0fe;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* Left blue indicator bar for active item */
+.sidebar-nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  background: var(--accent);
+  border-radius: 0 2px 2px 0;
+}
+
+.nav-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+}
+
+.nav-label {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-badge {
+  margin-left: auto;
+  background: var(--warn);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.sidebar-footer {
+  padding: 8px 0;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 4px 16px 8px;
+}
+
+/* ============================================================
+   Sidebar Collapsed State
+   ============================================================ */
+
+.sidebar.collapsed {
+  width: var(--sidebar-collapsed-width);
+}
+
+.sidebar.collapsed .sidebar-title,
+.sidebar.collapsed .nav-label,
+.sidebar.collapsed .nav-badge {
+  opacity: 0;
+  visibility: hidden;
+  width: 0;
+}
+
+.sidebar.collapsed .sidebar-nav-item {
+  justify-content: center;
+  padding: 10px 0;
+  margin: 2px 4px;
+}
+
+.sidebar.collapsed .sidebar-nav-item .nav-icon {
+  margin: 0;
+}
+
+/* Tooltip on hover for collapsed sidebar */
+.sidebar.collapsed .sidebar-nav-item[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(var(--sidebar-collapsed-width) - 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--text);
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 200;
+}
+
+/* ============================================================
+   Sidebar Backdrop (Mobile Overlay)
+   ============================================================ */
+
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 80;
+}
+
+.sidebar-backdrop.visible {
+  display: block;
+}
+
+/* ============================================================
+   Main Content Area
+   ============================================================ */
+
+.main-content {
+  flex: 1;
+  margin-left: var(--sidebar-width);
+  padding: 20px;
+  min-height: calc(100vh - var(--navbar-height));
+  transition: margin-left 0.2s ease;
+}
+
+.sidebar.collapsed ~ .main-content,
+.platform-layout:has(.sidebar.collapsed) .main-content {
+  margin-left: var(--sidebar-collapsed-width);
+}
+
+/* ============================================================
+   Module Container Visibility
+   ============================================================ */
+
+.module-view {
+  display: none;
+}
+
+.module-view.active {
+  display: block;
+}
+
+.module-view.hidden {
+  display: none;
+}
+
+/* ============================================================
+   Breadcrumb
+   ============================================================ */
+
+.breadcrumb-bar {
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+}
+
+.breadcrumb-item {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.breadcrumb-item:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.breadcrumb-item.current {
+  color: var(--text);
+  font-weight: 500;
+  pointer-events: none;
+}
+
+.breadcrumb-separator {
+  color: var(--line);
+  font-size: 12px;
+}
+
+/* ============================================================
+   Metric Cards
+   ============================================================ */
+
+.metric-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.metric-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.metric-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.metric-card-icon {
+  font-size: 20px;
+}
+
+.metric-card-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.metric-card-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.metric-card-status {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+}
+
+.metric-card-status.ok {
+  background: #f6ffed;
+  color: var(--ok);
+}
+
+.metric-card-status.warn {
+  background: #fff2e8;
+  color: var(--warn);
+}
+
+.metric-card-status.hold {
+  background: #fffbe6;
+  color: var(--hold);
+}
+
+.metric-card-status.normal {
+  background: #f0f5ff;
+  color: var(--accent);
+}
+
+/* ============================================================
+   Module Entry Cards
+   ============================================================ */
+
+.entry-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.entry-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 20px 24px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.entry-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 12px rgba(22, 104, 220, 0.1);
+}
+
+.entry-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.entry-card-icon {
+  font-size: 24px;
+}
+
+.entry-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.entry-card-desc {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.entry-card-action {
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 500;
+  align-self: flex-end;
+}
+
+/* ============================================================
+   Quick Access Section
+   ============================================================ */
+
+.quick-access {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.quick-access-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+
+.quick-access-panel h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.quick-access-panel.full-width {
+  grid-column: 1 / -1;
+}
+
+.alert-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.alert-item:last-child {
+  border-bottom: none;
+}
+
+.alert-icon {
+  flex-shrink: 0;
+}
+
+.alert-text {
+  flex: 1;
+}
+
+.alert-link {
+  color: var(--accent);
+  font-size: 12px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.alert-link:hover {
+  text-decoration: underline;
+}
+
+.deviation-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.deviation-value {
+  font-weight: 500;
+}
+
+.deviation-value.positive {
+  color: var(--warn);
+}
+
+.deviation-value.negative {
+  color: var(--ok);
+}
+
+.archive-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.archive-item:last-child {
+  border-bottom: none;
+}
+
+.archive-item-icon {
+  flex-shrink: 0;
+}
+
+.archive-item-name {
+  flex: 1;
+}
+
+.archive-item-date {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ============================================================
+   Toast Notification
+   ============================================================ */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%);
+  background: #1f2329;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 13px;
+  z-index: 999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: opacity 0.3s;
+}
+
+.toast.hidden {
+  display: none;
+}
+
+.toast.success {
+  background: var(--ok);
+}
+
+.toast.error {
+  background: var(--warn);
+}
+
+.toast.warning {
+  background: var(--hold);
+}
+
+/* ============================================================
+   Archive / Read-Only Banner
+   ============================================================ */
+
+.archive-banner {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  background: #e6f7ff;
+  color: #0958d9;
+  border-bottom: 1px solid #91caff;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  border-radius: 6px;
+}
+
+.archive-banner.hidden {
+  display: none;
+}
+
+/* ============================================================
+   Modal (Confirmation Dialog)
+   ============================================================ */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.modal-overlay.hidden {
+  display: none;
+}
+
+.modal-dialog {
+  background: #fff;
+  border-radius: 8px;
+  width: 480px;
+  max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.modal-close {
+  background: none;
+  border: 0;
+  font-size: 22px;
+  cursor: pointer;
+  color: var(--muted);
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: var(--text);
+}
+
+.modal-body {
+  padding: 20px;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.modal-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* ============================================================
+   Table, Input, Button Base Styles (reused from app.css)
+   ============================================================ */
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+
+th, td {
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+  text-align: right;
+}
+
+th {
+  background: #fafbfc;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
+td.txt, th.txt {
+  text-align: left;
+}
+
+input[type=number], input[type=text], select {
+  width: 100%;
+  min-width: 60px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font: inherit;
+  text-align: right;
+}
+
+input[type=text], select {
+  text-align: left;
+}
+
+input:focus, select:focus {
+  outline: 0;
+  border-color: var(--accent);
+}
+
+.btn {
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.btn.primary:hover {
+  opacity: 0.9;
+  color: #fff;
+}
+
+.btn.danger {
+  background: var(--warn);
+  border-color: var(--warn);
+  color: #fff;
+}
+
+.btn.danger:hover {
+  opacity: 0.9;
+}
+
+/* ============================================================
+   Responsive Breakpoints
+   ============================================================ */
+
+/* Desktop: ≥1200px — sidebar expanded (default) */
+@media (min-width: 1200px) {
+  .hamburger-btn {
+    display: none;
+  }
+}
+
+/* Tablet / Small Desktop: 768px – 1199px — sidebar collapsed */
+@media (max-width: 1199px) and (min-width: 768px) {
+  .hamburger-btn {
+    display: none;
+  }
+
+  .sidebar {
+    width: var(--sidebar-collapsed-width);
+  }
+
+  .sidebar .sidebar-title,
+  .sidebar .nav-label,
+  .sidebar .nav-badge {
+    opacity: 0;
+    visibility: hidden;
+    width: 0;
+  }
+
+  .sidebar .sidebar-nav-item {
+    justify-content: center;
+    padding: 10px 0;
+    margin: 2px 4px;
+  }
+
+  .sidebar .sidebar-nav-item .nav-icon {
+    margin: 0;
+  }
+
+  .main-content {
+    margin-left: var(--sidebar-collapsed-width);
+  }
+
+  /* When user explicitly expands on tablet */
+  .sidebar.expanded {
+    width: var(--sidebar-width);
+  }
+
+  .sidebar.expanded .sidebar-title,
+  .sidebar.expanded .nav-label,
+  .sidebar.expanded .nav-badge {
+    opacity: 1;
+    visibility: visible;
+    width: auto;
+  }
+
+  .sidebar.expanded .sidebar-nav-item {
+    justify-content: flex-start;
+    padding: 10px 16px;
+    margin: 2px 8px;
+  }
+
+  .sidebar.expanded ~ .main-content,
+  .platform-layout:has(.sidebar.expanded) .main-content {
+    margin-left: var(--sidebar-width);
+  }
+}
+
+/* Mobile: <768px — sidebar hidden, hamburger visible */
+@media (max-width: 767px) {
+  .hamburger-btn {
+    display: block;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: var(--navbar-height);
+    left: 0;
+    bottom: 0;
+    width: var(--sidebar-width);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    z-index: 90;
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-collapse-btn {
+    display: none;
+  }
+
+  .main-content {
+    margin-left: 0;
+  }
+
+  .quick-access {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   Utility Classes
+   ============================================================ */
+
+.hidden {
+  display: none !important;
+}
+
+.text-muted {
+  color: var(--muted);
+}
+
+.text-accent {
+  color: var(--accent);
+}
+
+.text-warn {
+  color: var(--warn);
+}
+
+.text-ok {
+  color: var(--ok);
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.card h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.card .hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0 0 12px;
+}
+
+.scroll {
+  overflow-x: auto;
+}
+
+.link {
+  color: var(--accent);
+  cursor: pointer;
+  background: none;
+  border: 0;
+  font: inherit;
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}

@@ -1,0 +1,394 @@
+/* ============================================================
+   platform.js — Platform shell orchestrator
+   Registers modules, renders sidebar navigation, manages layout
+   state (collapse/expand/mobile), binds router, and provides
+   shared platform services (toast, breadcrumb, badge, whoami).
+   ============================================================ */
+
+// eslint-disable-next-line no-unused-vars
+const Platform = (() => {
+  'use strict';
+
+  const SIDEBAR_KEY = 'sidebar_collapsed';
+  const USER_KEY = 'wb_who';
+
+  let modules = [];          // ordered array of ModuleDefinition objects
+  let moduleMap = {};        // { moduleId: ModuleDefinition }
+  let sidebarCollapsed = false;
+  let mobileOpen = false;
+
+  /* ============================================================
+     Sidebar Rendering
+     ============================================================ */
+
+  /**
+   * Render sidebar navigation items into #sidebarNav.
+   * Only renders modules with sidebar !== false, sorted by order.
+   */
+  function renderSidebarNav() {
+    const nav = document.getElementById('sidebarNav');
+    if (!nav) return;
+
+    const sidebarModules = modules
+      .filter(m => m.sidebar !== false)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+    nav.innerHTML = sidebarModules.map(m => {
+      const href = '#/' + (m.id === 'dashboard' ? 'dashboard' : m.id);
+      return `<a class="sidebar-nav-item" href="${SharedUI.esc(href)}" data-module="${SharedUI.esc(m.id)}" data-tooltip="${SharedUI.esc(m.name)}">
+        <span class="nav-icon">${SharedUI.esc(m.icon || '')}</span>
+        <span class="nav-label">${SharedUI.esc(m.name)}</span>
+        <span class="nav-badge hidden" id="badge-${SharedUI.esc(m.id)}"></span>
+      </a>`;
+    }).join('');
+
+    // Bind click handlers for mobile close
+    nav.querySelectorAll('.sidebar-nav-item').forEach(item => {
+      item.addEventListener('click', () => {
+        if (mobileOpen) {
+          closeMobileSidebar();
+        }
+      });
+    });
+  }
+
+  /**
+   * Highlight the active navigation item in the sidebar.
+   * Dashboard sub-pages (budget, token) keep 'dashboard' active.
+   * @param {string} moduleId - The module to highlight
+   */
+  function highlightNav(moduleId) {
+    const nav = document.getElementById('sidebarNav');
+    if (!nav) return;
+
+    nav.querySelectorAll('.sidebar-nav-item').forEach(item => {
+      const itemModule = item.getAttribute('data-module');
+      if (itemModule === moduleId) {
+        item.classList.add('active');
+      } else {
+        item.classList.remove('active');
+      }
+    });
+  }
+
+  /* ============================================================
+     Sidebar Collapse / Expand
+     ============================================================ */
+
+  /**
+   * Apply the current collapse state to the sidebar DOM.
+   */
+  function applySidebarState() {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+
+    if (sidebarCollapsed) {
+      sidebar.classList.add('collapsed');
+      sidebar.classList.remove('expanded');
+    } else {
+      sidebar.classList.remove('collapsed');
+      sidebar.classList.add('expanded');
+    }
+  }
+
+  /**
+   * Toggle sidebar collapsed state and persist preference.
+   */
+  function toggleSidebar() {
+    sidebarCollapsed = !sidebarCollapsed;
+    applySidebarState();
+    try {
+      localStorage.setItem(SIDEBAR_KEY, sidebarCollapsed ? 'true' : 'false');
+    } catch (e) { /* localStorage might be unavailable */ }
+  }
+
+  /**
+   * Load sidebar collapse preference from localStorage.
+   */
+  function loadSidebarPreference() {
+    try {
+      const stored = localStorage.getItem(SIDEBAR_KEY);
+      if (stored === 'true') {
+        sidebarCollapsed = true;
+      } else if (stored === 'false') {
+        sidebarCollapsed = false;
+      }
+      // If no stored preference, leave default (expanded for desktop)
+    } catch (e) { /* ignore */ }
+  }
+
+  /* ============================================================
+     Mobile Sidebar (Overlay)
+     ============================================================ */
+
+  function openMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    if (sidebar) sidebar.classList.add('mobile-open');
+    if (backdrop) backdrop.classList.add('visible');
+    mobileOpen = true;
+  }
+
+  function closeMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    if (sidebar) sidebar.classList.remove('mobile-open');
+    if (backdrop) backdrop.classList.remove('visible');
+    mobileOpen = false;
+  }
+
+  /* ============================================================
+     Responsive Resize Handling
+     ============================================================ */
+
+  /**
+   * Handle window resize — auto-collapse sidebar on narrow viewports.
+   */
+  function handleResize() {
+    const width = window.innerWidth;
+
+    if (width < 768) {
+      // Mobile: sidebar hidden by default, controlled by hamburger
+      closeMobileSidebar();
+    } else if (width < 1200) {
+      // Tablet: auto-collapse unless user explicitly expanded
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar && !sidebar.classList.contains('expanded')) {
+        sidebarCollapsed = true;
+        applySidebarState();
+      }
+    }
+    // Desktop (>=1200): respect user preference
+  }
+
+  /* ============================================================
+     Navbar User Display
+     ============================================================ */
+
+  /**
+   * Render the current user name in the navbar.
+   */
+  function renderNavbarUser() {
+    const el = document.getElementById('navbarUser');
+    if (!el) return;
+    const name = whoami();
+    el.textContent = name;
+  }
+
+  /* ============================================================
+     User Identity (whoami)
+     ============================================================ */
+
+  /**
+   * Get current user name.
+   * 1. Try localStorage key 'wb_who'
+   * 2. Fall back to legacy key 'workbench-user'
+   * 3. If not found, prompt the user
+   * @returns {string} User name
+   */
+  function whoami() {
+    let name = '';
+    try {
+      name = localStorage.getItem(USER_KEY) || '';
+      // Also check legacy key for backward compat
+      if (!name) {
+        name = localStorage.getItem('workbench-user') || '';
+        if (name) {
+          // Migrate to new key
+          localStorage.setItem(USER_KEY, name);
+        }
+      }
+    } catch (e) { /* ignore */ }
+
+    if (!name) {
+      name = (window.prompt('请输入你的姓名（用于记录操作人）') || '').trim();
+      if (name) {
+        try {
+          localStorage.setItem(USER_KEY, name);
+          // Also set legacy key for sync.js compat
+          localStorage.setItem('workbench-user', name);
+        } catch (e) { /* ignore */ }
+      }
+    }
+
+    return name || '未署名';
+  }
+
+  /* ============================================================
+     Module Container Management
+     ============================================================ */
+
+  /**
+   * Pre-create DOM containers for all registered modules.
+   * Containers already present in HTML are not recreated.
+   */
+  function ensureModuleContainers() {
+    const mainContent = document.getElementById('mainContent');
+    if (!mainContent) return;
+
+    modules.forEach(m => {
+      const containerId = 'module-' + m.id;
+      if (!document.getElementById(containerId)) {
+        const div = document.createElement('div');
+        div.id = containerId;
+        div.className = 'module-view hidden';
+        mainContent.appendChild(div);
+      }
+    });
+  }
+
+  /* ============================================================
+     Breadcrumb
+     ============================================================ */
+
+  /**
+   * Update the breadcrumb bar with given items.
+   * @param {Array<{label: string, href?: string}>} items
+   */
+  function setBreadcrumb(items) {
+    const bar = document.getElementById('breadcrumbBar');
+    if (!bar) return;
+    bar.innerHTML = SharedUI.renderBreadcrumb(items || []);
+  }
+
+  /* ============================================================
+     Toast
+     ============================================================ */
+
+  /**
+   * Show a transient toast notification.
+   * @param {string} msg - Message text
+   * @param {string} [type='info'] - Type: 'info' | 'success' | 'error' | 'warning'
+   */
+  function toast(msg, type) {
+    SharedUI.toast(msg, type);
+  }
+
+  /* ============================================================
+     Badge
+     ============================================================ */
+
+  /**
+   * Update the badge count on a navigation item.
+   * @param {string} moduleId - Module ID
+   * @param {number} count - Badge number (0 or falsy hides the badge)
+   */
+  function setBadge(moduleId, count) {
+    const badge = document.getElementById('badge-' + moduleId);
+    if (!badge) return;
+
+    if (count && count > 0) {
+      badge.textContent = count > 99 ? '99+' : String(count);
+      badge.classList.remove('hidden');
+    } else {
+      badge.textContent = '';
+      badge.classList.add('hidden');
+    }
+  }
+
+  /* ============================================================
+     Platform Init
+     ============================================================ */
+
+  /**
+   * Initialize the platform shell.
+   * - Register modules
+   * - Render sidebar navigation
+   * - Render navbar user
+   * - Set up sidebar collapse/expand
+   * - Set up mobile hamburger
+   * - Set up responsive resize
+   * - Bind router
+   *
+   * @param {Array<ModuleDefinition>} moduleList - Array of module definitions
+   */
+  function init(moduleList) {
+    modules = (moduleList || []).slice();
+    moduleMap = {};
+    modules.forEach(m => {
+      if (m && m.id) moduleMap[m.id] = m;
+    });
+
+    // Load sidebar preference
+    loadSidebarPreference();
+
+    // Render sidebar navigation items
+    renderSidebarNav();
+
+    // Apply sidebar state
+    applySidebarState();
+
+    // Render user name in navbar
+    renderNavbarUser();
+
+    // Pre-create module containers
+    ensureModuleContainers();
+
+    // Bind sidebar collapse button
+    const collapseBtn = document.getElementById('sidebarCollapseBtn');
+    if (collapseBtn) {
+      collapseBtn.addEventListener('click', toggleSidebar);
+    }
+
+    // Bind hamburger button (mobile)
+    const hamburgerBtn = document.getElementById('hamburgerBtn');
+    if (hamburgerBtn) {
+      hamburgerBtn.addEventListener('click', () => {
+        if (mobileOpen) {
+          closeMobileSidebar();
+        } else {
+          openMobileSidebar();
+        }
+      });
+    }
+
+    // Bind backdrop click (mobile)
+    const backdrop = document.getElementById('sidebarBackdrop');
+    if (backdrop) {
+      backdrop.addEventListener('click', closeMobileSidebar);
+    }
+
+    // Responsive resize handling
+    window.addEventListener('resize', handleResize);
+
+    // Initial responsive check
+    handleResize();
+
+    // Initialize the router with the module map
+    if (typeof Router !== 'undefined' && Router.init) {
+      Router.init(modules);
+    }
+  }
+
+  /**
+   * Get all registered modules.
+   * @returns {Array<ModuleDefinition>}
+   */
+  function getModules() {
+    return modules.slice();
+  }
+
+  /**
+   * Get a specific module by ID.
+   * @param {string} moduleId
+   * @returns {ModuleDefinition|undefined}
+   */
+  function getModule(moduleId) {
+    return moduleMap[moduleId];
+  }
+
+  // Public API
+  return {
+    init,
+    getModules,
+    getModule,
+    toast,
+    setBreadcrumb,
+    setBadge,
+    toggleSidebar,
+    whoami,
+
+    // Internal helper exposed for Router to call
+    _highlightNav: highlightNav
+  };
+})();

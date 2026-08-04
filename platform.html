@@ -86,6 +86,22 @@
 <!-- Platform shell scripts -->
 <script src="shared-ui.js"></script>
 <script src="router.js"></script>
+
+<!-- Module scripts (loaded before platform.js init) -->
+<script src="modules/dashboard/index.js"></script>
+<script src="modules/iteration/index.js"></script>
+<script src="modules/project/index.js"></script>
+<script src="modules/budget/index.js"></script>
+<script src="modules/token/index.js"></script>
+
+<!-- Platform orchestrator (must be last — calls Platform.init) -->
 <script src="platform.js"></script>
+
+<!-- Initialize platform with all modules -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    Platform.init([DashboardModule, IterationModule, ProjectModule]);
+  });
+</script>
 </body>
 </html>

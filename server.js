@@ -13,6 +13,10 @@ const url = require('url');
 /* 归档模块（独立于 server.js 中已有的 archive() 快照函数） */
 const archiveMod = require('./archive');
 
+/* 数据迁移 & 模块加载器 */
+const migrate = require('./migrate');
+const moduleLoader = require('./module-loader');
+
 /* 加载组织配置到全局（calc.js 依赖全局 TEAMS 等变量） */
 const _configSource = fs.readFileSync(path.join(__dirname, 'config.js'), 'utf8');
 const _configFn = new Function(_configSource + '\nreturn { TEAMS, PRODUCT_LINES, OTHER_CATEGORIES, LOCK_ROLES, LOCK_ROLE_TO_TEAM, OWNER_LINES, DEVIATION_TOLERANCE, IGNORED_TEAM_PATTERNS, RECONCILE_TOLERANCE };');
@@ -167,9 +171,9 @@ function sendJson(res, code, obj) {
 }
 
 function serveStatic(req, res, pathname) {
-  // 去掉前导斜杠；空路径（/ 或 //）一律回首页
+  // 去掉前导斜杠；空路径（/ 或 //）一律回平台首页
   let rel = decodeURIComponent(pathname).replace(/^\/+/, '');
-  if (!rel) rel = 'index.html';
+  if (!rel) rel = 'platform.html';
   // 阻断路径穿越，并禁止读取 data 目录
   const target = path.resolve(ROOT, rel);
   if (!target.startsWith(ROOT) || target.startsWith(DATA_DIR)) {
@@ -208,13 +212,48 @@ const server = http.createServer((req, res) => {
     }
   }
 
-  // 读取当前状态
+  // SSE 订阅
+  if (p === '/api/events') {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
+    });
+    res.write(': connected\n\n');
+    clients.push(res);
+    const ping = setInterval(() => {
+      try { res.write(': ping\n\n'); } catch (e) { clearInterval(ping); }
+    }, 25000);
+    req.on('close', () => {
+      clearInterval(ping);
+      clients = clients.filter(c => c !== res);
+    });
+    return;
+  }
+
+  // 模块路由分发（新平台模块）
+  // 按前缀匹配，最长前缀优先
+  if (moduleLoader.dispatch(req, res, u)) return;
+
+  // 读取当前状态（兼容旧路径 /api/state → 转发到迭代模块）
   if (p === '/api/state' && req.method === 'GET') {
+    // 如果迭代模块已加载，转发到迭代模块
+    const iterMod = moduleLoader.list().find(m => m.id === 'iteration');
+    if (iterMod) {
+      const fakeUrl = Object.assign({}, u, { pathname: '/api/iteration/state' });
+      return moduleLoader.dispatch(req, res, fakeUrl);
+    }
     return sendJson(res, 200, readState());
   }
 
   // 提交变更。乐观锁：客户端带上 baseRev，落后则拒绝并要求先合并
   if (p === '/api/state' && req.method === 'POST') {
+    // 如果迭代模块已加载，转发到迭代模块
+    const iterMod = moduleLoader.list().find(m => m.id === 'iteration');
+    if (iterMod) {
+      const fakeUrl = Object.assign({}, u, { pathname: '/api/iteration/state' });
+      return moduleLoader.dispatch(req, res, fakeUrl);
+    }
     let body = '';
     req.on('data', c => {
       body += c;
@@ -248,25 +287,6 @@ const server = http.createServer((req, res) => {
       archive(next);
       broadcast(next.rev, next.updatedBy);
       sendJson(res, 200, { ok: true, rev: next.rev, updatedAt: next.updatedAt });
-    });
-    return;
-  }
-
-  // SSE 订阅
-  if (p === '/api/events') {
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream; charset=utf-8',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive'
-    });
-    res.write(': connected\n\n');
-    clients.push(res);
-    const ping = setInterval(() => {
-      try { res.write(': ping\n\n'); } catch (e) { clearInterval(ping); }
-    }, 25000);
-    req.on('close', () => {
-      clearInterval(ping);
-      clients = clients.filter(c => c !== res);
     });
     return;
   }
@@ -361,6 +381,16 @@ const server = http.createServer((req, res) => {
 });
 
 ensureDirs();
+
+// 数据迁移检查（将旧版单目录结构迁移到多模块目录结构）
+migrate(DATA_DIR);
+
+// 加载动态模块
+moduleLoader.loadAll();
+
+// 将 broadcast 暴露到 global，供模块使用
+global._broadcast = broadcast;
+
 server.listen(PORT, () => {
   const nets = require('os').networkInterfaces();
   const ips = [];

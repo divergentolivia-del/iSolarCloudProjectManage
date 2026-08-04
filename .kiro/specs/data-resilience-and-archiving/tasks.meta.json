@@ -1,0 +1,428 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Create `package.json` with project metadata and devDependencies": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449635
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750456859
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750530673
+      }
+    ],
+    "1.2 Create `data/archive/` directory placeholder and ensure directory structure": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449639
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750457682
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750531585
+      }
+    ],
+    "2.1 Implement `createArchive(state, meta)` function": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449643
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750535036
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750770580
+      }
+    ],
+    "2.2 Implement `initNextIteration(currentState)` function": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449646
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750535823
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750771380
+      }
+    ],
+    "2.3 Implement `listArchives()` function": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449649
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750536621
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750772184
+      }
+    ],
+    "2.4 Implement `getArchive(id)` and `deleteArchive(id)` functions": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449657
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750537522
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750773087
+      }
+    ],
+    "3. Checkpoint - Ensure archive module tests pass": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449661
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750783810
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750868670
+      }
+    ],
+    "4.1 Implement `buildWorkbook(state, computeResult)` main entry and `buildCapacitySheet` (Sheet 1)": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449664
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750875443
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751134274
+      }
+    ],
+    "4.2 Implement `buildPlanningSheet` (Sheet 2 — 4 sections vertically stacked)": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449667
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750876867
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751135427
+      }
+    ],
+    "4.3 Implement `buildStoryPointSheet` (Sheet 3 — raw iteration story points)": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449670
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750878086
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751136416
+      }
+    ],
+    "5.1 Implement CLI argument parsing and main flow": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449674
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751151002
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751363039
+      }
+    ],
+    "5.2 Implement input validation, error handling, and batch export mode": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449677
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751151835
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751363874
+      }
+    ],
+    "6. Checkpoint - Ensure CLI export and builder tests pass": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449680
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751365048
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751451759
+      }
+    ],
+    "7.1 Add archive API routes (GET /api/archive/list, GET /api/archive/:id, POST /api/archive)": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449683
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751456213
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751670833
+      }
+    ],
+    "7.2 Add init-next and delete archive routes (POST /api/archive/init-next, DELETE /api/archive/:id)": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449687
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751457531
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751671713
+      }
+    ],
+    "8.1 Add \"归档本迭代\" button and confirmation dialog": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449690
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751675926
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751982050
+      }
+    ],
+    "8.2 Add \"历史归档\" tab (7th tab) with timeline view": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449693
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751677169
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751983101
+      }
+    ],
+    "8.3 Implement read-only archive viewing mode": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449697
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751678177
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751983833
+      }
+    ],
+    "8.4 Implement SSE event handling for archive events": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449700
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751679235
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751984755
+      }
+    ],
+    "9. Checkpoint - Ensure all tests pass and UI integration complete": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449704
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751989267
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785752192778
+      }
+    ],
+    "10.1 Wire export-builder into archive read-only view for Excel download": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449710
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751990437
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785752193549
+      }
+    ],
+    "11. Final checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750449714
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785752196946
+      },
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785752380025
+      }
+    ],
+    "1. Project setup and package initialization": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750531589
+      }
+    ],
+    "2. Implement archive module (`archive.js`)": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785750773095
+      }
+    ],
+    "4. Implement Excel export builder (`export-builder.js`)": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751136419
+      }
+    ],
+    "5. Implement CLI export tool (`export-cli.js`)": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751363878
+      }
+    ],
+    "7. Integrate archive API routes into `server.js`": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751671718
+      }
+    ],
+    "8. Implement Archive UI in `app.js` and `index.html`": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785751984758
+      }
+    ],
+    "10. Wire everything together and final validation": [
+      {
+        "executionId": "fd6f2b1d-a004-473b-a0c8-501a0c16a840",
+        "chatSessionId": "d4be2327-5280-4c99-a29c-264e597f7386",
+        "timestamp": 1785752193557
+      }
+    ]
+  }
+}

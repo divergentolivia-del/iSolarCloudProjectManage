@@ -424,6 +424,15 @@ const Platform = (() => {
       });
     }
 
+    // Bind sidebar help link — show toast instead of navigating
+    const helpLink = document.getElementById('sidebarHelp');
+    if (helpLink) {
+      helpLink.addEventListener('click', (event) => {
+        event.preventDefault();
+        SharedUI.toast('帮助文档建设中', 'info');
+      });
+    }
+
     // Close notification dropdown on outside click
     document.addEventListener('click', (e) => {
       const dropdown = document.getElementById('notificationDropdown');

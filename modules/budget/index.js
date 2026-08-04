@@ -119,8 +119,8 @@ const BudgetModule = (() => {
         <div class="budget-section">
           <h3 class="section-title">年度预算计划表</h3>
           <div class="cost-summary">
-            <span class="cost-summary-item">外包人月单价: ¥${outsourceRate.toLocaleString()}</span>
-            <span class="cost-summary-item">外包总成本: ${totalCostDisplay} (${totalOutsource}人)</span>
+            <span class="cost-summary-item">外包成本 = 外包人月 × ¥${outsourceRate.toLocaleString()}/人月</span>
+            <span class="cost-summary-item">外包总成本: ${totalCostDisplay} (${totalOutsource}人月)</span>
           </div>
           <div class="table-wrapper">
             <table class="data-table budget-table" id="budgetPlanTable">
@@ -132,7 +132,7 @@ const BudgetModule = (() => {
                   <th>Q3(正式+外包)</th>
                   <th>Q4(正式+外包)</th>
                   <th>年均</th>
-                  <th>外包(人)</th>
+                  <th>外包(人月)</th>
                   <th>外包成本</th>
                   <th>操作</th>
                 </tr>
@@ -319,14 +319,14 @@ const BudgetModule = (() => {
     var teamOptions = buildTeamOptions('');
     var formHtml = '<form id="budgetPlanForm" class="form-grid">' +
       '<div class="form-row"><label>\u56e2\u961f *</label><select id="bf-team">' + teamOptions + '</select></div>' +
-      '<div class="form-row"><label>Q1\u6b63\u5f0f</label><input type="number" id="bf-q1r" value="0" min="0"></div>' +
-      '<div class="form-row"><label>Q1\u5916\u5305</label><input type="number" id="bf-q1o" value="0" min="0"></div>' +
-      '<div class="form-row"><label>Q2\u6b63\u5f0f</label><input type="number" id="bf-q2r" value="0" min="0"></div>' +
-      '<div class="form-row"><label>Q2\u5916\u5305</label><input type="number" id="bf-q2o" value="0" min="0"></div>' +
-      '<div class="form-row"><label>Q3\u6b63\u5f0f</label><input type="number" id="bf-q3r" value="0" min="0"></div>' +
-      '<div class="form-row"><label>Q3\u5916\u5305</label><input type="number" id="bf-q3o" value="0" min="0"></div>' +
-      '<div class="form-row"><label>Q4\u6b63\u5f0f</label><input type="number" id="bf-q4r" value="0" min="0"></div>' +
-      '<div class="form-row"><label>Q4\u5916\u5305</label><input type="number" id="bf-q4o" value="0" min="0"></div>' +
+      '<div class="form-row"><label>Q1\u6b63\u5f0f(\u4eba\u6708)</label><input type="number" id="bf-q1r" value="0" min="0"></div>' +
+      '<div class="form-row"><label>Q1\u5916\u5305(\u4eba\u6708)</label><input type="number" id="bf-q1o" value="0" min="0"></div>' +
+      '<div class="form-row"><label>Q2\u6b63\u5f0f(\u4eba\u6708)</label><input type="number" id="bf-q2r" value="0" min="0"></div>' +
+      '<div class="form-row"><label>Q2\u5916\u5305(\u4eba\u6708)</label><input type="number" id="bf-q2o" value="0" min="0"></div>' +
+      '<div class="form-row"><label>Q3\u6b63\u5f0f(\u4eba\u6708)</label><input type="number" id="bf-q3r" value="0" min="0"></div>' +
+      '<div class="form-row"><label>Q3\u5916\u5305(\u4eba\u6708)</label><input type="number" id="bf-q3o" value="0" min="0"></div>' +
+      '<div class="form-row"><label>Q4\u6b63\u5f0f(\u4eba\u6708)</label><input type="number" id="bf-q4r" value="0" min="0"></div>' +
+      '<div class="form-row"><label>Q4\u5916\u5305(\u4eba\u6708)</label><input type="number" id="bf-q4o" value="0" min="0"></div>' +
       '</form>';
 
     SharedUI.confirm('\u65b0\u589e\u56e2\u961f\u9884\u7b97', formHtml, function () {
@@ -347,14 +347,14 @@ const BudgetModule = (() => {
     var teamOptions = buildTeamOptions(team);
     var formHtml = '<form id="budgetPlanForm" class="form-grid">' +
       '<div class="form-row"><label>\u56e2\u961f</label><select id="bf-team" disabled>' + teamOptions + '</select></div>' +
-      '<div class="form-row"><label>Q1\u6b63\u5f0f</label><input type="number" id="bf-q1r" value="' + (q1.regular || 0) + '" min="0"></div>' +
-      '<div class="form-row"><label>Q1\u5916\u5305</label><input type="number" id="bf-q1o" value="' + (q1.outsource || 0) + '" min="0"></div>' +
-      '<div class="form-row"><label>Q2\u6b63\u5f0f</label><input type="number" id="bf-q2r" value="' + (q2.regular || 0) + '" min="0"></div>' +
-      '<div class="form-row"><label>Q2\u5916\u5305</label><input type="number" id="bf-q2o" value="' + (q2.outsource || 0) + '" min="0"></div>' +
-      '<div class="form-row"><label>Q3\u6b63\u5f0f</label><input type="number" id="bf-q3r" value="' + (q3.regular || 0) + '" min="0"></div>' +
-      '<div class="form-row"><label>Q3\u5916\u5305</label><input type="number" id="bf-q3o" value="' + (q3.outsource || 0) + '" min="0"></div>' +
-      '<div class="form-row"><label>Q4\u6b63\u5f0f</label><input type="number" id="bf-q4r" value="' + (q4.regular || 0) + '" min="0"></div>' +
-      '<div class="form-row"><label>Q4\u5916\u5305</label><input type="number" id="bf-q4o" value="' + (q4.outsource || 0) + '" min="0"></div>' +
+      '<div class="form-row"><label>Q1\u6b63\u5f0f(\u4eba\u6708)</label><input type="number" id="bf-q1r" value="' + (q1.regular || 0) + '" min="0"></div>' +
+      '<div class="form-row"><label>Q1\u5916\u5305(\u4eba\u6708)</label><input type="number" id="bf-q1o" value="' + (q1.outsource || 0) + '" min="0"></div>' +
+      '<div class="form-row"><label>Q2\u6b63\u5f0f(\u4eba\u6708)</label><input type="number" id="bf-q2r" value="' + (q2.regular || 0) + '" min="0"></div>' +
+      '<div class="form-row"><label>Q2\u5916\u5305(\u4eba\u6708)</label><input type="number" id="bf-q2o" value="' + (q2.outsource || 0) + '" min="0"></div>' +
+      '<div class="form-row"><label>Q3\u6b63\u5f0f(\u4eba\u6708)</label><input type="number" id="bf-q3r" value="' + (q3.regular || 0) + '" min="0"></div>' +
+      '<div class="form-row"><label>Q3\u5916\u5305(\u4eba\u6708)</label><input type="number" id="bf-q3o" value="' + (q3.outsource || 0) + '" min="0"></div>' +
+      '<div class="form-row"><label>Q4\u6b63\u5f0f(\u4eba\u6708)</label><input type="number" id="bf-q4r" value="' + (q4.regular || 0) + '" min="0"></div>' +
+      '<div class="form-row"><label>Q4\u5916\u5305(\u4eba\u6708)</label><input type="number" id="bf-q4o" value="' + (q4.outsource || 0) + '" min="0"></div>' +
       '</form>';
 
     SharedUI.confirm('\u7f16\u8f91\u56e2\u961f\u9884\u7b97: ' + team, formHtml, function () {

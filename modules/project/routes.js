@@ -128,11 +128,11 @@ function validateProjects(projects) {
     // resourceSummary 数值校验
     if (p.resourceSummary) {
       const rs = p.resourceSummary;
-      if (rs.totalManDays != null && (typeof rs.totalManDays !== 'number' || rs.totalManDays < 0)) {
-        return `项目 "${p.id}" totalManDays 必须为非负数`;
+      if (rs.totalManMonths != null && (typeof rs.totalManMonths !== 'number' || rs.totalManMonths < 0)) {
+        return `项目 "${p.id}" totalManMonths 必须为非负数`;
       }
-      if (rs.usedManDays != null && (typeof rs.usedManDays !== 'number' || rs.usedManDays < 0)) {
-        return `项目 "${p.id}" usedManDays 必须为非负数`;
+      if (rs.usedManMonths != null && (typeof rs.usedManMonths !== 'number' || rs.usedManMonths < 0)) {
+        return `项目 "${p.id}" usedManMonths 必须为非负数`;
       }
       if (rs.totalCost != null && (typeof rs.totalCost !== 'number' || rs.totalCost < 0)) {
         return `项目 "${p.id}" totalCost 必须为非负数`;

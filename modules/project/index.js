@@ -85,7 +85,7 @@ const ProjectModule = (() => {
       const statusBadge = `<span class="badge ${STATUS_CLASSES[p.status] || ''}">${SharedUI.esc(STATUS_LABELS[p.status] || p.status)}</span>`;
       const priority = PRIORITY_LABELS[p.priority] || p.priority || '—';
       const rs = p.resourceSummary || {};
-      const manDays = rs.totalManDays ? (rs.usedManDays || 0) + '/' + rs.totalManDays : '—';
+      const manMonths = rs.totalManMonths ? (rs.usedManMonths || 0) + '/' + rs.totalManMonths : '—';
       const costStr = rs.totalCost ? (rs.usedCost || 0) + '/' + rs.totalCost + '万' : '—';
 
       return `<tr>
@@ -95,7 +95,7 @@ const ProjectModule = (() => {
         <td>${SharedUI.esc(priority)}</td>
         <td>${SharedUI.esc(p.owner || '')}</td>
         <td>${SharedUI.esc(p.startDate || '')} ~ ${SharedUI.esc(p.endDate || '')}</td>
-        <td>${SharedUI.esc(manDays)}</td>
+        <td>${SharedUI.esc(manMonths)}</td>
         <td>${SharedUI.esc(costStr)}</td>
       </tr>`;
     }).join('');
@@ -167,18 +167,18 @@ const ProjectModule = (() => {
     let resourceHtml = '';
     if (project.resourceSummary) {
       const rs = project.resourceSummary;
-      const pct = rs.totalManDays ? Math.round(rs.usedManDays / rs.totalManDays * 100) : 0;
+      const pct = rs.totalManMonths ? Math.round(rs.usedManMonths / rs.totalManMonths * 100) : 0;
       const costPct = rs.totalCost ? Math.round((rs.usedCost || 0) / rs.totalCost * 100) : 0;
-      const teamRows = rs.teams ? Object.entries(rs.teams).map(([team, days]) =>
-        `<tr><td>${SharedUI.esc(team)}</td><td>${days} 人天</td></tr>`
+      const teamRows = rs.teams ? Object.entries(rs.teams).map(([team, months]) =>
+        `<tr><td>${SharedUI.esc(team)}</td><td>${months} 人月</td></tr>`
       ).join('') : '';
 
       resourceHtml = `
         <div class="detail-section">
           <h4>人力规划 & 成本预算</h4>
           <div class="resource-grid">
-            <div class="resource-item"><span class="resource-item-label">预计总人力</span><span class="resource-item-value">${rs.totalManDays || 0} 人天</span></div>
-            <div class="resource-item"><span class="resource-item-label">已投入人力</span><span class="resource-item-value">${rs.usedManDays || 0} 人天 (${pct}%)</span></div>
+            <div class="resource-item"><span class="resource-item-label">预计总人力</span><span class="resource-item-value">${rs.totalManMonths || 0} 人月</span></div>
+            <div class="resource-item"><span class="resource-item-label">已投入人力</span><span class="resource-item-value">${rs.usedManMonths || 0} 人月 (${pct}%)</span></div>
             <div class="resource-item"><span class="resource-item-label">预计总成本</span><span class="resource-item-value">${rs.totalCost || 0}万元</span></div>
             <div class="resource-item"><span class="resource-item-label">已使用成本</span><span class="resource-item-value">${rs.usedCost || 0}万元 (${costPct}%)</span></div>
             <div class="resource-item"><span class="resource-item-label">外包人数</span><span class="resource-item-value">${rs.outsourceCount || 0} 人</span></div>
@@ -295,12 +295,12 @@ const ProjectModule = (() => {
           <label>— 人力规划 —</label>
         </div>
         <div class="form-row">
-          <label>预计总人力(人天)</label>
-          <input type="number" id="pf-totalManDays" value="${rs.totalManDays || ''}" min="0">
+          <label>预计总人力(人月)</label>
+          <input type="number" id="pf-totalManMonths" value="${rs.totalManMonths || ''}" min="0">
         </div>
         <div class="form-row">
-          <label>已投入人力(人天)</label>
-          <input type="number" id="pf-usedManDays" value="${rs.usedManDays || ''}" min="0">
+          <label>已投入人力(人月)</label>
+          <input type="number" id="pf-usedManMonths" value="${rs.usedManMonths || ''}" min="0">
         </div>
         <div class="form-row">
           <label>涉及团队(逗号分隔)</label>
@@ -345,8 +345,8 @@ const ProjectModule = (() => {
     const note = document.getElementById('pf-note')?.value?.trim();
 
     // Resource fields
-    const totalManDays = Number(document.getElementById('pf-totalManDays')?.value) || 0;
-    const usedManDays = Number(document.getElementById('pf-usedManDays')?.value) || 0;
+    const totalManMonths = Number(document.getElementById('pf-totalManMonths')?.value) || 0;
+    const usedManMonths = Number(document.getElementById('pf-usedManMonths')?.value) || 0;
     const teamsStr = (document.getElementById('pf-teams')?.value || '').trim();
     const totalCost = Number(document.getElementById('pf-totalCost')?.value) || 0;
     const usedCost = Number(document.getElementById('pf-usedCost')?.value) || 0;
@@ -365,7 +365,7 @@ const ProjectModule = (() => {
 
     // Build resourceSummary
     let resourceSummary = null;
-    if (totalManDays || totalCost || outsourceCount || durationMonths) {
+    if (totalManMonths || totalCost || outsourceCount || durationMonths) {
       const teams = {};
       if (teamsStr) {
         teamsStr.split(',').map(function (t) { return t.trim(); }).filter(Boolean).forEach(function (t) {
@@ -373,8 +373,8 @@ const ProjectModule = (() => {
         });
       }
       resourceSummary = {
-        totalManDays: totalManDays,
-        usedManDays: usedManDays,
+        totalManMonths: totalManMonths,
+        usedManMonths: usedManMonths,
         totalCost: totalCost,
         usedCost: usedCost,
         outsourceCount: outsourceCount,

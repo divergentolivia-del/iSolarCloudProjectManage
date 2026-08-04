@@ -72,6 +72,9 @@ const Router = (() => {
     } else if (moduleId === 'dashboard' && subPath === 'token') {
       items.push({ label: '首页', href: '#/dashboard' });
       items.push({ label: 'AI/Token 使用记录' });
+    } else if (moduleId === 'dashboard' && subPath === 'settings') {
+      items.push({ label: '首页', href: '#/dashboard' });
+      items.push({ label: '系统设置' });
     } else if (moduleId === 'iteration') {
       if (!subPath) {
         items.push({ label: mod ? mod.name : '阳光云迭代项目' });

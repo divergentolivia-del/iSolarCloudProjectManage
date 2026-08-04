@@ -20,6 +20,9 @@ const HISTORY_DIR = path.join(BUDGET_DIR, 'history');
 /* 预算告警阈值 */
 const ALERT_THRESHOLD = 0.10; // 超 10% 触发告警
 
+/* 默认外包人月单价 */
+const DEFAULT_OUTSOURCE_RATE = 30000;
+
 /* ---------- 空状态模板 ---------- */
 const EMPTY_STATE = {
   rev: 0,
@@ -169,12 +172,24 @@ function validateBudgetState(state) {
 }
 
 /**
+ * 计算外包成本
+ * @param {number} outsource - 外包人数
+ * @param {number} [rate] - 人月单价（默认30000）
+ * @returns {number} 月成本
+ */
+function computeOutsourceCost(outsource, rate) {
+  const r = rate || DEFAULT_OUTSOURCE_RATE;
+  return (Number(outsource) || 0) * r;
+}
+
+/**
  * 自动生成预算告警
  * 当实际人数超过计划超过阈值 (10%) 时生成告警
  */
 function generateAlerts(state) {
   const alerts = [];
   const currentQ = getCurrentQuarter();
+  const outsourceRate = (state.costConfig && state.costConfig.outsourceRate) || DEFAULT_OUTSOURCE_RATE;
 
   if (!Array.isArray(state.plans) || !Array.isArray(state.actuals)) return alerts;
 
@@ -199,13 +214,18 @@ function generateAlerts(state) {
         const totalActual = Number(actual.total) || 0;
         if (totalActual > planned * (1 + ALERT_THRESHOLD)) {
           const deviation = (totalActual - planned) / planned;
+          const overCount = totalActual - planned;
+          const costImpact = computeOutsourceCost(overCount, outsourceRate);
+          const costDisplay = costImpact >= 10000
+            ? '¥' + (costImpact / 10000).toFixed(1) + '万'
+            : '¥' + costImpact.toLocaleString();
           alerts.push({
             team: plan.team,
             month: actual.month,
             type: 'over-budget',
             threshold: ALERT_THRESHOLD,
             actual: Math.round(deviation * 100) / 100,
-            message: `实际人数超预算 ${(deviation * 100).toFixed(0)}%`
+            message: `实际人数超预算 ${(deviation * 100).toFixed(0)}%，超出成本影响约${costDisplay}/月`
           });
         }
       });
@@ -271,6 +291,13 @@ module.exports = {
         }
 
         const next = incoming.state || {};
+
+        // Ensure costConfig exists with default outsource rate
+        if (!next.costConfig) {
+          next.costConfig = { outsourceRate: DEFAULT_OUTSOURCE_RATE };
+        } else if (!next.costConfig.outsourceRate) {
+          next.costConfig.outsourceRate = DEFAULT_OUTSOURCE_RATE;
+        }
 
         // 验证预算数据
         const err = validateBudgetState(next);

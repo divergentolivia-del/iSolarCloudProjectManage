@@ -287,6 +287,71 @@ const Platform = (() => {
   }
 
   /* ============================================================
+     Notification Dropdown
+     ============================================================ */
+
+  /**
+   * Toggle the notification dropdown panel.
+   * Fetches latest alerts from /api/dashboard/summary and shows them.
+   */
+  async function toggleNotificationDropdown() {
+    let dropdown = document.getElementById('notificationDropdown');
+
+    // Create dropdown if not exists
+    if (!dropdown) {
+      dropdown = document.createElement('div');
+      dropdown.id = 'notificationDropdown';
+      dropdown.className = 'notification-dropdown hidden';
+      document.body.appendChild(dropdown);
+    }
+
+    // Toggle visibility
+    if (!dropdown.classList.contains('hidden')) {
+      dropdown.classList.add('hidden');
+      return;
+    }
+
+    // Fetch alerts
+    dropdown.innerHTML = '<div class="notification-loading">加载中...</div>';
+    dropdown.classList.remove('hidden');
+
+    try {
+      const resp = await fetch('/api/dashboard/summary');
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      const alerts = data.alerts || [];
+
+      if (alerts.length === 0) {
+        dropdown.innerHTML = '<div class="notification-empty">暂无告警通知</div>';
+      } else {
+        const items = alerts.map(a => {
+          const icon = (a.type || '').startsWith('budget') ? '⚠' : a.type === 'token-warning' ? '🤖' : '⚠';
+          return `<div class="notification-item"><span class="notification-icon">${icon}</span><span class="notification-text">${SharedUI.esc(a.message || '')}</span></div>`;
+        }).join('');
+        dropdown.innerHTML = `<div class="notification-header">告警通知 (${alerts.length})</div>${items}`;
+      }
+    } catch (e) {
+      dropdown.innerHTML = '<div class="notification-empty">获取通知失败</div>';
+    }
+  }
+
+  /* ============================================================
+     Dark Theme on Load
+     ============================================================ */
+
+  /**
+   * Apply dark theme if persisted in localStorage.
+   */
+  function applyPersistedTheme() {
+    try {
+      const theme = localStorage.getItem('platform_theme');
+      if (theme === 'dark') {
+        document.body.classList.add('dark-theme');
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  /* ============================================================
      Platform Init
      ============================================================ */
 
@@ -308,6 +373,9 @@ const Platform = (() => {
     modules.forEach(m => {
       if (m && m.id) moduleMap[m.id] = m;
     });
+
+    // Apply persisted dark theme
+    applyPersistedTheme();
 
     // Load sidebar preference
     loadSidebarPreference();
@@ -341,6 +409,29 @@ const Platform = (() => {
         }
       });
     }
+
+    // Bind notification bell button
+    const notifyBtn = document.getElementById('navbarNotify');
+    if (notifyBtn) {
+      notifyBtn.addEventListener('click', toggleNotificationDropdown);
+    }
+
+    // Bind settings button
+    const settingsBtn = document.getElementById('navbarSettings');
+    if (settingsBtn) {
+      settingsBtn.addEventListener('click', () => {
+        window.location.hash = '#/dashboard/settings';
+      });
+    }
+
+    // Close notification dropdown on outside click
+    document.addEventListener('click', (e) => {
+      const dropdown = document.getElementById('notificationDropdown');
+      const btn = document.getElementById('navbarNotify');
+      if (dropdown && !dropdown.contains(e.target) && e.target !== btn) {
+        dropdown.classList.add('hidden');
+      }
+    });
 
     // Bind backdrop click (mobile)
     const backdrop = document.getElementById('sidebarBackdrop');

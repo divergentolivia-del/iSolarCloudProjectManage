@@ -61,9 +61,10 @@ const BudgetModule = (() => {
     if (!container) return;
 
     await fetchState();
-    const data = state || { plans: [], actuals: [], alerts: [] };
+    const data = state || { plans: [], actuals: [], alerts: [], costConfig: { outsourceRate: 30000 } };
+    const outsourceRate = (data.costConfig && data.costConfig.outsourceRate) || 30000;
 
-    // 年度预算计划表
+    // 年度预算计划表（含外包成本列）
     let planTableHtml = '';
     if (data.plans && data.plans.length > 0) {
       const rows = data.plans.map(plan => {
@@ -73,6 +74,11 @@ const BudgetModule = (() => {
         const q3 = q.find(x => x.q === 'Q3') || {};
         const q4 = q.find(x => x.q === 'Q4') || {};
         const annual = plan.annual || {};
+        const outsource = Number(plan.outsource) || 0;
+        const outsourceCost = outsource * outsourceRate;
+        const outsourceCostDisplay = outsourceCost >= 10000
+          ? '¥' + (outsourceCost / 10000).toFixed(1) + '万/月'
+          : '¥' + outsourceCost.toLocaleString() + '/月';
 
         return `<tr>
           <td>${SharedUI.esc(plan.team)}</td>
@@ -81,12 +87,25 @@ const BudgetModule = (() => {
           <td class="editable" data-team="${SharedUI.esc(plan.team)}" data-q="Q3" data-field="budget">${q3.budget || 0}</td>
           <td class="editable" data-team="${SharedUI.esc(plan.team)}" data-q="Q4" data-field="budget">${q4.budget || 0}</td>
           <td>${annual.budget || '—'}</td>
+          <td>${outsource}</td>
+          <td>${outsourceCostDisplay}</td>
         </tr>`;
       }).join('');
+
+      // 汇总外包成本
+      const totalOutsource = data.plans.reduce((sum, p) => sum + (Number(p.outsource) || 0), 0);
+      const totalOutsourceCost = totalOutsource * outsourceRate;
+      const totalCostDisplay = totalOutsourceCost >= 10000
+        ? '¥' + (totalOutsourceCost / 10000).toFixed(1) + '万/月'
+        : '¥' + totalOutsourceCost.toLocaleString() + '/月';
 
       planTableHtml = `
         <div class="budget-section">
           <h3 class="section-title">年度预算计划表</h3>
+          <div class="cost-summary">
+            <span class="cost-summary-item">外包人月单价: ¥${outsourceRate.toLocaleString()}</span>
+            <span class="cost-summary-item">外包总成本: ${totalCostDisplay} (${totalOutsource}人)</span>
+          </div>
           <div class="table-wrapper">
             <table class="data-table budget-table" id="budgetPlanTable">
               <thead>
@@ -97,6 +116,8 @@ const BudgetModule = (() => {
                   <th>Q3计划</th>
                   <th>Q4计划</th>
                   <th>年均</th>
+                  <th>外包(人)</th>
+                  <th>外包成本</th>
                 </tr>
               </thead>
               <tbody>${rows}</tbody>
@@ -108,7 +129,11 @@ const BudgetModule = (() => {
       planTableHtml = `
         <div class="budget-section">
           <h3 class="section-title">年度预算计划表</h3>
-          <p class="empty-hint">暂无预算计划数据</p>
+          <div class="empty-state-box">
+            <p class="empty-hint">暂无预算计划数据</p>
+            <p class="empty-desc">点击下方按钮创建您的第一个团队预算计划</p>
+            <button class="btn primary" id="addBudgetPlanBtn">+ 新增团队预算</button>
+          </div>
         </div>
       `;
     }
@@ -201,6 +226,14 @@ const BudgetModule = (() => {
     const exportBtn = document.getElementById('budgetExportBtn');
     if (exportBtn) {
       exportBtn.addEventListener('click', exportExcel);
+    }
+
+    // 绑定新增团队预算按钮（空状态时出现）
+    const addBudgetBtn = document.getElementById('addBudgetPlanBtn');
+    if (addBudgetBtn) {
+      addBudgetBtn.addEventListener('click', () => {
+        SharedUI.toast('新增团队预算功能开发中', 'info');
+      });
     }
   }
 

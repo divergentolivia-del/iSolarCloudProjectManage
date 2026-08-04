@@ -59,9 +59,33 @@ const DashboardModule = (() => {
 
     const metricsHtml = `
       <div class="metrics-row">
-        ${SharedUI.renderMetricCard('📊', '产能偏差', deviationValue, deviationStatus, deviationStatus === 'warn' ? '⚠ ' + deviationText : '✓ ' + deviationText)}
-        ${SharedUI.renderMetricCard('📋', '在研项目数', projectValue, projectStatus, projectStatus === 'warn' ? '⚠ ' + projectText : '✓ ' + projectText)}
-        ${SharedUI.renderMetricCard('🤖', 'Token月度消耗', tokenValue, tokenStatus, '✓ ' + tokenText)}
+        <div class="metric-card">
+          <div class="metric-card-header">
+            <span class="metric-card-icon">📊</span>
+            <span class="metric-card-label">产能偏差</span>
+          </div>
+          <div class="metric-card-value">${SharedUI.esc(deviationValue)}</div>
+          <span class="metric-card-status ${deviationStatus}">${SharedUI.esc(deviationStatus === 'warn' ? '⚠ ' + deviationText : '✓ ' + deviationText)}</span>
+          <span class="metric-card-subtitle">偏差超±10%时预警</span>
+        </div>
+        <div class="metric-card">
+          <div class="metric-card-header">
+            <span class="metric-card-icon">📋</span>
+            <span class="metric-card-label">在研项目数</span>
+          </div>
+          <div class="metric-card-value">${SharedUI.esc(projectValue)}</div>
+          <span class="metric-card-status ${projectStatus}">${SharedUI.esc(projectStatus === 'warn' ? '⚠ ' + projectText : '✓ ' + projectText)}</span>
+          <span class="metric-card-subtitle">有逾期里程碑时预警</span>
+        </div>
+        <div class="metric-card">
+          <div class="metric-card-header">
+            <span class="metric-card-icon">🤖</span>
+            <span class="metric-card-label">Token月度消耗</span>
+          </div>
+          <div class="metric-card-value">${SharedUI.esc(tokenValue)}</div>
+          <span class="metric-card-status ${tokenStatus}">${SharedUI.esc('✓ ' + tokenText)}</span>
+          <span class="metric-card-subtitle">超月预算80%时预警</span>
+        </div>
       </div>
     `;
 
@@ -75,6 +99,7 @@ const DashboardModule = (() => {
 
     // 快速访问区：告警
     let alertsHtml = '';
+    const alertSourceNote = '来源：项目里程碑逾期、预算超支、Token超限';
     if (data.alerts && data.alerts.length > 0) {
       const alertItems = data.alerts.map(a => {
         const icon = a.type.startsWith('budget') ? '⚠' : a.type === 'token-warning' ? '○' : '⚠';
@@ -84,6 +109,7 @@ const DashboardModule = (() => {
       alertsHtml = `
         <div class="quick-section alerts-section">
           <h3 class="section-title">待办/告警</h3>
+          <p class="section-note">${SharedUI.esc(alertSourceNote)}</p>
           <ul class="alert-list">${alertItems}</ul>
           ${moreLink}
         </div>
@@ -92,6 +118,7 @@ const DashboardModule = (() => {
       alertsHtml = `
         <div class="quick-section alerts-section">
           <h3 class="section-title">待办/告警</h3>
+          <p class="section-note">${SharedUI.esc(alertSourceNote)}</p>
           <p class="empty-hint">暂无告警</p>
         </div>
       `;
@@ -142,24 +169,61 @@ const DashboardModule = (() => {
   }
 
   /**
-   * 渲染子页面（budget 或 token）
+   * 渲染子页面（budget、token 或 settings）
    */
   function renderSubPage(subPath) {
     if (!container) return;
 
     if (subPath === 'budget') {
       // 渲染预算管理子页面
+      container.innerHTML = `
+        <div class="sub-page">
+          <div class="sub-page-nav">
+            <a href="#/dashboard" class="btn back-btn">&larr; 返回首页</a>
+            <div class="breadcrumb-inline">${SharedUI.renderBreadcrumb([{label: '首页', href: '#/dashboard'}, {label: '人力预算管理'}])}</div>
+          </div>
+          <div id="budgetSubContainer"></div>
+        </div>
+      `;
+      const subContainer = document.getElementById('budgetSubContainer');
       if (typeof BudgetModule !== 'undefined' && BudgetModule.render) {
-        BudgetModule.render(container);
+        BudgetModule.render(subContainer);
       } else {
-        container.innerHTML = '<div class="sub-page"><p>人力预算管理模块加载中...</p></div>';
+        subContainer.innerHTML = '<p>人力预算管理模块加载中...</p>';
       }
     } else if (subPath === 'token') {
       // 渲染 Token 子页面
+      container.innerHTML = `
+        <div class="sub-page">
+          <div class="sub-page-nav">
+            <a href="#/dashboard" class="btn back-btn">&larr; 返回首页</a>
+            <div class="breadcrumb-inline">${SharedUI.renderBreadcrumb([{label: '首页', href: '#/dashboard'}, {label: 'AI/Token使用记录'}])}</div>
+          </div>
+          <div id="tokenSubContainer"></div>
+        </div>
+      `;
+      const subContainer = document.getElementById('tokenSubContainer');
       if (typeof TokenModule !== 'undefined' && TokenModule.render) {
-        TokenModule.render(container);
+        TokenModule.render(subContainer);
       } else {
-        container.innerHTML = '<div class="sub-page"><p>AI/Token 使用记录模块加载中...</p></div>';
+        subContainer.innerHTML = '<p>AI/Token 使用记录模块加载中...</p>';
+      }
+    } else if (subPath === 'settings') {
+      // 渲染系统设置子页面
+      container.innerHTML = `
+        <div class="sub-page">
+          <div class="sub-page-nav">
+            <a href="#/dashboard" class="btn back-btn">&larr; 返回首页</a>
+            <div class="breadcrumb-inline">${SharedUI.renderBreadcrumb([{label: '首页', href: '#/dashboard'}, {label: '系统设置'}])}</div>
+          </div>
+          <div id="settingsSubContainer"></div>
+        </div>
+      `;
+      const subContainer = document.getElementById('settingsSubContainer');
+      if (typeof SettingsModule !== 'undefined' && SettingsModule.render) {
+        SettingsModule.render(subContainer);
+      } else {
+        subContainer.innerHTML = '<p>系统设置模块加载中...</p>';
       }
     } else {
       renderHome();

@@ -62,14 +62,36 @@ const EMPTY_STATE = {
   rev: 0, updatedAt: '', updatedBy: ''
 };
 
-/* 读取状态。文件不存在属正常（首次启动），返回空态；
+/* 读取状态。迁移后优先从 data/iteration/state.json 读取真实数据；
+   旧 data/state.json 可能只有 _migrated 标记。
+   文件不存在属正常（首次启动），返回空态；
    文件存在但解析失败说明已损坏（如写盘中途断电），此时绝不能返回空态 ——
    那会让各端把空数据当成最新版，一提交就把所有人的填写覆盖掉。
    改为自动回退到 history 里最近一个可用快照。 */
 function readState() {
+  // 迁移后优先从 iteration/state.json 读取
+  const iterStateFile = path.join(DATA_DIR, 'iteration', 'state.json');
+  if (fs.existsSync(iterStateFile)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(iterStateFile, 'utf8'));
+      if (data && !data._migrated) return data;
+    } catch (e) { /* 迭代文件损坏，继续回退逻辑 */ }
+  }
+
+  // 回退到原始 state.json
   if (!fs.existsSync(STATE_FILE)) return JSON.parse(JSON.stringify(EMPTY_STATE));
   try {
-    return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    const data = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    // 如果是迁移标记文件，尝试从 iteration 目录读取
+    if (data._migrated) {
+      if (fs.existsSync(iterStateFile)) {
+        try {
+          return JSON.parse(fs.readFileSync(iterStateFile, 'utf8'));
+        } catch (e) { /* 迭代文件也坏了 */ }
+      }
+      return JSON.parse(JSON.stringify(EMPTY_STATE));
+    }
+    return data;
   } catch (e) {
     console.error('state.json 解析失败：' + e.message + '，尝试回退历史快照');
     const snap = latestSnapshot();
@@ -99,22 +121,28 @@ function latestSnapshot() {
   return null;
 }
 
-/* 原子写入：先写临时文件再 rename，避免并发读到半截 JSON */
+/* 原子写入：先写临时文件再 rename，避免并发读到半截 JSON。
+   迁移后优先写入 data/iteration/state.json */
 function writeState(s) {
   ensureDirs();
-  const tmp = STATE_FILE + '.tmp';
+  const iterDir = path.join(DATA_DIR, 'iteration');
+  const iterStateFile = path.join(iterDir, 'state.json');
+  const targetFile = fs.existsSync(iterDir) ? iterStateFile : STATE_FILE;
+  const tmp = targetFile + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(s, null, 2), 'utf8');
-  fs.renameSync(tmp, STATE_FILE);
+  fs.renameSync(tmp, targetFile);
 }
 
-/* 归档快照，便于回溯月度历史 */
+/* 归档快照，便于回溯月度历史。迁移后优先写入 data/iteration/history/ */
 function archive(s) {
   try {
     ensureDirs();
+    const iterHistDir = path.join(DATA_DIR, 'iteration', 'history');
+    const targetDir = fs.existsSync(iterHistDir) ? iterHistDir : HISTORY_DIR;
     const c = (s.cycles || []).find(x => x.active) || {};
     const tag = String(c.online || 'unnamed').replace(/[^\w.-]/g, '_');
     const name = tag + '-rev' + s.rev + '.json';
-    fs.writeFileSync(path.join(HISTORY_DIR, name), JSON.stringify(s), 'utf8');
+    fs.writeFileSync(path.join(targetDir, name), JSON.stringify(s), 'utf8');
   } catch (e) { /* 归档失败不影响主流程 */ }
 }
 

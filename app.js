@@ -1028,11 +1028,15 @@ function enterArchiveReadOnlyMode(data) {
   const dateLabel = data.meta.name || data.meta.id || '归档数据';
   banner.innerHTML = `
     <span>📋 正在查看「${esc(dateLabel)}」归档数据（${esc(data.meta.archivedAt || '')}）</span>
-    <button class="btn" id="archiveBannerBack">返回当前迭代</button>`;
+    <button class="btn" onclick="exitArchiveView()">返回当前迭代</button>`;
   banner.classList.remove('hidden');
 
   // 启用只读样式
   document.body.classList.add('archive-readonly');
+
+  // 隐藏历史归档 Tab（查看归档时不需要再看列表）
+  const archiveTab = document.querySelector('.tab[data-view="archiveHistory"]');
+  if (archiveTab) archiveTab.style.display = 'none';
 
   // 更新归档按钮
   updateArchiveButton();
@@ -1040,8 +1044,6 @@ function enterArchiveReadOnlyMode(data) {
   // 切到第一个 Tab 并渲染
   switchView('cycle');
 
-  // 绑定返回按钮
-  document.getElementById('archiveBannerBack').addEventListener('click', exitArchiveView);
 }
 
 function exitArchiveView() {
@@ -1067,6 +1069,10 @@ function exitArchiveView() {
 
   // 移除只读样式
   document.body.classList.remove('archive-readonly');
+
+  // 恢复历史归档 Tab 显示
+  const archiveTab = document.querySelector('.tab[data-view="archiveHistory"]');
+  if (archiveTab) archiveTab.style.display = '';
 
   // 更新归档按钮
   updateArchiveButton();

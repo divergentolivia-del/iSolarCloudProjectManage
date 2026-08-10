@@ -687,9 +687,35 @@ RENDERERS.analysis = function () {
       </table></div>
     </div>` : '';
 
+  /* 多方案偏差列：当有 2+ 个 workdays>0 的方案时展示多方案对比 */
+  const validSchemes = state.cycles.filter(cyc => cyc.workdays > 0 || cyc.saturdays > 0);
+  const multiScheme = validSchemes.length >= 2;
+
+  let schemeHeaders = '';
+  let schemeSubHeaders = '';
+  if (multiScheme) {
+    schemeHeaders = validSchemes.map(cyc => {
+      const days = cycleDays(cyc);
+      return `<th class="scheme-header" colspan="3">${esc(cyc.name)}（${days}天）</th>`;
+    }).join('');
+    schemeSubHeaders = validSchemes.map(() =>
+      `<th class="scheme-sub-header">总产能</th><th class="scheme-sub-header">超出</th><th class="scheme-sub-header">比例</th>`
+    ).join('');
+  }
+
   const devRows = res.deviation.map(d => {
     const cls = d.verdict === '正常' ? 'ok' : (d.verdict === '产能富余' ? 'hold' : 'warn');
     const ratio = Math.min(Math.abs(d.ratio), 1);
+    let schemeCells = '';
+    if (multiScheme) {
+      schemeCells = validSchemes.map(cyc => {
+        const days = cycleDays(cyc);
+        const cap = d.head * days;
+        const over = d.workload - cap;
+        const r = cap ? over / cap : 0;
+        return `<td>${fmt(cap)}</td><td>${fmt(over)}</td><td>${cap ? pct(r) : '—'}</td>`;
+      }).join('');
+    }
     return `
       <tr>
         <td class="txt">${esc(d.team)}</td>
@@ -700,10 +726,22 @@ RENDERERS.analysis = function () {
         <td>${d.capacity ? pct(d.ratio) : '—'}</td>
         <td style="width:120px"><div class="bar"><i class="${d.over > 0 ? 'over' : ''}" style="width:${(ratio * 100).toFixed(0)}%"></i></div></td>
         <td class="txt"><span class="tag ${cls}">${esc(d.verdict)}</span></td>
+        ${schemeCells}
       </tr>`;
   }).join('');
 
   const overall = res.totals.capacity ? (res.totals.workload - res.totals.capacity) / res.totals.capacity : 0;
+
+  let schemeSumCells = '';
+  if (multiScheme) {
+    schemeSumCells = validSchemes.map(cyc => {
+      const days = cycleDays(cyc);
+      const cap = res.totals.head * days;
+      const over = res.totals.workload - cap;
+      const r = cap ? over / cap : 0;
+      return `<td>${fmt(cap)}</td><td>${fmt(over)}</td><td>${cap ? pct(r) : '—'}</td>`;
+    }).join('');
+  }
 
   document.getElementById('view-analysis').innerHTML = `
     ${warn}
@@ -719,13 +757,17 @@ RENDERERS.analysis = function () {
 
     <div class="card">
       <h2>团队版本工作量与产能偏差分析</h2>
-      <p class="hint">超出工作量 = 版本工作量 − 总产能；总产能 = 可投入人数 × 开发周期。为正说明产能不足需裁剪需求，为负说明产能富余可继续导入需求，${(DEVIATION_TOLERANCE * 100).toFixed(0)}% 以内属正常偏差由团队自行消化。</p>
+      <p class="hint">超出工作量 = 版本工作量 − 总产能；总产能 = 可投入人数 × 开发周期。为正说明产能不足需裁剪需求，为负说明产能富余可继续导入需求，${(DEVIATION_TOLERANCE * 100).toFixed(0)}% 以内属正常偏差由团队自行消化。${multiScheme ? '下方同时展示多个方案的产能对比。' : ''}</p>
       <div class="scroll"><table>
-        <thead><tr>
-          <th class="txt">团队</th><th>版本工作量<br>（人天）</th><th>可投入人数</th>
-          <th>总产能<br>（人天）</th><th>超出工作量</th><th>超出比例</th>
-          <th>偏差</th><th class="txt">结论</th>
-        </tr></thead>
+        <thead>
+          ${multiScheme ? `<tr><th colspan="8"></th>${schemeHeaders}</tr>` : ''}
+          <tr>
+            <th class="txt">团队</th><th>版本工作量<br>（人天）</th><th>可投入人数</th>
+            <th>总产能<br>（人天）</th><th>超出工作量</th><th>超出比例</th>
+            <th>偏差</th><th class="txt">结论</th>
+            ${multiScheme ? schemeSubHeaders : ''}
+          </tr>
+        </thead>
         <tbody>${devRows}</tbody>
         <tfoot><tr class="sum">
           <td class="txt">合计</td>
@@ -734,6 +776,7 @@ RENDERERS.analysis = function () {
           <td>${fmt(res.totals.workload - res.totals.capacity)}</td>
           <td>${res.totals.capacity ? pct(overall) : '—'}</td>
           <td colspan="2"></td>
+          ${schemeSumCells}
         </tr></tfoot>
       </table></div>
     </div>
@@ -966,42 +1009,131 @@ function loadArchiveList() {
         container.innerHTML = '<p style="color:var(--muted);text-align:center;padding:32px 0">暂无归档记录</p>';
         return;
       }
-      const cards = list.map(item => {
+      const rows = list.map(item => {
         const deviation = item.summary && item.summary.overallDeviation != null
           ? (item.summary.overallDeviation * 100).toFixed(1) + '%'
           : '—';
-        const devClass = item.summary && item.summary.overallDeviation > 0 ? 'positive' : 'negative';
-        const cycleInfo = item.cycle
-          ? '封版 ' + (item.cycle.seal || '—') + ' / 上线 ' + (item.cycle.online || '—')
-          : '';
+        const onlineTime = item.cycle ? (item.cycle.online || '—') : '—';
         return `
-          <div class="archive-card" data-archive-id="${esc(item.id)}">
-            <div class="archive-card-header">
-              <span class="archive-card-title">${esc(item.name || item.id)}</span>
-              <span class="archive-card-date">${esc(item.archivedAt || '')}</span>
-            </div>
-            <div class="archive-card-meta">
-              <span>${esc(cycleInfo)}</span>
-              <span>操作人：${esc(item.archivedBy || '未知')}</span>
-              <span class="archive-card-deviation ${devClass}">偏差 ${deviation}</span>
-            </div>
-            ${item.note ? '<div style="margin-top:6px;font-size:12px;color:var(--muted)">' + esc(item.note) + '</div>' : ''}
-          </div>`;
+          <tr>
+            <td class="txt">${esc(item.name || item.id)}</td>
+            <td>${esc(onlineTime)}</td>
+            <td>${esc(deviation)}</td>
+            <td>${esc(item.archivedBy || '未知')}</td>
+            <td>${esc(item.archivedAt || '')}</td>
+            <td class="archive-ops" style="white-space:nowrap">
+              <button class="btn" onclick="viewArchive('${esc(item.id)}')">查看</button>
+              <button class="btn" onclick="editArchive('${esc(item.id)}')">编辑</button>
+              <button class="btn" onclick="exportArchiveExcel('${esc(item.id)}')">导出Excel</button>
+              <button class="btn" onclick="deleteArchive('${esc(item.id)}')">删除</button>
+            </td>
+          </tr>`;
       }).join('');
-      container.innerHTML = '<div class="archive-timeline">' + cards + '</div>';
-
-      // 绑定卡片点击事件
-      container.querySelectorAll('.archive-card').forEach(card => {
-        card.addEventListener('click', () => {
-          const id = card.dataset.archiveId;
-          if (id) viewArchive(id);
-        });
-      });
+      container.innerHTML = `
+        <div class="scroll"><table>
+          <thead><tr>
+            <th class="txt">归档标题</th><th>上线时间</th><th>偏差</th>
+            <th>操作人</th><th>归档时间</th><th>操作</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>`;
     })
     .catch(e => {
       const container = document.getElementById('archiveListContainer');
       if (container) container.innerHTML = '<p style="color:var(--warn);text-align:center;padding:32px 0">加载失败：' + esc(e.message) + '</p>';
     });
+}
+
+/* 编辑归档元信息 */
+async function editArchive(id) {
+  const data = await fetch('api/archive/' + id).then(r => r.json());
+  if (!data || !data.meta) { toast('归档数据异常'); return; }
+
+  const bodyHtml = `
+    <div class="form-group" style="margin-bottom:12px">
+      <label style="font-size:13px;color:var(--muted);display:block;margin-bottom:4px">归档标题</label>
+      <input type="text" id="editArchiveName" value="${esc(data.meta.name || '')}" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:4px;font-size:14px">
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label style="font-size:13px;color:var(--muted);display:block;margin-bottom:4px">备注</label>
+      <textarea id="editArchiveNote" rows="3" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:4px;font-size:14px;resize:vertical">${esc(data.meta.note || '')}</textarea>
+    </div>
+    <p style="color:var(--muted);font-size:12px;margin:0">注意：编辑归档仅修改标题和备注信息。</p>
+  `;
+  showModal('编辑归档', bodyHtml, `
+    <button class="btn" onclick="hideModal()">取消</button>
+    <button class="btn primary" id="saveArchiveEditBtn">保存</button>
+  `);
+
+  document.getElementById('saveArchiveEditBtn').addEventListener('click', async () => {
+    const newName = document.getElementById('editArchiveName').value.trim();
+    const newNote = document.getElementById('editArchiveNote').value.trim();
+    await fetch('api/archive/' + id, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name: newName, note: newNote })
+    });
+    hideModal();
+    toast('归档信息已更新');
+    loadArchiveList();
+  });
+}
+
+/* 导出归档为 Excel */
+async function exportArchiveExcel(id) {
+  const data = await fetch('api/archive/' + id).then(r => r.json());
+  if (!data || !data.state) { toast('归档数据异常'); return; }
+  const result = compute(data.state);
+  exportXlsxFromState(data.state, result, data.meta.name || id);
+}
+
+/* 删除归档 */
+async function deleteArchive(id) {
+  if (!window.confirm('确定删除此归档？此操作不可恢复。')) return;
+  const resp = await fetch('api/archive/' + id, { method: 'DELETE' });
+  const result = await resp.json();
+  if (result.error) { toast('删除失败：' + result.error); return; }
+  toast('归档已删除');
+  loadArchiveList();
+}
+
+/* 通用导出 xlsx 逻辑（可用于当前 state 或归档 state） */
+function exportXlsxFromState(s, res, fileName) {
+  const wb = XLSX.utils.book_new();
+
+  const head = ['分类'].concat(TEAMS.map(t => t.key)).concat(['合计（人天）']);
+  const toAoa = rows => [head].concat(rows.map(r =>
+    [r.key].concat(TEAMS.map(t => num(r.values[t.key]))).concat([rowTotal(r.values)])));
+
+  XLSX.utils.book_append_sheet(wb,
+    XLSX.utils.aoa_to_sheet(toAoa(res.lineRows.concat([{ key: '产品线汇总', values: res.lineSummary }]))),
+    '产品线工作量汇总');
+  XLSX.utils.book_append_sheet(wb,
+    XLSX.utils.aoa_to_sheet(toAoa(res.planRows.concat([{ key: '合计', values: res.planTotal }]))),
+    '版本规划工作量汇总');
+
+  const hc = [['组-方向', '正式', '外包', '可投入迭代人数', '填报人']];
+  TEAMS.forEach(t => {
+    const h = s.headcount[t.key] || {};
+    hc.push([t.key, num(h.regular), num(h.outsource), res.heads[t.key], h.owner || '']);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(hc), '人头数');
+
+  const dv = [['团队', '版本工作量（人天）', '可投入人数', '总产能（人天）', '超出工作量', '超出比例', '结论']];
+  res.deviation.forEach(d => dv.push([d.team, d.workload, d.head, d.capacity, d.over, d.ratio, d.verdict]));
+  const overall = res.totals.capacity ? (res.totals.workload - res.totals.capacity) / res.totals.capacity : 0;
+  dv.push(['合计', res.totals.workload, res.totals.head, res.totals.capacity,
+    res.totals.workload - res.totals.capacity, overall, '']);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dv), '偏差分析');
+
+  const it = [['本期迭代']].concat(res.iterations.map(n => [n]));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(it), '迭代口径');
+
+  const cy = [['方案', '封版时间', '上线时间', '工作日', '周六天数', '开发周期', '是否采用', '备注']];
+  s.cycles.forEach(c => cy.push([c.name, c.seal, c.online, num(c.workdays), num(c.saturdays), cycleDays(c), c.active ? '是' : '', c.note || '']));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cy), '版本周期');
+
+  XLSX.writeFile(wb, '云平台人力产能-' + (fileName || '未命名') + '.xlsx');
 }
 
 /* ---------- 8.3: 只读模式查看归档 ---------- */
@@ -1156,42 +1288,8 @@ document.getElementById('fileJson').addEventListener('change', function () {
 
 document.getElementById('btnExportXlsx').addEventListener('click', () => {
   const res = compute(state);
-  const wb = XLSX.utils.book_new();
-
-  const head = ['分类'].concat(TEAMS.map(t => t.key)).concat(['合计（人天）']);
-  const toAoa = rows => [head].concat(rows.map(r =>
-    [r.key].concat(TEAMS.map(t => num(r.values[t.key]))).concat([rowTotal(r.values)])));
-
-  XLSX.utils.book_append_sheet(wb,
-    XLSX.utils.aoa_to_sheet(toAoa(res.lineRows.concat([{ key: '产品线汇总', values: res.lineSummary }]))),
-    '产品线工作量汇总');
-  XLSX.utils.book_append_sheet(wb,
-    XLSX.utils.aoa_to_sheet(toAoa(res.planRows.concat([{ key: '合计', values: res.planTotal }]))),
-    '版本规划工作量汇总');
-
-  const hc = [['组-方向', '正式', '外包', '可投入迭代人数', '填报人']];
-  TEAMS.forEach(t => {
-    const h = state.headcount[t.key] || {};
-    hc.push([t.key, num(h.regular), num(h.outsource), res.heads[t.key], h.owner || '']);
-  });
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(hc), '人头数');
-
-  const dv = [['团队', '版本工作量（人天）', '可投入人数', '总产能（人天）', '超出工作量', '超出比例', '结论']];
-  res.deviation.forEach(d => dv.push([d.team, d.workload, d.head, d.capacity, d.over, d.ratio, d.verdict]));
-  dv.push(['合计', res.totals.workload, res.totals.head, res.totals.capacity,
-    res.totals.workload - res.totals.capacity,
-    res.totals.capacity ? (res.totals.workload - res.totals.capacity) / res.totals.capacity : 0, '']);
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dv), '偏差分析');
-
-  const it = [['本期迭代']].concat(res.iterations.map(n => [n]));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(it), '迭代口径');
-
-  const cy = [['方案', '封版时间', '上线时间', '工作日', '周六天数', '开发周期', '是否采用', '备注']];
-  state.cycles.forEach(c => cy.push([c.name, c.seal, c.online, num(c.workdays), num(c.saturdays), cycleDays(c), c.active ? '是' : '', c.note || '']));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cy), '版本周期');
-
   const c = activeCycle(state);
-  XLSX.writeFile(wb, '云平台人力产能-' + ((c && c.online) || '未命名') + '.xlsx');
+  exportXlsxFromState(state, res, (c && c.online) || '未命名');
 });
 
 /* 关页面前的兜底：

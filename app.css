@@ -219,3 +219,12 @@ body.archive-readonly button:not(.tab):not(.modal-close):not(#archiveBannerBack)
 }
 body.archive-readonly .drop { pointer-events: none; opacity: .5; }
 body.archive-readonly .archive-btn { display: none; }
+
+
+/* ---------- Archive Operations ---------- */
+.archive-ops { display: flex; gap: 6px; }
+.archive-ops .btn { padding: 3px 8px; font-size: 12px; white-space: nowrap; }
+
+/* ---------- Multi-scheme deviation header ---------- */
+.scheme-header { background: #e8f0fe !important; font-weight: 600; }
+.scheme-sub-header { background: #f0f5ff !important; font-size: 12px; }

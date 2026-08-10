@@ -410,6 +410,44 @@ const server = http.createServer((req, res) => {
     return sendJson(res, 200, result);
   }
 
+  // PATCH /api/archive/:id — 编辑归档元信息（仅修改 name/note）
+  if (/^\/api\/archive\/[\w.\-]+$/.test(p) && req.method === 'PATCH') {
+    const id = p.split('/').pop();
+    if (id.includes('..') || id.includes('/') || id === 'list' || id === 'init-next') {
+      return sendJson(res, 400, { error: '无效的归档 ID' });
+    }
+    let body = '';
+    req.on('data', c => {
+      body += c;
+      if (body.length > 1 * 1024 * 1024) req.destroy();
+    });
+    req.on('end', () => {
+      let incoming;
+      try { incoming = JSON.parse(body); }
+      catch (e) { return sendJson(res, 400, { error: 'JSON 解析失败' }); }
+
+      const data = archiveMod.getArchive(id);
+      if (!data) return sendJson(res, 404, { error: '归档不存在' });
+
+      // 仅更新 meta 中的 name 和 note 字段
+      if (incoming.name !== undefined) data.meta.name = String(incoming.name).slice(0, 200);
+      if (incoming.note !== undefined) data.meta.note = String(incoming.note).slice(0, 1000);
+
+      // 写回文件
+      const archiveFilePath = path.join(DATA_DIR, 'archive', id + '.json');
+      try {
+        const tmp = archiveFilePath + '.tmp';
+        fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
+        fs.renameSync(tmp, archiveFilePath);
+      } catch (e) {
+        return sendJson(res, 500, { error: '写入失败：' + e.message });
+      }
+
+      return sendJson(res, 200, { ok: true });
+    });
+    return;
+  }
+
   /* ---------- 平台配置 API ---------- */
 
   // GET /api/platform/config — 读取平台配置

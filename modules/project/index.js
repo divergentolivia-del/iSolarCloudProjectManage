@@ -11,6 +11,7 @@ const ProjectModule = (() => {
   let state = null;
   let currentView = 'list'; // 'list' | 'detail'
   let currentProjectId = null;
+  let currentListView = 'list'; // 'list' | 'timeline'
 
   const STATUS_LABELS = {
     'planned': '计划中',
@@ -81,6 +82,20 @@ const ProjectModule = (() => {
 
     const projects = state.projects || [];
 
+    // Status distribution for status bar chart
+    const statusCounts = { planned: 0, 'in-progress': 0, completed: 0, suspended: 0 };
+    projects.forEach(p => { if (statusCounts[p.status] !== undefined) statusCounts[p.status]++; });
+    const total = projects.length || 1;
+    const statusBar = projects.length ? `
+      <div class="status-summary">
+        <div class="status-bar">
+          ${statusCounts.planned ? `<span class="status-segment planned" style="width:${(statusCounts.planned / total * 100).toFixed(1)}%">计划中 ${statusCounts.planned}</span>` : ''}
+          ${statusCounts['in-progress'] ? `<span class="status-segment active" style="width:${(statusCounts['in-progress'] / total * 100).toFixed(1)}%">进行中 ${statusCounts['in-progress']}</span>` : ''}
+          ${statusCounts.completed ? `<span class="status-segment done" style="width:${(statusCounts.completed / total * 100).toFixed(1)}%">已完成 ${statusCounts.completed}</span>` : ''}
+          ${statusCounts.suspended ? `<span class="status-segment hold" style="width:${(statusCounts.suspended / total * 100).toFixed(1)}%">暂停 ${statusCounts.suspended}</span>` : ''}
+        </div>
+      </div>` : '';
+
     const rows = projects.map(p => {
       const statusBadge = `<span class="badge ${STATUS_CLASSES[p.status] || ''}">${SharedUI.esc(STATUS_LABELS[p.status] || p.status)}</span>`;
       const priority = PRIORITY_LABELS[p.priority] || p.priority || '—';
@@ -100,39 +115,122 @@ const ProjectModule = (() => {
       </tr>`;
     }).join('');
 
+    // Timeline view
+    const timelineHtml = buildTimelineView(projects);
+
     container.innerHTML = `
       <div class="project-page">
         <div class="page-header">
           <h2 class="page-title">全年度项目管理</h2>
-          <button class="btn primary" id="addProjectBtn">+ 新增项目</button>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn ${currentListView === 'list' ? 'primary' : ''}" id="viewListBtn">列表视图</button>
+            <button class="btn ${currentListView === 'timeline' ? 'primary' : ''}" id="viewTimelineBtn">时间线视图</button>
+            <button class="btn primary" id="addProjectBtn">+ 新增项目</button>
+          </div>
         </div>
-        <div class="table-wrapper">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>项目名称</th>
-                <th>产品线</th>
-                <th>状态</th>
-                <th>优先级</th>
-                <th>负责人</th>
-                <th>周期</th>
-                <th>人力(已投入/总计)</th>
-                <th>成本(已使用/总预算)</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows || '<tr><td colspan="8" class="empty-hint">暂无项目数据</td></tr>'}
-            </tbody>
-          </table>
+        ${statusBar}
+        <div id="projectListView" class="${currentListView === 'list' ? '' : 'hidden'}">
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>项目名称</th>
+                  <th>产品线</th>
+                  <th>状态</th>
+                  <th>优先级</th>
+                  <th>负责人</th>
+                  <th>周期</th>
+                  <th>人力(已投入/总计)</th>
+                  <th>成本(已使用/总预算)</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows || '<tr><td colspan="8" class="empty-hint">暂无项目数据</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div id="projectTimelineView" class="${currentListView === 'timeline' ? '' : 'hidden'}">
+          ${timelineHtml}
         </div>
       </div>
     `;
 
-    // 绑定新增按钮
+    // Bind view toggle buttons
+    const listBtn = document.getElementById('viewListBtn');
+    const timelineBtn = document.getElementById('viewTimelineBtn');
+    if (listBtn) listBtn.addEventListener('click', () => { currentListView = 'list'; renderList(); });
+    if (timelineBtn) timelineBtn.addEventListener('click', () => { currentListView = 'timeline'; renderList(); });
+
+    // Bind add button
     const addBtn = document.getElementById('addProjectBtn');
     if (addBtn) {
       addBtn.addEventListener('click', showAddForm);
     }
+  }
+
+  /* Timeline view: horizontal bars by status */
+  function buildTimelineView(projects) {
+    if (!projects.length) return '<p class="empty-hint">暂无项目数据</p>';
+
+    // Determine year range for positioning
+    const year = new Date().getFullYear();
+    const yearStart = new Date(year, 0, 1).getTime();
+    const yearEnd = new Date(year, 11, 31).getTime();
+    const yearSpan = yearEnd - yearStart;
+
+    // Month labels
+    const months = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+    const monthMarkers = months.map((m, i) =>
+      `<span class="timeline-month" style="left:${(i / 12 * 100).toFixed(1)}%">${m}</span>`
+    ).join('');
+
+    // Group by status
+    const groups = [
+      { key: 'in-progress', label: '进行中', cls: 'in-progress' },
+      { key: 'planned', label: '计划中', cls: 'planned' },
+      { key: 'completed', label: '已完成', cls: 'completed' },
+      { key: 'suspended', label: '已暂停', cls: 'suspended' }
+    ];
+
+    let html = `<div class="timeline-container">
+      <div class="timeline-header">
+        <span class="timeline-label" style="font-weight:600">项目</span>
+        <div class="timeline-track" style="position:relative;height:20px">${monthMarkers}</div>
+      </div>`;
+
+    groups.forEach(g => {
+      const items = projects.filter(p => p.status === g.key);
+      if (!items.length) return;
+      html += `<div class="timeline-group-label">${SharedUI.esc(g.label)} (${items.length})</div>`;
+      items.forEach(p => {
+        let left = 0, width = 100;
+        if (p.startDate) {
+          const startMs = new Date(p.startDate).getTime();
+          left = Math.max(0, Math.min(100, (startMs - yearStart) / yearSpan * 100));
+        }
+        if (p.endDate) {
+          const endMs = new Date(p.endDate).getTime();
+          const right = Math.max(0, Math.min(100, (endMs - yearStart) / yearSpan * 100));
+          width = Math.max(2, right - left);
+        } else {
+          width = Math.max(2, 100 - left);
+        }
+        const dates = (p.startDate || '?') + ' ~ ' + (p.endDate || '?');
+        html += `
+          <div class="timeline-row">
+            <span class="timeline-label">${SharedUI.esc(p.name || '')}</span>
+            <div class="timeline-track">
+              <div class="timeline-bar ${g.cls}" style="left:${left.toFixed(1)}%;width:${width.toFixed(1)}%">
+                <span class="bar-dates">${SharedUI.esc(dates)}</span>
+              </div>
+            </div>
+          </div>`;
+      });
+    });
+
+    html += '</div>';
+    return html;
   }
 
   function renderDetail(projectId) {
@@ -149,17 +247,23 @@ const ProjectModule = (() => {
       return;
     }
 
-    // 里程碑时间线
-    const milestones = (project.milestones || []).map(ms => {
+    // 里程碑时间线 with action buttons
+    const milestones = (project.milestones || []).map((ms, idx) => {
       const statusIcon = ms.status === 'done' ? '✅' : ms.status === 'in-progress' ? '🔵' : '⚪';
       const today = new Date().toISOString().slice(0, 10);
       const overdue = ms.status !== 'done' && ms.date && ms.date < today;
       const cls = overdue ? 'overdue' : '';
+      const doneDisabled = ms.status === 'done' ? 'disabled' : '';
       return `<li class="milestone-item ${cls}">
         <span class="ms-icon">${statusIcon}</span>
         <span class="ms-name">${SharedUI.esc(ms.name || '')}</span>
         <span class="ms-date">${SharedUI.esc(ms.date || '')}</span>
         ${overdue ? '<span class="ms-overdue">逾期</span>' : ''}
+        <span class="ms-actions" style="margin-left:auto;display:flex;gap:4px;white-space:nowrap">
+          <button class="btn" style="padding:2px 6px;font-size:12px" ${doneDisabled} data-ms-done="${idx}">标记完成</button>
+          <button class="btn" style="padding:2px 6px;font-size:12px" data-ms-edit="${idx}">编辑</button>
+          <button class="btn" style="padding:2px 6px;font-size:12px" data-ms-del="${idx}">删除</button>
+        </span>
       </li>`;
     }).join('');
 
@@ -208,6 +312,7 @@ const ProjectModule = (() => {
         <div class="detail-section">
           <h4>里程碑</h4>
           ${milestones ? `<ul class="milestone-list">${milestones}</ul>` : '<p class="empty-hint">暂无里程碑</p>'}
+          <button class="btn" id="addMilestoneBtn" style="margin-top:8px">+ 添加里程碑</button>
         </div>
 
         ${resourceHtml}
@@ -221,6 +326,91 @@ const ProjectModule = (() => {
     if (editBtn) {
       editBtn.addEventListener('click', () => showEditForm(project));
     }
+
+    // 绑定里程碑操作按钮
+    container.querySelectorAll('[data-ms-done]').forEach(btn => {
+      btn.addEventListener('click', () => markMilestoneDone(project, +btn.dataset.msDone));
+    });
+    container.querySelectorAll('[data-ms-edit]').forEach(btn => {
+      btn.addEventListener('click', () => showEditMilestone(project, +btn.dataset.msEdit));
+    });
+    container.querySelectorAll('[data-ms-del]').forEach(btn => {
+      btn.addEventListener('click', () => deleteMilestone(project, +btn.dataset.msDel));
+    });
+    const addMsBtn = document.getElementById('addMilestoneBtn');
+    if (addMsBtn) addMsBtn.addEventListener('click', () => showAddMilestone(project));
+  }
+
+  /* ---------- 里程碑操作 ---------- */
+
+  async function markMilestoneDone(project, idx) {
+    if (!project.milestones || !project.milestones[idx]) return;
+    project.milestones[idx].status = 'done';
+    const newState = { ...state };
+    newState.projects = (state.projects || []).map(p => p.id === project.id ? project : p);
+    const ok = await saveState(newState);
+    if (ok) { await fetchState(); renderDetail(project.id); }
+  }
+
+  async function deleteMilestone(project, idx) {
+    if (!project.milestones || !project.milestones[idx]) return;
+    if (!window.confirm('确定删除此里程碑？')) return;
+    project.milestones.splice(idx, 1);
+    const newState = { ...state };
+    newState.projects = (state.projects || []).map(p => p.id === project.id ? project : p);
+    const ok = await saveState(newState);
+    if (ok) { await fetchState(); renderDetail(project.id); }
+  }
+
+  function showEditMilestone(project, idx) {
+    const ms = (project.milestones || [])[idx];
+    if (!ms) return;
+    const formHtml = `
+      <form id="milestoneForm" class="form-grid">
+        <div class="form-row"><label>名称</label><input type="text" id="ms-name" value="${SharedUI.esc(ms.name || '')}"></div>
+        <div class="form-row"><label>日期</label><input type="text" id="ms-date" value="${SharedUI.esc(ms.date || '')}" placeholder="YYYY-MM-DD"></div>
+        <div class="form-row"><label>状态</label><select id="ms-status">
+          <option value="pending" ${ms.status === 'pending' ? 'selected' : ''}>待完成</option>
+          <option value="in-progress" ${ms.status === 'in-progress' ? 'selected' : ''}>进行中</option>
+          <option value="done" ${ms.status === 'done' ? 'selected' : ''}>已完成</option>
+        </select></div>
+      </form>`;
+    SharedUI.confirm('编辑里程碑', formHtml, async () => {
+      const name = document.getElementById('ms-name')?.value?.trim();
+      const date = document.getElementById('ms-date')?.value?.trim();
+      const status = document.getElementById('ms-status')?.value;
+      if (!name) { SharedUI.toast('名称不能为空', 'warning'); return; }
+      project.milestones[idx] = { name, date: date || '', status: status || 'pending' };
+      const newState = { ...state };
+      newState.projects = (state.projects || []).map(p => p.id === project.id ? project : p);
+      const ok = await saveState(newState);
+      if (ok) { await fetchState(); renderDetail(project.id); }
+    }, { confirmText: '保存', cancelText: '取消' });
+  }
+
+  function showAddMilestone(project) {
+    const formHtml = `
+      <form id="milestoneForm" class="form-grid">
+        <div class="form-row"><label>名称</label><input type="text" id="ms-name" value="" placeholder="里程碑名称"></div>
+        <div class="form-row"><label>日期</label><input type="text" id="ms-date" value="" placeholder="YYYY-MM-DD"></div>
+        <div class="form-row"><label>状态</label><select id="ms-status">
+          <option value="pending" selected>待完成</option>
+          <option value="in-progress">进行中</option>
+          <option value="done">已完成</option>
+        </select></div>
+      </form>`;
+    SharedUI.confirm('添加里程碑', formHtml, async () => {
+      const name = document.getElementById('ms-name')?.value?.trim();
+      const date = document.getElementById('ms-date')?.value?.trim();
+      const status = document.getElementById('ms-status')?.value;
+      if (!name) { SharedUI.toast('名称不能为空', 'warning'); return; }
+      if (!project.milestones) project.milestones = [];
+      project.milestones.push({ name, date: date || '', status: status || 'pending' });
+      const newState = { ...state };
+      newState.projects = (state.projects || []).map(p => p.id === project.id ? project : p);
+      const ok = await saveState(newState);
+      if (ok) { await fetchState(); renderDetail(project.id); }
+    }, { confirmText: '添加', cancelText: '取消' });
   }
 
   /* ---------- 表单 ---------- */

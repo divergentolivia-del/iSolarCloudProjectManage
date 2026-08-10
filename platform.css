@@ -1722,3 +1722,33 @@ body.readonly-mode .btn.danger {
   font-size: 13px;
   text-align: center;
 }
+
+
+/* ---------- Project Timeline View ---------- */
+.timeline-container { position: relative; padding: 16px 0; }
+.timeline-header { display: flex; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.timeline-group-label { font-size: 12px; font-weight: 600; color: var(--muted); margin: 12px 0 4px; padding-left: 4px; }
+.timeline-row { display: flex; align-items: center; margin-bottom: 8px; height: 32px; }
+.timeline-label { width: 160px; font-size: 13px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-track { flex: 1; position: relative; height: 24px; background: var(--bg); border-radius: 4px; }
+.timeline-bar { position: absolute; top: 2px; bottom: 2px; border-radius: 3px; font-size: 11px; color: #fff; display: flex; align-items: center; padding: 0 8px; overflow: hidden; white-space: nowrap; }
+.timeline-bar.planned { background: #8c8c8c; }
+.timeline-bar.in-progress { background: var(--accent); }
+.timeline-bar.completed { background: var(--ok); }
+.timeline-bar.suspended { background: var(--hold); }
+.bar-dates { opacity: 0.9; font-size: 10px; }
+.timeline-month { position: absolute; top: 0; font-size: 10px; color: var(--muted); transform: translateX(-50%); }
+
+/* ---------- Status Distribution Bar ---------- */
+.status-summary { margin-bottom: 20px; }
+.status-bar { display: flex; height: 28px; border-radius: 4px; overflow: hidden; font-size: 12px; }
+.status-segment { display: flex; align-items: center; justify-content: center; color: #fff; white-space: nowrap; min-width: 40px; }
+.status-segment.planned { background: #8c8c8c; }
+.status-segment.active { background: var(--accent); }
+.status-segment.done { background: var(--ok); }
+.status-segment.hold { background: var(--hold); }
+
+/* ---------- Milestone actions ---------- */
+.milestone-item { display: flex; align-items: center; gap: 8px; }
+.ms-actions .btn { white-space: nowrap; }
+.hidden { display: none; }

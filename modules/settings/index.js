@@ -79,11 +79,27 @@ const SettingsModule = (() => {
             </div>
           </div>
         </div>
+
+        <h2 class="page-title" style="margin-top:32px">白名单管理</h2>
+        <div class="settings-section" id="whitelistSection">
+          <p style="color:#6b7280">加载中...</p>
+        </div>
+
+        <h2 class="page-title" style="margin-top:32px">操作记录</h2>
+        <div class="settings-section" id="auditSection">
+          <p style="color:#6b7280">加载中...</p>
+        </div>
       </div>
     `;
 
     // 绑定事件
     bindEvents(container);
+
+    // 加载白名单配置
+    loadWhitelistSection();
+
+    // 加载审计日志
+    loadAuditSection();
   }
 
   /* ---------- 事件绑定 ---------- */
@@ -162,6 +178,155 @@ const SettingsModule = (() => {
     try {
       localStorage.setItem(key, value);
     } catch (e) { /* ignore */ }
+  }
+
+  /* ---------- 白名单管理 ---------- */
+
+  let _platformConfig = null;
+
+  function loadWhitelistSection() {
+    fetch('/api/platform/config')
+      .then(r => r.json())
+      .then(config => {
+        _platformConfig = config;
+        renderWhitelist(config);
+      })
+      .catch(() => {
+        const el = document.getElementById('whitelistSection');
+        if (el) el.innerHTML = '<p style="color:var(--warn)">获取配置失败</p>';
+      });
+  }
+
+  function renderWhitelist(config) {
+    const el = document.getElementById('whitelistSection');
+    if (!el) return;
+
+    const isWhitelist = config.editMode === 'whitelist';
+    const list = config.whitelist || [];
+
+    el.innerHTML = `
+      <div class="form-group">
+        <label class="form-label">编辑权限模式</label>
+        <div class="form-control">
+          <label style="margin-right:16px"><input type="radio" name="editMode" value="open" ${!isWhitelist ? 'checked' : ''}> 开放（所有人可编辑）</label>
+          <label><input type="radio" name="editMode" value="whitelist" ${isWhitelist ? 'checked' : ''}> 白名单（仅白名单成员可编辑）</label>
+        </div>
+      </div>
+      <div class="form-group" id="whitelistMembers" style="${isWhitelist ? '' : 'display:none'}">
+        <label class="form-label">白名单成员</label>
+        <div class="form-control" style="flex-direction:column;align-items:flex-start;gap:8px">
+          ${list.length ? list.map((name, i) => `
+            <span style="display:inline-flex;align-items:center;gap:6px;background:#f0f0f0;padding:4px 10px;border-radius:4px">
+              ${SharedUI.esc(name)}
+              <button class="link" data-wl-remove="${i}" style="color:var(--warn);font-size:12px">移除</button>
+            </span>
+          `).join('') : '<span style="color:#6b7280">暂无成员</span>'}
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <input type="text" id="whitelistInput" placeholder="输入姓名" style="padding:4px 8px;border:1px solid var(--line);border-radius:4px;font-size:13px">
+            <button class="btn" id="whitelistAdd" style="font-size:13px;padding:4px 12px">添加</button>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="btn primary" id="whitelistSave">保存白名单配置</button>
+      </div>
+    `;
+
+    // Bind events
+    el.querySelectorAll('input[name=editMode]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        const members = document.getElementById('whitelistMembers');
+        if (members) members.style.display = radio.value === 'whitelist' ? '' : 'none';
+      });
+    });
+
+    el.querySelectorAll('[data-wl-remove]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.dataset.wlRemove);
+        _platformConfig.whitelist.splice(idx, 1);
+        renderWhitelist(_platformConfig);
+      });
+    });
+
+    const addBtn = document.getElementById('whitelistAdd');
+    const addInput = document.getElementById('whitelistInput');
+    if (addBtn && addInput) {
+      addBtn.addEventListener('click', () => {
+        const name = addInput.value.trim();
+        if (!name) return;
+        if (!_platformConfig.whitelist) _platformConfig.whitelist = [];
+        if (!_platformConfig.whitelist.includes(name)) {
+          _platformConfig.whitelist.push(name);
+        }
+        renderWhitelist(_platformConfig);
+      });
+    }
+
+    const saveBtn = document.getElementById('whitelistSave');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => {
+        const mode = el.querySelector('input[name=editMode]:checked');
+        _platformConfig.editMode = mode ? mode.value : 'open';
+        _platformConfig._updatedBy = Platform.whoami();
+        fetch('/api/platform/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(_platformConfig)
+        }).then(r => r.json()).then(res => {
+          if (res.ok) SharedUI.toast('白名单配置已保存', 'success');
+          else SharedUI.toast('保存失败', 'error');
+        }).catch(() => SharedUI.toast('保存失败', 'error'));
+      });
+    }
+  }
+
+  /* ---------- 审计日志 ---------- */
+
+  function loadAuditSection() {
+    fetch('/api/platform/audit')
+      .then(r => r.json())
+      .then(logs => {
+        renderAuditLog(logs);
+      })
+      .catch(() => {
+        const el = document.getElementById('auditSection');
+        if (el) el.innerHTML = '<p style="color:var(--warn)">获取日志失败</p>';
+      });
+  }
+
+  function renderAuditLog(logs) {
+    const el = document.getElementById('auditSection');
+    if (!el) return;
+
+    if (!logs || logs.length === 0) {
+      el.innerHTML = '<p style="color:#6b7280">暂无操作记录</p>';
+      return;
+    }
+
+    const rows = logs.map(log => `
+      <tr>
+        <td style="padding:6px 12px;border-bottom:1px solid var(--line);font-size:13px">${SharedUI.esc(log.timestamp || '')}</td>
+        <td style="padding:6px 12px;border-bottom:1px solid var(--line);font-size:13px">${SharedUI.esc(log.user || '')}</td>
+        <td style="padding:6px 12px;border-bottom:1px solid var(--line);font-size:13px">${SharedUI.esc(log.module || '')}</td>
+        <td style="padding:6px 12px;border-bottom:1px solid var(--line);font-size:13px">${SharedUI.esc(log.action || '')}${log.details ? ' (' + SharedUI.esc(log.details) + ')' : ''}</td>
+      </tr>
+    `).join('');
+
+    el.innerHTML = `
+      <div style="max-height:400px;overflow:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="background:var(--bg)">
+              <th style="padding:8px 12px;text-align:left;font-size:13px;border-bottom:1px solid var(--line)">时间</th>
+              <th style="padding:8px 12px;text-align:left;font-size:13px;border-bottom:1px solid var(--line)">操作人</th>
+              <th style="padding:8px 12px;text-align:left;font-size:13px;border-bottom:1px solid var(--line)">模块</th>
+              <th style="padding:8px 12px;text-align:left;font-size:13px;border-bottom:1px solid var(--line)">操作</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
   }
 
   /* ---------- 模块接口 ---------- */

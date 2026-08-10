@@ -1697,3 +1697,28 @@ body.dark-theme th {
   color: var(--hold);
 }
 
+
+
+/* ============================================================
+   Readonly Mode (whitelist)
+   ============================================================ */
+
+body.readonly-mode input:not([type=search]),
+body.readonly-mode select,
+body.readonly-mode textarea {
+  pointer-events: none;
+  opacity: 0.6;
+}
+body.readonly-mode .btn.primary,
+body.readonly-mode .btn.danger {
+  pointer-events: none;
+  opacity: 0.5;
+}
+.readonly-banner {
+  padding: 8px 20px;
+  background: #fff7e6;
+  color: var(--hold);
+  border-bottom: 1px solid #ffe58f;
+  font-size: 13px;
+  text-align: center;
+}

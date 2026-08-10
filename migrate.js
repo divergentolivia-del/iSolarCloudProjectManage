@@ -106,6 +106,29 @@ function migrate(dataDir) {
   const iterDir = path.join(dataDir, 'iteration');
   const iterStateFile = path.join(iterDir, 'state.json');
 
+  // 强制迁移检测：如果 data/state.json 有真实数据（非迁移标记），
+  // 而 data/iteration/state.json 存在但 headcount 为空，
+  // 说明 git pull 覆盖了 iteration/state.json 为空测试数据，需要用真实数据覆盖。
+  if (fs.existsSync(oldStateFile) && fs.existsSync(iterStateFile)) {
+    try {
+      const oldContent = JSON.parse(fs.readFileSync(oldStateFile, 'utf8'));
+      const iterContent = JSON.parse(fs.readFileSync(iterStateFile, 'utf8'));
+      // 条件：旧文件非迁移标记、有真实 headcount 数据；新文件 headcount 为空
+      if (!oldContent._migrated &&
+          oldContent.headcount && Object.keys(oldContent.headcount).length > 0 &&
+          (!iterContent.headcount || Object.keys(iterContent.headcount).length === 0)) {
+        console.log('[migrate] 检测到 iteration/state.json 为空但 state.json 有真实数据，执行强制覆盖');
+        const realData = Object.assign({}, oldContent);
+        realData.rev = Math.max(Number(oldContent.rev || 0), Number(iterContent.rev || 0)) + 1;
+        realData.updatedAt = new Date().toLocaleString('zh-CN');
+        fs.writeFileSync(iterStateFile, JSON.stringify(realData, null, 2), 'utf8');
+        console.log('[migrate]   已用真实数据覆盖 iteration/state.json (rev ' + realData.rev + ')');
+      }
+    } catch (e) {
+      // 解析失败不影响正常流程
+    }
+  }
+
   // 检测是否需要迁移：
   // 条件：data/state.json 存在 且 data/iteration/state.json 不存在
   if (!fs.existsSync(oldStateFile) || fs.existsSync(iterStateFile)) {

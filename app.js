@@ -223,8 +223,8 @@ function updateModeBadge() {
   if (Sync.mode === 'server') {
     el.innerHTML = Sync.online
       ? '<span class="tag ok">实时协同</span> ' +
-        '<span class="note">rev ' + Sync.rev +
-        (state.updatedBy ? ' · 最后更新 ' + esc(state.updatedBy) + ' ' + esc(state.updatedAt || '') : '') + '</span>'
+        '<span class="note">' +
+        (state.updatedBy ? '最后更新 ' + esc(state.updatedBy) + ' ' + esc(state.updatedAt || '') : '') + '</span>'
       : '<span class="tag warn">服务未连接</span> <span class="note">改动暂存本机，恢复后自动补交</span>';
   } else {
     el.innerHTML = '<span class="tag hold">单机模式</span> <span class="note">数据仅存本机，需导出 JSON 汇总</span>';

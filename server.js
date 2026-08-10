@@ -13,6 +13,9 @@ const url = require('url');
 /* 归档模块（独立于 server.js 中已有的 archive() 快照函数） */
 const archiveMod = require('./archive');
 
+/* 审计日志 */
+const audit = require('./audit');
+
 /* 数据迁移 & 模块加载器 */
 const migrate = require('./migrate');
 const moduleLoader = require('./module-loader');
@@ -36,6 +39,7 @@ const DATA_DIR = process.env.DATA_DIR
 const ACCESS_TOKEN = (process.env.ACCESS_TOKEN || '').trim();
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const HISTORY_DIR = path.join(DATA_DIR, 'history');
+const PLATFORM_FILE = path.join(DATA_DIR, 'platform.json');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -286,6 +290,7 @@ const server = http.createServer((req, res) => {
 
       archive(next);
       broadcast(next.rev, next.updatedBy);
+      audit.log({ user: next.updatedBy, module: 'iteration', action: '更新数据', details: 'rev ' + next.rev });
       sendJson(res, 200, { ok: true, rev: next.rev, updatedAt: next.updatedAt });
     });
     return;
@@ -375,6 +380,54 @@ const server = http.createServer((req, res) => {
     const result = archiveMod.deleteArchive(id);
     if (result.error) return sendJson(res, 404, result);
     return sendJson(res, 200, result);
+  }
+
+  /* ---------- 平台配置 API ---------- */
+
+  // GET /api/platform/config — 读取平台配置
+  if (p === '/api/platform/config' && req.method === 'GET') {
+    try {
+      const config = JSON.parse(fs.readFileSync(PLATFORM_FILE, 'utf8'));
+      return sendJson(res, 200, config);
+    } catch (e) {
+      return sendJson(res, 200, { version: '2.0.0', editMode: 'open', whitelist: [], modules: {} });
+    }
+  }
+
+  // POST /api/platform/config — 更新平台配置
+  if (p === '/api/platform/config' && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => {
+      body += c;
+      if (body.length > 1 * 1024 * 1024) req.destroy();
+    });
+    req.on('end', () => {
+      let incoming;
+      try { incoming = JSON.parse(body); }
+      catch (e) { return sendJson(res, 400, { error: 'JSON 解析失败' }); }
+
+      // 写入平台配置
+      try {
+        fs.writeFileSync(PLATFORM_FILE, JSON.stringify(incoming, null, 2), 'utf8');
+      } catch (e) {
+        return sendJson(res, 500, { error: '写入失败: ' + e.message });
+      }
+
+      audit.log({
+        user: incoming._updatedBy || '未署名',
+        module: 'platform',
+        action: '更新平台配置',
+        details: 'editMode=' + (incoming.editMode || 'open')
+      });
+
+      return sendJson(res, 200, { ok: true });
+    });
+    return;
+  }
+
+  // GET /api/platform/audit — 获取审计日志
+  if (p === '/api/platform/audit' && req.method === 'GET') {
+    return sendJson(res, 200, audit.getRecent(50));
   }
 
   serveStatic(req, res, p);

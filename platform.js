@@ -352,6 +352,34 @@ const Platform = (() => {
   }
 
   /* ============================================================
+     Whitelist / Readonly Mode
+     ============================================================ */
+
+  /**
+   * Check platform config for whitelist mode.
+   * If editMode is 'whitelist' and current user is NOT in the list,
+   * apply readonly mode to the body.
+   */
+  function checkWhitelist() {
+    fetch('/api/platform/config')
+      .then(r => r.json())
+      .then(config => {
+        if (config.editMode === 'whitelist' && Array.isArray(config.whitelist) && config.whitelist.length > 0) {
+          const user = whoami();
+          if (!config.whitelist.includes(user)) {
+            document.body.classList.add('readonly-mode');
+            // Show readonly banner
+            const banner = document.createElement('div');
+            banner.className = 'readonly-banner';
+            banner.textContent = '当前为只读模式（' + user + '不在编辑白名单中）';
+            document.body.insertBefore(banner, document.body.firstChild);
+          }
+        }
+      })
+      .catch(() => { /* 获取配置失败时不阻塞页面 */ });
+  }
+
+  /* ============================================================
      Platform Init
      ============================================================ */
 
@@ -391,6 +419,9 @@ const Platform = (() => {
 
     // Pre-create module containers
     ensureModuleContainers();
+
+    // Check whitelist / readonly mode
+    checkWhitelist();
 
     // Bind sidebar collapse button
     const collapseBtn = document.getElementById('sidebarCollapseBtn');

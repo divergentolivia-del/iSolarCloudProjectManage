@@ -1,0 +1,11 @@
+{
+  "version": "2.0.0",
+  "editMode": "open",
+  "whitelist": [],
+  "modules": {
+    "iteration": { "enabled": true },
+    "project": { "enabled": true },
+    "budget": { "enabled": true },
+    "token": { "enabled": true }
+  }
+}

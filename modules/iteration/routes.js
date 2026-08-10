@@ -21,6 +21,9 @@ const HISTORY_DIR = path.join(ITER_DIR, 'history');
 /* 归档模块复用 */
 const archiveMod = require('../../archive');
 
+/* 审计日志 */
+const audit = require('../../audit');
+
 /* 加载 compute 函数（需要全局 config 已加载） */
 const { compute } = require('../../calc');
 
@@ -181,6 +184,7 @@ module.exports = {
           global._broadcast(next.rev, next.updatedBy);
         }
 
+        audit.log({ user: next.updatedBy, module: 'iteration', action: '更新数据', details: 'rev ' + next.rev });
         sendJson(res, 200, { ok: true, rev: next.rev, updatedAt: next.updatedAt });
       });
       return;

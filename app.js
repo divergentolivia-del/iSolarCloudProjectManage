@@ -778,10 +778,29 @@ function showArchiveDialog() {
     ? ((res.totals.workload - res.totals.capacity) / res.totals.capacity * 100).toFixed(1) + '%'
     : '—';
 
+  // Derive a smart default title from iterations or cycle info
+  let defaultTitle = '';
+  if (res.iterations && res.iterations.length > 0) {
+    const firstIter = res.iterations[0] || '';
+    const monthMatch = firstIter.match(/(\d+)月/);
+    const month = monthMatch ? monthMatch[1] + '月' : (new Date().getMonth() + 1) + '月';
+    defaultTitle = '阳光云' + new Date().getFullYear() + '年' + month + '迭代版本';
+  } else if (c && c.online) {
+    defaultTitle = new Date().getFullYear() + '年' + c.online + '上线版本';
+  } else {
+    defaultTitle = new Date().getFullYear() + '年' + (new Date().getMonth() + 1) + '月迭代';
+  }
+
   const bodyHtml = `
+    <div style="margin-bottom:16px">
+      <label style="font-size:13px;color:var(--muted);display:block;margin-bottom:4px">归档标题（可编辑）</label>
+      <input type="text" id="archiveNameInput" value="${esc(defaultTitle)}" 
+        style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:4px;font-size:14px">
+    </div>
     <p style="margin:0 0 12px"><b>确认归档当前迭代？</b></p>
     <dl class="archive-metrics">
-      <dt>版本周期</dt><dd>${esc(c ? c.name + '：' + (c.online || '') : '未设置')}</dd>
+      <dt>上线时间</dt><dd>${esc(c ? c.online || '未设置' : '未设置')}</dd>
+      <dt>封版时间</dt><dd>${esc(c ? c.seal || '未设置' : '未设置')}</dd>
       <dt>开发周期</dt><dd>${res.days} 天</dd>
       <dt>总工作量</dt><dd>${fmt(res.totals.workload)} 人天</dd>
       <dt>总产能</dt><dd>${fmt(res.totals.capacity)} 人天</dd>
@@ -806,10 +825,8 @@ function doArchive() {
   const btn = document.getElementById('confirmArchiveBtn');
   if (btn) { btn.disabled = true; btn.textContent = '归档中…'; }
 
-  const c = activeCycle(state);
-  const name = (c && c.online)
-    ? new Date().getFullYear() + '年' + (new Date().getMonth() + 1) + '月迭代'
-    : '未命名迭代';
+  const nameInput = document.getElementById('archiveNameInput');
+  const name = nameInput ? nameInput.value.trim() : '未命名迭代';
 
   fetch('api/archive', {
     method: 'POST',

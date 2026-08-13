@@ -46,9 +46,10 @@ const OTHER_CATEGORIES = [
 ];
 
 /* 专项锁定人力可填的岗位列 */
-const LOCK_ROLES = ['APP', 'WEB', '后端'];
+const LOCK_ROLES = ['APP', 'WEB', '后端', '测试-云服务', '测试-中台'];
 const LOCK_ROLE_TO_TEAM = {
-  'APP': 'APP开发-阳光云', 'WEB': 'Web开发-阳光云', '后端': '后端开发-阳光云'
+  'APP': 'APP开发-阳光云', 'WEB': 'Web开发-阳光云', '后端': '后端开发-阳光云',
+  '测试-云服务': '测试部-应用软件测试-云服务', '测试-中台': '测试部-应用软件测试-中后台'
 };
 
 const OWNER_LINES = ['智慧能源', '储能', '地面电站', '其他'];

@@ -119,7 +119,9 @@ function mergeStates(base, server, mine) {
     iterations: mergeList(base.iterations, server.iterations, mine.iterations,
       x => (x && x.name) || '', '迭代勾选', conflicts),
     iterDirty: mine.iterDirty || server.iterDirty,
-    showAllIterations: mine.showAllIterations
+    showAllIterations: mine.showAllIterations,
+    sourceOverrides: pickWhole('sourceOverrides', '统计口径配置'),
+    deviationOverrides: pickWhole('deviationOverrides', '偏差手动调整')
   };
   // 工时源被一方整份换掉时，迭代清单必须跟着那一方走，否则会出现清单里有已不存在的迭代
   if (!eq(base.totals, merged.totals) || !eq(base.board, merged.board)) {
@@ -531,14 +533,18 @@ RENDERERS.import = function () {
       '产线维度明细，仅用于「产品线版本工作量汇总」的分布展示，不参与产能偏差计算。不导入则分类分布表为空，偏差分析仍可正常使用。')}
 
     ${res.unknownTeams.length ? `
-    <div class="card">
-      <h2>未识别的团队名 <span class="tag warn">${res.unknownTeams.length} 个</span></h2>
-      <p class="hint">以下团队既不在 TEAMS 白名单，也不在 IGNORED_TEAM_PATTERNS 忽略名单中，其工时未计入任何汇总。请确认是否为新组或命名变更，需要时在 config.js 补充。</p>
-      <div class="scroll"><table>
-        <thead><tr><th class="txt">团队名</th><th>记录数</th></tr></thead>
-        <tbody>${res.unknownTeams.map(u =>
+    <div class="card" style="border-left:3px solid var(--hold)">
+      <details>
+        <summary style="cursor:pointer;font-weight:600;font-size:14px;color:var(--hold)">
+          ⚠ 未识别的团队名 (${res.unknownTeams.length}个) — 点击展开查看
+        </summary>
+        <p class="hint">以下团队不在白名单中，其工时未计入汇总。如为新组或命名变更，请在 config.js 补充。</p>
+        <div class="scroll"><table>
+          <thead><tr><th class="txt">团队名</th><th>记录数</th></tr></thead>
+          <tbody>${res.unknownTeams.map(u =>
       `<tr><td class="txt">${esc(u.name)}</td><td>${u.count}</td></tr>`).join('')}</tbody>
-      </table></div>
+        </table></div>
+      </details>
     </div>` : ''}
 
     ${res.unmappedLines.length ? `
@@ -551,6 +557,25 @@ RENDERERS.import = function () {
       `<tr><td class="txt">${esc(u.name)}</td><td>${fmt(u.value, 2)}</td></tr>`).join('')}</tbody>
       </table></div>
     </div>` : ''}
+
+    <div class="card">
+      <h2>统计口径配置</h2>
+      <p class="hint">按团队设置工时取数规则。默认来自系统配置，可按需切换。仅对偏差分析计算生效。</p>
+      <div class="scroll"><table>
+        <thead><tr><th class="txt">团队</th><th>当前口径</th><th>操作</th></tr></thead>
+        <tbody>${TEAMS.map(t => {
+          const override = (state.sourceOverrides || {})[t.key];
+          const current = override || t.source;
+          return '<tr>' +
+            '<td class="txt">' + esc(t.key) + '</td>' +
+            '<td>' + (current === 'est' ? '预估故事点' : '故事点') + '</td>' +
+            '<td><select class="source-sel" data-team="' + esc(t.key) + '">' +
+              '<option value="story"' + (current === 'story' ? ' selected' : '') + '>故事点</option>' +
+              '<option value="est"' + (current === 'est' ? ' selected' : '') + '>预估故事点</option>' +
+            '</select></td></tr>';
+        }).join('')}</tbody>
+      </table></div>
+    </div>
 
     <div class="card">
       <h2>导入说明</h2>
@@ -585,6 +610,15 @@ RENDERERS.import = function () {
     drop.addEventListener('drop', e => {
       const f = e.dataTransfer.files[0];
       if (f) handleImport(f);
+    });
+  });
+  // 统计口径配置 event binding
+  view.querySelectorAll('.source-sel').forEach(el => {
+    el.addEventListener('change', () => {
+      const team = el.dataset.team;
+      if (!state.sourceOverrides) state.sourceOverrides = {};
+      state.sourceOverrides[team] = el.value;
+      save(true); renderAll();
     });
   });
 };
@@ -719,8 +753,8 @@ RENDERERS.analysis = function () {
     return `
       <tr>
         <td class="txt">${esc(d.team)}</td>
-        <td>${fmt(d.workload)}</td>
-        <td>${fmt(d.head)}</td>
+        <td><input type="number" step="0.1" class="dev-input${d.workloadOverridden ? ' overridden' : ''}" data-team="${esc(d.team)}" data-field="workload" value="${fmt(d.workload)}"></td>
+        <td><input type="number" step="0.1" class="dev-input${d.headOverridden ? ' overridden' : ''}" data-team="${esc(d.team)}" data-field="head" value="${fmt(d.head)}"></td>
         <td>${fmt(d.capacity)}</td>
         <td>${fmt(d.over)}</td>
         <td>${d.capacity ? pct(d.ratio) : '—'}</td>
@@ -757,7 +791,7 @@ RENDERERS.analysis = function () {
 
     <div class="card">
       <h2>团队版本工作量与产能偏差分析</h2>
-      <p class="hint">超出工作量 = 版本工作量 − 总产能；总产能 = 可投入人数 × 开发周期。为正说明产能不足需裁剪需求，为负说明产能富余可继续导入需求，${(DEVIATION_TOLERANCE * 100).toFixed(0)}% 以内属正常偏差由团队自行消化。${multiScheme ? '下方同时展示多个方案的产能对比。' : ''}</p>
+      <p class="hint">超出工作量 = 版本工作量 − 总产能；总产能 = 可投入人数 × 开发周期。为正说明产能不足需裁剪需求，为负说明产能富余可继续导入需求，${(DEVIATION_TOLERANCE * 100).toFixed(0)}% 以内属正常偏差由团队自行消化。${multiScheme ? '下方同时展示多个方案的产能对比。' : ''}可直接编辑「版本工作量」和「可投入人数」列进行假设分析，黄底表示手动修改值。</p>
       <div class="scroll"><table>
         <thead>
           ${multiScheme ? `<tr><th colspan="8"></th>${schemeHeaders}</tr>` : ''}
@@ -779,11 +813,34 @@ RENDERERS.analysis = function () {
           ${schemeSumCells}
         </tr></tfoot>
       </table></div>
+      ${Object.keys(state.deviationOverrides || {}).length ? '<p style="margin-top:12px"><button class="btn" id="resetDeviationOverrides">重置为计算值</button></p>' : ''}
     </div>
 
     ${rec}
     ${matrixTable('产品线版本工作量汇总', '各产品线在各组的工时分布，来自人力看板。', res.lineRows, res.lineSummary, '产品线汇总')}
     ${matrixTable('版本规划工作量汇总', '产品线汇总 + 其他分类。「智慧能源产品中心」为部门级兜底分类，占比过高说明大量任务未打产线标签。', res.planRows, res.planTotal, '合计')}`;
+
+  // Deviation input event bindings
+  const view = document.getElementById('view-analysis');
+  view.querySelectorAll('.dev-input').forEach(el => {
+    el.addEventListener('change', () => {
+      const team = el.dataset.team;
+      const field = el.dataset.field;
+      if (!state.deviationOverrides) state.deviationOverrides = {};
+      if (!state.deviationOverrides[team]) state.deviationOverrides[team] = {};
+      state.deviationOverrides[team][field] = num(el.value);
+      save(true);
+      RENDERERS.analysis();
+    });
+  });
+  const resetBtn = view.querySelector('#resetDeviationOverrides');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      state.deviationOverrides = {};
+      save(true);
+      RENDERERS.analysis();
+    });
+  }
 };
 
 /* ---------- 归档功能 (Archive UI) ---------- */

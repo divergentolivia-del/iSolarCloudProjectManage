@@ -228,3 +228,8 @@ body.archive-readonly .archive-btn { display: none; }
 /* ---------- Multi-scheme deviation header ---------- */
 .scheme-header { background: #e8f0fe !important; font-weight: 600; }
 .scheme-sub-header { background: #f0f5ff !important; font-size: 12px; }
+
+
+/* ---------- Deviation editable inputs ---------- */
+.dev-input { width: 70px; padding: 3px 6px; font-size: 12px; text-align: right; }
+.dev-input.overridden { background: #fffbe6; border-color: var(--hold); }

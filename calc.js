@@ -26,9 +26,11 @@ function isIgnoredTeam(name) {
   return IGNORED_TEAM_PATTERNS.some(p => s.indexOf(p) >= 0);
 }
 
-/* 单条记录按团队口径取值 */
-function pickValue(row, team) {
-  return team.source === 'est' ? (Number(row.est) || 0) : (Number(row.story) || 0);
+/* 单条记录按团队口径取值（支持 sourceOverrides） */
+function pickValue(row, team, state) {
+  const override = state && state.sourceOverrides ? state.sourceOverrides[team.key] : undefined;
+  const source = override || team.source;
+  return source === 'est' ? (Number(row.est) || 0) : (Number(row.story) || 0);
 }
 
 function emptyRow() {
@@ -59,7 +61,7 @@ function totalsByTeam(state) {
     if (!picked[normLine(row.iteration)]) return;
     const team = TEAM_INDEX[normTeam(row.team)];
     if (!team) return;
-    out[team.key] += pickValue(row, team);
+    out[team.key] += pickValue(row, team, state);
   });
   return out;
 }
@@ -75,7 +77,7 @@ function boardByLine(state) {
     if (!team) return;
     const line = normLine(row.productLine);
     if (!byLine[line]) byLine[line] = emptyRow();
-    byLine[line][team.key] += pickValue(row, team);
+    byLine[line][team.key] += pickValue(row, team, state);
   });
   return byLine;
 }
@@ -141,8 +143,9 @@ function compute(state) {
   const locked = lockedTotals(state);
 
   const deviation = TEAMS.map(t => {
-    const workload = authoritative[t.key] || 0;
-    const head = heads[t.key] || 0;
+    const override = (state.deviationOverrides || {})[t.key] || {};
+    const workload = override.workload !== undefined ? override.workload : (authoritative[t.key] || 0);
+    const head = override.head !== undefined ? override.head : (heads[t.key] || 0);
     const capacity = head * days;
     const over = workload - capacity;
     const ratio = capacity ? over / capacity : 0;
@@ -153,7 +156,9 @@ function compute(state) {
     return {
       team: t.key, dept: t.dept, workload: workload, head: head,
       lockedHead: locked[t.key] || 0, capacity: capacity,
-      over: over, ratio: ratio, verdict: verdict
+      over: over, ratio: ratio, verdict: verdict,
+      workloadOverridden: override.workload !== undefined,
+      headOverridden: override.head !== undefined
     };
   });
 
@@ -164,12 +169,15 @@ function compute(state) {
     return { team: t.key, totals: a, board: b, diff: b - a };
   }).filter(r => Math.abs(r.diff) > RECONCILE_TOLERANCE);
 
-  // 未识别团队（已排除非核算主体）
+  // 未识别团队（已排除非核算主体），按归一化名去重合并计数
   const unknown = {};
+  const unknownDisplay = {};  // normKey → 首次出现的原始名（用于展示）
   (state.totals || []).concat(state.board || []).forEach(r => {
     const n = String(r.team || '').trim();
     if (!n || TEAM_INDEX[normTeam(n)] || isIgnoredTeam(n)) return;
-    unknown[n] = (unknown[n] || 0) + 1;
+    const nk = normTeam(n);
+    if (!unknownDisplay[nk]) unknownDisplay[nk] = n;
+    unknown[nk] = (unknown[nk] || 0) + 1;
   });
 
   // 看板里出现但未归入任何分类的「所属项目(层级1)」
@@ -192,7 +200,7 @@ function compute(state) {
       capacity: deviation.reduce((s, d) => s + d.capacity, 0),
       head: TEAMS.reduce((s, t) => s + (heads[t.key] || 0), 0)
     },
-    unknownTeams: Object.keys(unknown).map(k => ({ name: k, count: unknown[k] })),
+    unknownTeams: Object.keys(unknown).map(k => ({ name: unknownDisplay[k], count: unknown[k] })),
     unmappedLines: unmapped
   };
 }

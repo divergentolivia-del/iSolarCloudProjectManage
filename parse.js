@@ -87,28 +87,58 @@ function csvToAoa(text) {
   return out;
 }
 
+/* 读取 CSV 文件为文本，自动检测 GBK 编码并回退解码 */
+function readFileAsText(file, callback) {
+  const reader = new FileReader();
+  reader.onerror = () => callback(null, new Error('文件读取失败'));
+  reader.onload = e => {
+    let text = e.target.result;
+    // Check for encoding issues (replacement characters indicating UTF-8 misread of GBK)
+    if (text.includes('\ufffd') || text.includes('�')) {
+      // Retry with GBK encoding
+      const reader2 = new FileReader();
+      reader2.onerror = () => callback(null, new Error('文件读取失败'));
+      reader2.onload = e2 => {
+        const decoder = new TextDecoder('gbk');
+        const uint8 = new Uint8Array(e2.target.result);
+        callback(decoder.decode(uint8));
+      };
+      reader2.readAsArrayBuffer(file);
+      return;
+    }
+    callback(text);
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
 /* 读取文件 → { kind, rows }。CSV 走文本，xlsx 走 SheetJS */
 function parseFile(file, onDone, onError) {
   const isCsv = /\.csv$/i.test(file.name);
-  const reader = new FileReader();
-  reader.onerror = () => onError(new Error('文件读取失败'));
-  reader.onload = e => {
-    try {
-      let aoa;
-      if (isCsv) {
-        aoa = csvToAoa(e.target.result);
-      } else {
+  if (isCsv) {
+    readFileAsText(file, (text, err) => {
+      if (err) return onError(err);
+      try {
+        const aoa = csvToAoa(text);
+        const res = parseAoa(aoa);
+        res.fileName = file.name;
+        onDone(res);
+      } catch (e) { onError(e); }
+    });
+  } else {
+    const reader = new FileReader();
+    reader.onerror = () => onError(new Error('文件读取失败'));
+    reader.onload = e => {
+      try {
         const wb = XLSX.read(e.target.result, { type: 'array' });
         const name = wb.SheetNames.find(n => /工时|工作量|看板/.test(n)) || wb.SheetNames[0];
-        aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true });
-      }
-      const res = parseAoa(aoa);
-      res.fileName = file.name;
-      onDone(res);
-    } catch (err) { onError(err); }
-  };
-  if (isCsv) reader.readAsText(file, 'UTF-8');
-  else reader.readAsArrayBuffer(file);
+        const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true });
+        const res = parseAoa(aoa);
+        res.fileName = file.name;
+        onDone(res);
+      } catch (err) { onError(err); }
+    };
+    reader.readAsArrayBuffer(file);
+  }
 }
 
 /* 从已导入数据中提取迭代清单，按工时降序，便于勾选本期口径 */

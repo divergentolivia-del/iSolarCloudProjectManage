@@ -139,7 +139,8 @@ input:focus, select:focus { outline: 0; border-color: var(--accent); }
 }
 .modal-overlay.hidden { display: none; }
 .modal-dialog {
-  background: #fff; border-radius: 8px; width: 480px; max-width: 90vw;
+  background: #fff; border-radius: 8px; width: 520px; max-width: 90vw;
+  max-height: 85vh; display: flex; flex-direction: column;
   box-shadow: 0 8px 32px rgba(0,0,0,.2);
 }
 .modal-header {
@@ -152,7 +153,7 @@ input:focus, select:focus { outline: 0; border-color: var(--accent); }
   color: var(--muted); line-height: 1;
 }
 .modal-close:hover { color: var(--text); }
-.modal-body { padding: 20px; font-size: 14px; line-height: 1.7; }
+.modal-body { padding: 20px; font-size: 14px; line-height: 1.7; overflow-y: auto; flex: 1; min-height: 0; }
 .modal-footer {
   padding: 12px 20px; border-top: 1px solid var(--line);
   display: flex; gap: 8px; justify-content: flex-end;

@@ -688,8 +688,11 @@ body {
 .modal-dialog {
   background: #fff;
   border-radius: 8px;
-  width: 480px;
+  width: 520px;
   max-width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 
@@ -723,6 +726,9 @@ body {
   padding: 20px;
   font-size: 14px;
   line-height: 1.7;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .modal-footer {

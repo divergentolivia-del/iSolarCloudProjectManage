@@ -548,14 +548,18 @@ RENDERERS.import = function () {
     </div>` : ''}
 
     ${res.unmappedLines.length ? `
-    <div class="card">
-      <h2>未归类的分类值 <span class="tag warn">${res.unmappedLines.length} 个</span></h2>
-      <p class="hint">看板中出现但未归入产品线或其他分类的「所属项目(层级1)」值，其工时未计入分类分布表。请在 config.js 的 PRODUCT_LINES 或 OTHER_CATEGORIES 中补充。</p>
-      <div class="scroll"><table>
-        <thead><tr><th class="txt">分类值</th><th>工时（人天）</th></tr></thead>
-        <tbody>${res.unmappedLines.map(u =>
+    <div class="card" style="border-left:3px solid var(--hold)">
+      <details>
+        <summary style="cursor:pointer;font-weight:600;font-size:14px;color:var(--hold)">
+          ⚠ 未归类的分类值 (${res.unmappedLines.length}个) — 点击展开查看
+        </summary>
+        <p class="hint">看板中出现但未归入产品线或其他分类的值，其工时未计入分类分布表。</p>
+        <div class="scroll"><table>
+          <thead><tr><th class="txt">分类值</th><th>工时（人天）</th></tr></thead>
+          <tbody>${res.unmappedLines.map(u =>
       `<tr><td class="txt">${esc(u.name)}</td><td>${fmt(u.value, 2)}</td></tr>`).join('')}</tbody>
-      </table></div>
+        </table></div>
+      </details>
     </div>` : ''}
 
     <div class="card">

@@ -11,11 +11,19 @@ let state = load() || {
   ],
   headcount: {},
   locked: [],
-  totals: [],      // 阳光云迭代工作量统计（权威口径）
+  totals: [],      // 合并后的完整工作量数据 = _totalsCloud + _totalsMiddle
+  _totalsCloud: [], // 阳光云迭代工作量统计
+  _totalsMiddle: [], // 中后台工作量统计
   board: [],       // 月底版本项目人力看板（产线分布）
   iterations: [],  // 迭代清单与本期勾选状态
-  sources: {}      // { totals: {fileName, at, rows}, board: {...} }
+  sources: {}      // { totals: {fileName, at, rows}, totalsMiddle: {...}, board: {...} }
 };
+
+// Backward compatibility: if state.totals exists but _totalsCloud doesn't, treat totals as _totalsCloud
+if (state.totals && state.totals.length && !state._totalsCloud) {
+  state._totalsCloud = state.totals;
+}
+if (!state._totalsMiddle) state._totalsMiddle = [];
 
 function load() {
   try { return JSON.parse(localStorage.getItem(STORE_KEY)); } catch (e) { return null; }
@@ -114,6 +122,8 @@ function mergeStates(base, server, mine) {
       x => (x && x.name) || '(未命名)', '专项锁定', conflicts),
     // 工时源数据整份替换，谁后导入以谁为准；迭代勾选跟随同一来源，避免半新半旧
     totals: pickWhole('totals', '工作量统计导入'),
+    _totalsCloud: pickWhole('_totalsCloud', '阳光云工作量统计导入'),
+    _totalsMiddle: pickWhole('_totalsMiddle', '中后台工作量统计导入'),
     board: pickWhole('board', '人力看板导入'),
     sources: pickWhole('sources', '数据源信息'),
     iterations: mergeList(base.iterations, server.iterations, mine.iterations,
@@ -124,8 +134,8 @@ function mergeStates(base, server, mine) {
     deviationOverrides: pickWhole('deviationOverrides', '偏差手动调整')
   };
   // 工时源被一方整份换掉时，迭代清单必须跟着那一方走，否则会出现清单里有已不存在的迭代
-  if (!eq(base.totals, merged.totals) || !eq(base.board, merged.board)) {
-    const src = !eq(base.totals, mine.totals) || !eq(base.board, mine.board) ? mine : server;
+  if (!eq(base.totals, merged.totals) || !eq(base.board, merged.board) || !eq(base._totalsCloud, merged._totalsCloud) || !eq(base._totalsMiddle, merged._totalsMiddle)) {
+    const src = !eq(base.totals, mine.totals) || !eq(base.board, mine.board) || !eq(base._totalsCloud, mine._totalsCloud) || !eq(base._totalsMiddle, mine._totalsMiddle) ? mine : server;
     merged.iterations = src.iterations || [];
   }
   return { merged: merged, conflicts: conflicts, degraded: false };
@@ -483,19 +493,27 @@ function rebuildIterations() {
   state.iterDirty = true;
 }
 
-function handleImport(file) {
+function handleImport(file, kind) {
   parseFile(file, res => {
-    if (res.kind === 'totals') {
-      state.totals = res.rows;
-      state.sources.totals = { fileName: res.fileName, at: new Date().toLocaleString('zh-CN'), rows: res.rows.length };
+    const effectiveKind = kind || res.kind;
+    const meta = { fileName: res.fileName, at: new Date().toLocaleString('zh-CN'), rows: res.rows.length };
+    if (effectiveKind === 'totals') {
+      state._totalsCloud = res.rows;
+      state.sources.totals = meta;
+    } else if (effectiveKind === 'totalsMiddle') {
+      state._totalsMiddle = res.rows;
+      state.sources.totalsMiddle = meta;
     } else {
       state.board = res.rows;
-      state.sources.board = { fileName: res.fileName, at: new Date().toLocaleString('zh-CN'), rows: res.rows.length };
+      state.sources.board = meta;
     }
+    // Merge totals from both sources
+    state.totals = (state._totalsCloud || []).concat(state._totalsMiddle || []);
     rebuildIterations();
     save(true); renderAll();
-    toast((res.kind === 'totals' ? '工作量统计' : '人力看板') + ' 已导入 ' + res.rows.length +
-      ' 行，迭代清单已重建，请到第⑤页重新勾选');
+    const label = effectiveKind === 'totalsMiddle' ? '中后台工作量统计'
+      : effectiveKind === 'totals' ? '阳光云工作量统计' : '人力看板';
+    toast(label + ' 已导入 ' + res.rows.length + ' 行，迭代清单已重建，请到第⑤页重新勾选');
   }, err => toast('导入失败：' + err.message));
 }
 
@@ -527,7 +545,10 @@ RENDERERS.import = function () {
 
   document.getElementById('view-import').innerHTML = `
     ${sourceCard('totals', '① 阳光云迭代工作量统计（必需）',
-      '各组工时总计，作为产能偏差计算的<b>唯一权威口径</b>。注意：「中后台工作量统计」与本表是同一份数据的两个导出视图（737 行键完全一致），两者相加会导致中后台工时翻倍，因此只需导入本表 —— 它含预估故事点列，是超集。')}
+      '阳光云相关团队（APP/WEB/后端/测试/欧洲）的当月迭代工时统计。与下方中后台数据合并后作为完整版本工作量。')}
+
+    ${sourceCard('totalsMiddle', '①-2 阳光云迭代中后台工作量统计（必需）',
+      '中后台各组（IoT中台/数据中台/技术中台/平台运维）的当月迭代工时数据，与上方阳光云数据合并后参与偏差分析。')}
 
     ${sourceCard('board', '② 月底版本项目人力看板（可选）',
       '产线维度明细，仅用于「产品线版本工作量汇总」的分布展示，不参与产能偏差计算。不导入则分类分布表为空，偏差分析仍可正常使用。')}
@@ -595,12 +616,13 @@ RENDERERS.import = function () {
 
   const view = document.getElementById('view-import');
   view.querySelectorAll('.drop').forEach(drop => {
+    const kind = drop.dataset.kind;
     const pick = () => {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = '.csv,.xlsx,.xls';
       input.addEventListener('change', () => {
-        if (input.files[0]) handleImport(input.files[0]);
+        if (input.files[0]) handleImport(input.files[0], kind);
       });
       input.click();
     };
@@ -613,7 +635,7 @@ RENDERERS.import = function () {
     }));
     drop.addEventListener('drop', e => {
       const f = e.dataTransfer.files[0];
-      if (f) handleImport(f);
+      if (f) handleImport(f, kind);
     });
   });
   // 统计口径配置 event binding
@@ -1302,6 +1324,11 @@ function handleRemoteWithArchive(remote, by) {
     window._savedState = remote;
     return;
   }
+  // Backward compatibility for remote state
+  if (remote.totals && remote.totals.length && !remote._totalsCloud) {
+    remote._totalsCloud = remote.totals;
+  }
+  if (!remote._totalsMiddle) remote._totalsMiddle = [];
   state = remote;
   renderAll();
 
@@ -1381,6 +1408,11 @@ Sync.init({
 }).then(res => {
   if (res.mode === 'server' && res.state) {
     state = res.state;
+    // Backward compatibility for server state
+    if (state.totals && state.totals.length && !state._totalsCloud) {
+      state._totalsCloud = state.totals;
+    }
+    if (!state._totalsMiddle) state._totalsMiddle = [];
     // 上次断连时暂存的改动（含关掉浏览器后重开的情况），恢复后一并处理
     if (res.pending) onRecover(res.state, res.pending);
   }

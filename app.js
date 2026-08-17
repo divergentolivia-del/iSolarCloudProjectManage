@@ -734,6 +734,12 @@ function matrixTable(title, hint, rows, sumRow, sumLabel) {
 
 RENDERERS.analysis = function () {
   const res = compute(state);
+  // Debug: log authoritative values to console for troubleshooting
+  console.log('[偏差分析] authoritative工时表数据:', JSON.stringify(res.authoritative));
+  console.log('[偏差分析] state.totals行数:', (state.totals || []).length, 
+    'state._totalsCloud行数:', (state._totalsCloud || []).length,
+    'state._totalsMiddle行数:', (state._totalsMiddle || []).length);
+  console.log('[偏差分析] 选中迭代:', res.iterations);
   const c = res.cycle;
   let warn = '';
   if (!res.iterations.length)

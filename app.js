@@ -734,14 +734,20 @@ function matrixTable(title, hint, rows, sumRow, sumLabel) {
 
 RENDERERS.analysis = function () {
   const res = compute(state);
-  // Debug: log authoritative values to console for troubleshooting
-  console.log('[偏差分析] authoritative工时表数据:', JSON.stringify(res.authoritative));
-  console.log('[偏差分析] state.totals行数:', (state.totals || []).length, 
-    'state._totalsCloud行数:', (state._totalsCloud || []).length,
-    'state._totalsMiddle行数:', (state._totalsMiddle || []).length);
-  console.log('[偏差分析] 选中迭代:', res.iterations);
+
   const c = res.cycle;
   let warn = '';
+  // Data source indicator - shows exactly what data the system is using
+  warn += '<div class="card" style="border-left:3px solid var(--accent)">' +
+    '<details><summary style="cursor:pointer;font-size:13px;color:var(--accent)">📊 数据源确认 — 点击展开查看（工时表 ' + (state.totals || []).length + ' 行，已选 ' + res.iterations.length + ' 个迭代）</summary>' +
+    '<p class="hint" style="margin-top:8px">当前 state.totals 行数: <b>' + (state.totals || []).length + '</b>，' +
+    '_totalsCloud: <b>' + (state._totalsCloud || []).length + '</b>，' +
+    '_totalsMiddle: <b>' + (state._totalsMiddle || []).length + '</b></p>' +
+    '<p class="hint">已选迭代: <b>' + (res.iterations.length ? res.iterations.join('、') : '无') + '</b></p>' +
+    '<p class="hint">各团队 authoritative 值（工时表直接汇总）:</p>' +
+    '<div class="scroll" style="max-height:200px;overflow:auto"><table><thead><tr><th>团队</th><th>工时表值</th></tr></thead><tbody>' +
+    TEAMS.map(function(t) { return '<tr><td class="txt">' + esc(t.key) + '</td><td>' + fmt(res.authoritative[t.key]) + '</td></tr>'; }).join('') +
+    '</tbody></table></div></details></div>';
   if (!res.iterations.length)
     warn += '<div class="card"><p class="tag warn">未选择本期迭代，所有工时为 0。请到第⑤页勾选。</p></div>';
   if (res.days === 0)

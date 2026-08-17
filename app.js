@@ -400,6 +400,13 @@ RENDERERS.headcount = function () {
       const k = el.dataset.t, f = el.dataset.f;
       if (!state.headcount[k]) state.headcount[k] = {};
       state.headcount[k][f] = (f === 'owner') ? el.value : (el.value === '' ? null : num(el.value));
+      // 人头数变化时，清除偏差分析中对应团队的可投入人数 override，保持同步
+      if (f === 'regular' || f === 'outsource') {
+        if (state.deviationOverrides && state.deviationOverrides[k] && state.deviationOverrides[k].head !== undefined) {
+          delete state.deviationOverrides[k].head;
+          if (!Object.keys(state.deviationOverrides[k]).length) delete state.deviationOverrides[k];
+        }
+      }
       save(true); renderAll();
     });
   });

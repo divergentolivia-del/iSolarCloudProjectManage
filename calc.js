@@ -144,7 +144,7 @@ function compute(state) {
 
   const deviation = TEAMS.map(t => {
     const override = (state.deviationOverrides || {})[t.key] || {};
-    const workload = override.workload !== undefined ? override.workload : (authoritative[t.key] || 0);
+    const workload = override.workload !== undefined ? override.workload : (planTotal[t.key] || 0);
     const head = override.head !== undefined ? override.head : (heads[t.key] || 0);
     const capacity = head * days;
     const over = workload - capacity;
@@ -195,7 +195,7 @@ function compute(state) {
     heads: heads, locked: locked, deviation: deviation,
     reconcile: reconcile,
     totals: {
-      workload: rowTotal(authoritative),
+      workload: deviation.reduce((s, d) => s + d.workload, 0),
       boardWorkload: rowTotal(planTotal),
       capacity: deviation.reduce((s, d) => s + d.capacity, 0),
       head: TEAMS.reduce((s, t) => s + (heads[t.key] || 0), 0)

@@ -1,4 +1,4 @@
-/* modules/project/routes.js — 全年度项目管理模块服务端路由
+﻿/* modules/project/routes.js — 全年度项目管理模块服务端路由
    处理 /api/project/state 的 GET/POST 请求和 /api/project/milestones。
    数据存储于 data/project/state.json 和 data/project/history/。
 */
@@ -18,6 +18,8 @@ const HISTORY_DIR = path.join(PROJ_DIR, 'history');
 
 /* 有效状态枚举 */
 const VALID_STATUSES = ['planned', 'in-progress', 'completed', 'suspended'];
+const VALID_RELEASE_LAYERS = ['platform', 'business', 'shared'];
+const VALID_RELEASE_RISKS = ['high', 'medium', 'low'];
 
 /* ---------- 空状态模板 ---------- */
 const EMPTY_STATE = {
@@ -41,6 +43,19 @@ function sendJson(res, code, obj) {
     'Cache-Control': 'no-store'
   });
   res.end(body);
+}
+
+function isValidProjectDateText(value) {
+  if (!value) return true;
+  if (typeof value !== 'string') return false;
+  const m = /^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$/.exec(value.trim());
+  if (!m) return false;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3] || 1);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 }
 
 /**
@@ -123,6 +138,17 @@ function validateProjects(projects) {
     // 日期范围校验：startDate ≤ endDate
     if (p.startDate && p.endDate && p.startDate > p.endDate) {
       return `项目 "${p.id}" 开始日期(${p.startDate})不能晚于结束日期(${p.endDate})`;
+    }
+
+    // 年度发布字段校验
+    if (p.releaseLayer && !VALID_RELEASE_LAYERS.includes(p.releaseLayer)) {
+      return `项目 "${p.id}" releaseLayer 无效: "${p.releaseLayer}"，有效值为 ${VALID_RELEASE_LAYERS.join(', ')}`;
+    }
+    if (p.releaseRisk && !VALID_RELEASE_RISKS.includes(p.releaseRisk)) {
+      return `项目 "${p.id}" releaseRisk 无效: "${p.releaseRisk}"，有效值为 ${VALID_RELEASE_RISKS.join(', ')}`;
+    }
+    if (p.releaseDate && !isValidProjectDateText(p.releaseDate)) {
+      return `项目 "${p.id}" releaseDate 必须为 YYYY-MM 或 YYYY-MM-DD`;
     }
 
     // resourceSummary 数值校验

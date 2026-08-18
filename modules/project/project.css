@@ -1,0 +1,6 @@
+﻿/* Project module release planning styles */
+.release-card { display:flex; flex-direction:column; gap:6px; min-height:72px; padding:8px; color:var(--text); text-decoration:none; background:#fff; border:1px solid var(--line); border-left:3px solid var(--ok); border-radius:6px; }
+.release-card:hover { border-color:var(--accent); box-shadow:0 6px 14px rgba(22,104,220,.12); transform:translateY(-1px); }
+.release-card.release-risk-high { border-left-color:var(--warn); }
+.release-card.release-risk-medium { border-left-color:var(--hold); }
+.release-card.release-risk-low { border-left-color:var(--ok); }

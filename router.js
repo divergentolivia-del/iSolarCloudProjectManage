@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    router.js — Hash-based client-side router
    Parses URL hash into moduleId + subPath, manages module
    lifecycle (init/enter/leave), and updates navigation state.
@@ -89,8 +89,12 @@ const Router = (() => {
         items.push({ label: mod ? mod.name : '全年度项目管理', href: '#/project' });
         items.push({ label: '项目详情' });
       } else {
+        const projectSubLabels = {
+          timeline: '周期视图',
+          release: '年度发布视图'
+        };
         items.push({ label: mod ? mod.name : '全年度项目管理', href: '#/project' });
-        items.push({ label: subPath });
+        items.push({ label: projectSubLabels[subPath] || subPath });
       }
     } else {
       // Generic fallback

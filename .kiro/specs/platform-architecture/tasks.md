@@ -6,8 +6,8 @@ This plan incrementally transforms the existing single-function iteration workbe
 
 ## Tasks
 
-- [ ] 1. Platform Shell Foundation (平台外壳基础)
-  - [ ] 1.1 Create `platform.html` — new platform entry point
+- [x] 1. Platform Shell Foundation (平台外壳基础)
+  - [x] 1.1 Create `platform.html` — new platform entry point
     - New HTML file serving as the multi-module platform entry
     - Include three-zone layout skeleton: top navbar (48px), sidebar (200px), main content area
     - Pre-create module containers (`#module-dashboard`, `#module-iteration`, `#module-project`)
@@ -15,7 +15,7 @@ This plan incrementally transforms the existing single-function iteration workbe
     - Keep original `index.html` as standalone iteration entry (backward compatibility)
     - _Requirements: 1.1, 1.2, 1.3, 4.4, 10.1_
 
-  - [ ] 1.2 Create `platform.css` — responsive layout styles
+  - [x] 1.2 Create `platform.css` — responsive layout styles
     - Implement three-zone grid/flex layout: navbar, sidebar, main content
     - Sidebar styles: expanded (200px), collapsed (56px), hidden (mobile overlay)
     - Active nav item: left blue indicator bar + background highlight
@@ -25,7 +25,7 @@ This plan incrementally transforms the existing single-function iteration workbe
     - Metric card grid, module entry card styles, quick access section layout
     - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.4, 2.6, 2.7, 17.1, 17.2, 17.3, 17.4_
 
-  - [ ] 1.3 Create `shared-ui.js` — shared UI component helpers
+  - [x] 1.3 Create `shared-ui.js` — shared UI component helpers
     - `renderMetricCard(icon, label, value, status)` — renders a metric card HTML string
     - `renderBreadcrumb(items)` — renders breadcrumb navigation
     - `renderModuleEntryCard(title, description, hash)` — renders module entry card
@@ -34,7 +34,7 @@ This plan incrementally transforms the existing single-function iteration workbe
     - `formatCurrency(value)` — formats as ¥X.X
     - _Requirements: 5.2, 5.3, 5.4, 6.4, 3.7_
 
-  - [ ] 1.4 Create `router.js` — hash-based client-side router
+  - [x] 1.4 Create `router.js` — hash-based client-side router
     - Parse URL hash into `{ moduleId, subPath }` (split on `/` after `#/`)
     - Default to `dashboard` when hash is empty or `#/`
     - Fall back to dashboard for unregistered/disabled modules
@@ -45,7 +45,7 @@ This plan incrementally transforms the existing single-function iteration workbe
     - Support route mappings: `#/dashboard`, `#/dashboard/budget`, `#/dashboard/token`, `#/iteration`, `#/iteration/{tab}`, `#/project`, `#/project/detail/{id}`
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8_
 
-  - [ ] 1.5 Create `platform.js` — platform shell orchestrator
+  - [x] 1.5 Create `platform.js` — platform shell orchestrator
     - `Platform.init(modules)` — register modules, render sidebar nav items, render navbar, bind router
     - Render sidebar with module entries ordered by `order` field, with icon + name + optional badge
     - Sidebar collapse toggle: persist preference to `localStorage`, handle responsive resize
@@ -55,11 +55,11 @@ This plan incrementally transforms the existing single-function iteration workbe
     - Dashboard sub-pages (`#/dashboard/budget`, `#/dashboard/token`): keep 首页 nav item active
     - _Requirements: 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 4.1, 4.2, 4.3, 4.4, 4.5_
 
-- [ ] 2. Checkpoint — Platform shell renders correctly
+- [x] 2. Checkpoint — Platform shell renders correctly
   - Ensure platform.html loads with sidebar, navbar, and empty content area. Manually verify responsive breakpoints. Ask the user if questions arise.
 
-- [ ] 3. Server-Side Module Loader & Data Migration
-  - [ ] 3.1 Create `module-loader.js` — server-side dynamic module loading
+- [x] 3. Server-Side Module Loader & Data Migration
+  - [x] 3.1 Create `module-loader.js` — server-side dynamic module loading
     - `loadAll()` — scan `modules/` directory, require each sub-directory's `routes.js`
     - Register module route handlers with declared URL prefix
     - Log warning and skip on load failure (syntax error, missing file)
@@ -69,7 +69,7 @@ This plan incrementally transforms the existing single-function iteration workbe
     - `dispatch(req, res, url)` — match request path against registered prefixes
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6_
 
-  - [ ] 3.2 Create `migrate.js` — data migration logic
+  - [x] 3.2 Create `migrate.js` — data migration logic
     - Detect migration needed: `data/state.json` exists but `data/iteration/state.json` does not
     - Copy `data/state.json` → `data/iteration/state.json`
     - Copy `data/history/*` → `data/iteration/history/`
@@ -78,7 +78,7 @@ This plan incrementally transforms the existing single-function iteration workbe
     - Idempotent: safe to run multiple times, handles interruption gracefully
     - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6_
 
-  - [ ] 3.3 Refactor `server.js` — integrate module loader and migration
+  - [x] 3.3 Refactor `server.js` — integrate module loader and migration
     - On startup: run migration check (call `migrate.js`), then call `moduleLoader.loadAll()`
     - Route dispatching: authentication check → SSE → dashboard API → module dispatch → legacy `/api/state` fallback → static files
     - Serve `platform.html` as default entry (while keeping `index.html` accessible)
@@ -93,15 +93,15 @@ This plan incrementally transforms the existing single-function iteration workbe
     - **Property 5: Dashboard aggregation consistency — computed metrics match individual module data**
     - **Validates: Requirements 8.5, 3.1, 9.1, 9.3**
 
-- [ ] 4. Iteration Module Refactor
-  - [ ] 4.1 Create `modules/iteration/routes.js` — server-side iteration module
+- [x] 4. Iteration Module Refactor
+  - [x] 4.1 Create `modules/iteration/routes.js` — server-side iteration module
     - Export module definition: `{ id: 'iteration', prefix: '/api/iteration', handle(), ensureData() }`
     - `ensureData()` — ensure `data/iteration/` and `data/iteration/history/` exist
     - `handle()` — serve GET/POST for `/api/iteration/state` (reuse existing state logic from server.js)
     - Maintain backward compat: `/api/state` in server.js forwards to this handler
     - _Requirements: 10.1, 10.2, 10.3_
 
-  - [ ] 4.2 Create `modules/iteration/index.js` — client-side iteration module
+  - [x] 4.2 Create `modules/iteration/index.js` — client-side iteration module
     - Implement `ModuleDefinition` interface: `{ id: 'iteration', name: '阳光云迭代项目', icon: '📊', order: 1, init(), enter(), leave(), getSummary() }`
     - `init(container, context)` — render the existing 7-tab workbench UI (refactored from app.js)
     - `enter(subPath)` — activate specified tab (e.g., `analysis`, `contacts`)
@@ -110,7 +110,7 @@ This plan incrementally transforms the existing single-function iteration workbe
     - Reuse existing `calc.js`, `config.js`, `parse.js` logic
     - _Requirements: 4.1, 4.2, 4.3, 4.5, 10.1_
 
-  - [ ] 4.3 Adapt `sync.js` — enhance for multi-module SSE
+  - [x] 4.3 Adapt `sync.js` — enhance for multi-module SSE
     - Add `pushModule(moduleId, getState)` — submit state to `/api/{moduleId}/state`
     - Add `onModuleUpdate(moduleId, callback)` — subscribe to module-specific SSE events
     - SSE events now include `moduleId` field; events without moduleId default to `iteration`
@@ -120,11 +120,11 @@ This plan incrementally transforms the existing single-function iteration workbe
     - Preserve existing `push()` and `init()` signatures for backward compat
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 12.1, 12.2, 12.3, 12.4, 18.1, 18.2, 18.3, 18.4_
 
-- [ ] 5. Checkpoint — Iteration module works within new platform
+- [x] 5. Checkpoint — Iteration module works within new platform
   - Ensure the iteration workbench loads at `#/iteration` within the platform shell. Verify `/api/state` backward compatibility. Verify SSE events. Ask the user if questions arise.
 
-- [ ] 6. Dashboard Module
-  - [ ] 6.1 Create `modules/dashboard/routes.js` — server-side dashboard API
+- [x] 6. Dashboard Module
+  - [x] 6.1 Create `modules/dashboard/routes.js` — server-side dashboard API
     - Export: `{ id: 'dashboard', prefix: '/api/dashboard', handle(), ensureData() }`
     - `GET /api/dashboard/summary` — read state files from all modules, aggregate metrics
     - Compute iteration deviation using existing `compute()` from `calc.js`
@@ -137,7 +137,7 @@ This plan incrementally transforms the existing single-function iteration workbe
     - Recent 3 archive records from `data/archive/`
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 5.5, 5.6, 7.1, 7.2, 7.3, 7.4_
 
-  - [ ] 6.2 Create `modules/dashboard/index.js` — client-side dashboard module
+  - [x] 6.2 Create `modules/dashboard/index.js` — client-side dashboard module
     - Implement `ModuleDefinition`: `{ id: 'dashboard', name: '首页', icon: '🏠', order: 0 }`
     - `init()` — fetch `/api/dashboard/summary` and render full dashboard
     - Render 3 metric cards: 产能偏差 (±X.X%), 在研项目数 (X 个), Token月度消耗 (¥X.X)
@@ -149,11 +149,11 @@ This plan incrementally transforms the existing single-function iteration workbe
     - On SSE update for any module while on dashboard → refresh aggregation
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3, 7.4, 11.4, 19.4_
 
-- [ ] 7. Checkpoint — Dashboard shows live metrics
+- [x] 7. Checkpoint — Dashboard shows live metrics
   - Ensure dashboard loads at `#/dashboard` with metric cards, entry cards, and quick access section. Verify zero-value fallback when module data is empty. Ask the user if questions arise.
 
-- [ ] 8. Project Module (全年度项目管理)
-  - [ ] 8.1 Create `modules/project/routes.js` — server-side project module
+- [x] 8. Project Module (全年度项目管理)
+  - [x] 8.1 Create `modules/project/routes.js` — server-side project module
     - Export: `{ id: 'project', prefix: '/api/project', handle(), ensureData() }`
     - `ensureData()` — create `data/project/` and `data/project/history/` directories, init empty state
     - `GET /api/project/state` — return project state
@@ -163,7 +163,7 @@ This plan incrementally transforms the existing single-function iteration workbe
     - Record `updatedBy` on writes, save history snapshots
     - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6, 14.7, 18.1, 18.4_
 
-  - [ ] 8.2 Create `modules/project/index.js` — client-side project module
+  - [x] 8.2 Create `modules/project/index.js` — client-side project module
     - Implement `ModuleDefinition`: `{ id: 'project', name: '全年度项目管理', icon: '📋', order: 2 }`
     - `init()` — fetch project state and render project list table
     - Project list: columns for name, productLine, status, priority, owner, dates, progress
@@ -180,8 +180,8 @@ This plan incrementally transforms the existing single-function iteration workbe
     - Test project validation: unique IDs, valid status enum, startDate ≤ endDate
     - **Validates: Requirements 10.1, 18.4, 14.3, 14.4, 14.5**
 
-- [ ] 9. Budget Module (人力预算管理)
-  - [ ] 9.1 Create `modules/budget/routes.js` — server-side budget module
+- [x] 9. Budget Module (人力预算管理)
+  - [x] 9.1 Create `modules/budget/routes.js` — server-side budget module
     - Export: `{ id: 'budget', prefix: '/api/budget', handle(), ensureData() }`
     - `ensureData()` — create `data/budget/` and `data/budget/history/`
     - `GET /api/budget/state` — return budget state
@@ -191,7 +191,7 @@ This plan incrementally transforms the existing single-function iteration workbe
     - Record `updatedBy`, save history snapshots
     - _Requirements: 15.1, 15.2, 15.3, 15.4, 15.5, 15.7_
 
-  - [ ] 9.2 Create `modules/budget/index.js` — client-side budget module
+  - [x] 9.2 Create `modules/budget/index.js` — client-side budget module
     - Render as dashboard sub-page (within Dashboard module at `#/dashboard/budget`)
     - Breadcrumb: 首页 > 人力预算管理
     - Annual budget plan table: team × Q1–Q4 with editable cells, auto-save on change
@@ -201,15 +201,15 @@ This plan incrementally transforms the existing single-function iteration workbe
     - Excel export button (reuse existing xlsx devDependency via export-builder.js pattern)
     - _Requirements: 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 15.7_
 
-- [ ] 10. Token Module Placeholder (AI/Token 使用记录)
-  - [ ] 10.1 Create `modules/token/routes.js` — server-side token module
+- [x] 10. Token Module Placeholder (AI/Token 使用记录)
+  - [x] 10.1 Create `modules/token/routes.js` — server-side token module
     - Export: `{ id: 'token', prefix: '/api/token', handle(), ensureData() }`
     - `ensureData()` — create `data/token/`, `data/token/history/`, `data/token/logs/`
     - `GET /api/token/state` — return token state (read-only endpoint)
     - Initialize with sample/empty token state if not exists
     - _Requirements: 16.1, 16.2_
 
-  - [ ] 10.2 Create `modules/token/index.js` — client-side token module
+  - [x] 10.2 Create `modules/token/index.js` — client-side token module
     - Render as dashboard sub-page (within Dashboard module at `#/dashboard/token`)
     - Breadcrumb: 首页 > AI/Token 使用记录
     - Monthly summary: total tokens, total cost, invocation count
@@ -218,14 +218,14 @@ This plan incrementally transforms the existing single-function iteration workbe
     - Placeholder content — detailed tracking deferred to future iteration
     - _Requirements: 16.1, 16.2, 16.3, 16.4_
 
-- [ ] 11. Error Resilience & Security Hardening
-  - [ ] 11.1 Implement error resilience across platform
+- [x] 11. Error Resilience & Security Hardening
+  - [x] 11.1 Implement error resilience across platform
     - Module load failure → sidebar shows disabled/gray nav item, platform continues
     - Corrupted state file → attempt restore from latest history snapshot; if none, init empty + notify user
     - Dashboard aggregation error for one module → show "数据异常" indicator, don't block others
     - _Requirements: 19.1, 19.2, 19.3, 19.4_
 
-  - [ ] 11.2 Implement security validations
+  - [x] 11.2 Implement security validations
     - Module ID validation: `/^[a-z][a-z0-9-]*$/` pattern on all module-related paths
     - POST body size limit enforcement (64MB)
     - `updatedBy` field recorded on every write operation
@@ -233,7 +233,7 @@ This plan incrementally transforms the existing single-function iteration workbe
     - Security warning to console when no ACCESS_TOKEN set
     - _Requirements: 20.1, 20.2, 20.3, 20.4, 20.5_
 
-- [ ] 12. Final Checkpoint — Full platform integration
+- [x] 12. Final Checkpoint — Full platform integration
   - Ensure all modules load correctly within the platform. Verify routing between all pages. Verify SSE broadcasts across modules. Verify data migration with existing state.json. Verify responsive layout at all breakpoints. Ask the user if questions arise.
 
 ## Notes

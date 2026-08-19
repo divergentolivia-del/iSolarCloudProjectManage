@@ -1,1 +1,17 @@
 node_modules/
+data/iteration/state.json
+data/iteration/state.json.bak
+data/iteration/state.json.broken
+data/iteration/history/
+data/state.json
+data/archive/*.json
+data/audit-log.json
+data/budget/state.json
+data/budget/history/
+data/project/state.json
+data/project/history/
+data/token/state.json
+data/token/history/
+data/token/logs/
+data/platform.json
+*.xlsx

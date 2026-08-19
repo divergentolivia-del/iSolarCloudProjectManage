@@ -55,7 +55,7 @@
     - Validate ID format matches `[\w.-]+` pattern to prevent path traversal
     - _Requirements: 9.1, 9.2, 10.1, 10.3, 13.3_
 
-  - [ ]* 2.5 Write unit tests for archive module (`_test-archive.js`)
+  - [x]* 2.5 Write unit tests for archive module (`_test-archive.js`)
     - Test `createArchive()`: normal creation with file verification and summary field correctness
     - Test `createArchive()`: duplicate ID rejection returns error
     - Test `initNextIteration()`: preserves headcount keys, clears totals/board/iterations, increments rev
@@ -129,7 +129,7 @@
     - Print output file path and summary to stdout on success (unless `--quiet`)
     - _Requirements: 1.4, 1.5, 3.1, 3.2, 3.3_
 
-  - [ ]* 5.3 Write unit tests for CLI export (`_test-export.js`)
+  - [x]* 5.3 Write unit tests for CLI export (`_test-export.js`)
     - Test `validateState()` for valid and invalid inputs
     - Test `deriveOutputPath()` for various cycle configurations
     - Test `buildWorkbook()` output contains exactly 3 sheets with correct names
@@ -163,7 +163,7 @@
     - Broadcast appropriate SSE events for state changes
     - _Requirements: 7.1, 7.7, 10.1, 10.2, 10.3, 13.1, 13.2, 14.2_
 
-  - [ ]* 7.3 Write integration tests for archive API endpoints
+  - [x]* 7.3 Write integration tests for archive API endpoints
     - Test POST /api/archive: creates file with correct structure and summary
     - Test POST /api/archive (duplicate): returns 409 conflict
     - Test POST /api/archive/init-next: state.json is cleared correctly

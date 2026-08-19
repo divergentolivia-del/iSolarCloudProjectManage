@@ -1125,7 +1125,6 @@ function loadArchiveList() {
             <td>${esc(item.archivedAt || '')}</td>
             <td class="archive-ops" style="white-space:nowrap">
               <button class="btn" onclick="viewArchive('${esc(item.id)}')">查看</button>
-              <button class="btn" onclick="editArchive('${esc(item.id)}')">编辑</button>
               <button class="btn" onclick="exportArchiveExcel('${esc(item.id)}')">导出Excel</button>
               <button class="btn" onclick="deleteArchive('${esc(item.id)}')">删除</button>
             </td>
@@ -1144,41 +1143,6 @@ function loadArchiveList() {
       const container = document.getElementById('archiveListContainer');
       if (container) container.innerHTML = '<p style="color:var(--warn);text-align:center;padding:32px 0">加载失败：' + esc(e.message) + '</p>';
     });
-}
-
-/* 编辑归档元信息 */
-async function editArchive(id) {
-  const data = await fetch('api/archive/' + id).then(r => r.json());
-  if (!data || !data.meta) { toast('归档数据异常'); return; }
-
-  const bodyHtml = `
-    <div class="form-group" style="margin-bottom:12px">
-      <label style="font-size:13px;color:var(--muted);display:block;margin-bottom:4px">归档标题</label>
-      <input type="text" id="editArchiveName" value="${esc(data.meta.name || '')}" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:4px;font-size:14px">
-    </div>
-    <div class="form-group" style="margin-bottom:12px">
-      <label style="font-size:13px;color:var(--muted);display:block;margin-bottom:4px">备注</label>
-      <textarea id="editArchiveNote" rows="3" style="width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:4px;font-size:14px;resize:vertical">${esc(data.meta.note || '')}</textarea>
-    </div>
-    <p style="color:var(--muted);font-size:12px;margin:0">注意：编辑归档仅修改标题和备注信息。</p>
-  `;
-  showModal('编辑归档', bodyHtml, `
-    <button class="btn" onclick="hideModal()">取消</button>
-    <button class="btn primary" id="saveArchiveEditBtn">保存</button>
-  `);
-
-  document.getElementById('saveArchiveEditBtn').addEventListener('click', async () => {
-    const newName = document.getElementById('editArchiveName').value.trim();
-    const newNote = document.getElementById('editArchiveNote').value.trim();
-    await fetch('api/archive/' + id, {
-      method: 'PATCH',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ name: newName, note: newNote })
-    });
-    hideModal();
-    toast('归档信息已更新');
-    loadArchiveList();
-  });
 }
 
 /* 导出归档为 Excel */

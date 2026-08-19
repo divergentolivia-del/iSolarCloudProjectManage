@@ -91,9 +91,11 @@ npm test
 
 实际执行结果（2026-08-19）：
 
-- `_test-merge.js`：20 通过，0 失败
-- `_test-server.js`：14 通过，3 失败
-- 失败点集中在损坏 `state.json` 后的日志断言和 `.broken` 回退断言
+- `npm test`：退出码 0
+- `_test-archive.js`：3 项通过
+- `_test-merge.js`：20 项通过
+- `_test-server.js`：19 项通过
+- Node test runner：5 个测试文件通过，0 失败
 
 部署前验证：
 
@@ -130,4 +132,20 @@ node export-cli.js
 - 为 archive/export/platform 三组能力补齐自动化测试后，再考虑合并主分支。
 - 若 GitHub 或部署平台配置了“任意分支自动部署”，建议改为仅 main/tag 部署，独立分支只用于代码审查。
 
+## 10. Codex 代码提交（供 Kiro 审查）
 
+本次在 Kiro 已实现代码上补充一项数据安全修复：归档记录创建后应保持不可变，不能通过 API 或页面修改标题/备注。
+
+代码改动：
+
+- `server.js`：移除 `PATCH /api/archive/:id` 写回归档文件的接口。
+- `app.js`：移除历史归档列表中的“编辑”按钮及对应 PATCH 调用。
+- `_test-archive.js`：新增归档深拷贝、重复归档、初始化下一迭代、损坏文件跳过和路径安全回归测试。
+- `_test-server.js`：将损坏文件回退测试适配到当前 `data/iteration/` 多模块目录。
+- `_test-server.js`：新增 PATCH 归档接口不可用且归档文件不被修改的回归断言。
+
+审查重点：
+
+- 归档仍可查看、导出和按权限删除。
+- 归档创建后的 `state` 快照不会被后续当前状态修改影响。
+- 不应重新引入修改已归档文件内容的 PATCH/PUT 接口。

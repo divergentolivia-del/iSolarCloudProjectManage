@@ -65,6 +65,20 @@ function gracefulStop(p) {
   let srv = start();
   await sleep(1200);
 
+  {
+    console.log('\n[0] 归档不可变性');
+    const archiveDir = path.join(DATA, 'archive');
+    const archivePath = path.join(archiveDir, 'test-archive.json');
+    fs.mkdirSync(archiveDir, { recursive: true });
+    fs.writeFileSync(archivePath, JSON.stringify({
+      meta: { id: 'test-archive', name: '原始标题', note: '原始备注' },
+      state: { rev: 1 }
+    }), 'utf8');
+    const patchResp = await req('PATCH', '/api/archive/test-archive', { name: '修改标题', note: '修改备注' });
+    ck('已归档内容不提供 PATCH', patchResp.code === 404, patchResp.code);
+    const archiveAfterPatch = JSON.parse(fs.readFileSync(archivePath, 'utf8'));
+    ck('PATCH 不改变归档文件', archiveAfterPatch.meta.name === '原始标题' && archiveAfterPatch.meta.note === '原始备注', archiveAfterPatch.meta);
+  }
   console.log('\n[1] 基本读写与乐观锁');
   let r = await req('POST', '/api/state', { baseRev: 0, by: '甲', state: { headcount: { 'APP开发-阳光云': { regular: 5 } } } });
   ck('首次提交 rev=1', r.code === 200 && r.body.rev === 1, r.body);
@@ -106,8 +120,8 @@ function gracefulStop(p) {
   gracefulStop(srv);
   await sleep(700);
 
-  console.log('\n[5] state.json 损坏时回退历史快照，而非返回空态');
-  fs.writeFileSync(path.join(DATA, 'state.json'), '{"headcount": {broken', 'utf8');
+  console.log('\n[5] iteration/state.json 损坏时回退历史快照，而非返回空态');
+  fs.writeFileSync(path.join(DATA, 'iteration', 'state.json'), '{"headcount": {broken', 'utf8');
   srv = start();
   await sleep(1200);
   r = await req('GET', '/api/state');
@@ -118,13 +132,13 @@ function gracefulStop(p) {
   await sleep(700);
 
   console.log('\n[6] 无快照且文件损坏时留存 .broken 供人工检查');
-  fs.rmSync(path.join(DATA, 'history'), { recursive: true, force: true });
-  fs.writeFileSync(path.join(DATA, 'state.json'), 'not json at all', 'utf8');
+  fs.rmSync(path.join(DATA, 'iteration', 'history'), { recursive: true, force: true });
+  fs.writeFileSync(path.join(DATA, 'iteration', 'state.json'), 'not json at all', 'utf8');
   srv = start();
   await sleep(1200);
   r = await req('GET', '/api/state');
   ck('降级为空态', Number(r.body.rev || 0) === 0, r.body.rev);
-  ck('原损坏文件已另存 .broken', fs.existsSync(path.join(DATA, 'state.json.broken')));
+  ck('原损坏文件已另存 .broken', fs.existsSync(path.join(DATA, 'iteration', 'state.json.broken')));
   gracefulStop(srv);
   await sleep(700);
 

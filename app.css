@@ -15,14 +15,15 @@ body {
   font: 14px/1.5 "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
 }
 .topbar {
-  display: flex; align-items: center; gap: 16px;
+  display: flex; align-items: center; gap: 12px;
   padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--line);
   position: sticky; top: 0; z-index: 20;
+  flex-wrap: wrap;
 }
-.brand { font-size: 16px; font-weight: 600; }
-.cycle-label { color: var(--muted); font-size: 13px; }
-.mode-badge { display: flex; align-items: center; gap: 6px; font-size: 12px; }
-.actions { margin-left: auto; display: flex; gap: 8px; }
+.brand { font-size: 16px; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+.cycle-label { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.mode-badge { display: flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
+.actions { margin-left: auto; display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
 .btn {
   padding: 6px 12px; border: 1px solid var(--line); border-radius: 4px;
   background: #fff; color: var(--text); cursor: pointer; font-size: 13px;

@@ -156,7 +156,13 @@ const DashboardModule = (() => {
 
     container.innerHTML = `
       <div class="dashboard-page">
-        <h2 class="page-title">云平台管理工作台</h2>
+        <div class="dashboard-heading">
+          <div>
+            <div class="section-kicker">WORKBENCH OVERVIEW</div>
+            <h2 class="page-title">云平台管理工作台</h2>
+            <p class="dashboard-lead">&#x628A;&#x9879;&#x76EE;&#x8FDB;&#x5EA6;&#x3001;&#x4EBA;&#x529B;&#x9884;&#x7B97;&#x548C; AI &#x4F7F;&#x7528;&#x6210;&#x672C;&#x653E;&#x5728;&#x540C;&#x4E00;&#x5C4F;&#xFF0C;&#x5148;&#x5904;&#x7406;&#x98CE;&#x9669;&#xFF0C;&#x518D;&#x63A8;&#x8FDB;&#x4EA4;&#x4ED8;&#x3002;</p>
+          </div>
+        </div>
         ${metricsHtml}
         ${entriesHtml}
         <div class="quick-access-row">

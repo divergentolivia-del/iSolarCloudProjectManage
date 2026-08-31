@@ -7,6 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="platform.css">
 <link rel="stylesheet" href="modules/project/project.css">
+<link rel="stylesheet" href="modules/csenergy/csenergy.css">
 </head>
 <body>
 
@@ -95,6 +96,7 @@
 <script src="modules/budget/index.js"></script>
 <script src="modules/token/index.js"></script>
 <script src="modules/settings/index.js"></script>
+<script src="modules/csenergy/index.js"></script>
 
 <!-- Platform orchestrator (must be last — calls Platform.init) -->
 <script src="platform.js"></script>
@@ -102,7 +104,7 @@
 <!-- Initialize platform with all modules -->
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    Platform.init([DashboardModule, IterationModule, ProjectModule]);
+    Platform.init([DashboardModule, IterationModule, ProjectModule, CsEnergyModule]);
   });
 </script>
 </body>

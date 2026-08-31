@@ -1,0 +1,288 @@
+/* ════════════════════════════════════════════════════════════════════
+   csenergy.css — 工商储项目管理模块样式
+   复用 platform.css 的 CSS 变量，自动适配亮/暗主题
+   ════════════════════════════════════════════════════════════════════ */
+
+.csenergy-page { width: 100%; max-width: 1400px; margin: 0 auto; }
+
+.cs-loading, .cs-empty {
+  padding: 48px; text-align: center; color: var(--muted); font-size: 14px;
+}
+
+/* ══ 顶部视图 tab ══ */
+.cs-topnav {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin-bottom: 20px; padding: 6px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.cs-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 18px; border: 0; border-radius: var(--radius-sm);
+  background: transparent; color: var(--muted);
+  font-size: 14px; font-weight: 600; transition: all 0.2s;
+}
+.cs-tab:hover { background: var(--panel-soft); color: var(--text); }
+.cs-tab.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #fff; box-shadow: 0 4px 12px rgba(82,196,26,0.3);
+}
+
+/* ══ 视图标题栏 ══ */
+.cs-view-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 18px; flex-wrap: wrap;
+}
+.cs-view-head h3 { margin: 0; font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: -0.01em; }
+.cs-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.cs-year-switch { display: flex; align-items: center; gap: 8px; }
+.cs-year-chip {
+  padding: 5px 14px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-strong);
+  font-size: 13px; font-weight: 700;
+}
+
+/* ══ 指标卡网格 ══ */
+.cs-metric-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px; margin-bottom: 18px;
+}
+.cs-metric {
+  position: relative; overflow: hidden;
+  padding: 18px 20px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow);
+  transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+.cs-metric::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+.cs-metric-green::before { background: linear-gradient(90deg, var(--accent), #7ad84a); }
+.cs-metric-orange::before { background: linear-gradient(90deg, var(--orange), #ffce6e); }
+.cs-metric-blue::before { background: linear-gradient(90deg, var(--blue), #7d9cff); }
+.cs-metric-purple::before { background: linear-gradient(90deg, var(--purple), #b39cff); }
+.cs-metric-pink::before { background: linear-gradient(90deg, var(--pink), #ff9ec7); }
+.cs-metric-teal::before { background: linear-gradient(90deg, #13c2c2, #5cdbd3); }
+.cs-metric:hover { box-shadow: var(--shadow-lg); transform: translateY(-4px); }
+
+.cs-metric-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.cs-metric-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--panel-soft); font-size: 18px;
+}
+.cs-metric-trend { font-size: 13px; opacity: 0.6; }
+.cs-metric-value { font-size: 30px; font-weight: 800; color: var(--text); line-height: 1.1; letter-spacing: -0.02em; }
+.cs-metric-label { margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--text); }
+.cs-metric-sub { margin-top: 3px; font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+/* ══ 图表行 ══ */
+.cs-chart-row {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 14px; margin-bottom: 18px;
+}
+.cs-chart-row-2 { grid-template-columns: 1fr 1fr; }
+
+.cs-chart-card, .cs-panel {
+  padding: 18px 20px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow);
+  transition: box-shadow 0.3s;
+}
+.cs-chart-card:hover, .cs-panel:hover { box-shadow: var(--shadow-lg); }
+.cs-chart-card h4, .cs-panel-head h4 {
+  margin: 0 0 16px; font-size: 14px; font-weight: 700; color: var(--text);
+}
+.cs-chart-card h4 small, .cs-panel-head h4 small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.cs-panel { margin-bottom: 18px; }
+.cs-panel-head { margin-bottom: 4px; }
+.cs-panel-head h4 { margin: 0 0 14px; }
+
+/* ══ 柱状图 ══ */
+.cs-bar-chart {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 6px; height: 150px; padding-top: 20px;
+}
+.cs-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+.cs-bar {
+  position: relative; width: 100%; max-width: 28px;
+  height: var(--h, 4%); min-height: 6px;
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+  transition: height 0.4s ease;
+}
+.cs-bar::after {
+  content: attr(data-v); position: absolute; top: -18px; left: 50%;
+  transform: translateX(-50%); font-size: 11px; font-weight: 600; color: var(--muted);
+}
+.cs-bar-label { margin-top: 6px; font-size: 10px; color: var(--muted); }
+
+/* ══ 环形图 ══ */
+.cs-donut-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.cs-donut { position: relative; width: 140px; height: 140px; }
+.cs-donut svg circle { transition: stroke-dasharray 0.5s ease; }
+.cs-donut-center {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+}
+.cs-donut-center strong { font-size: 24px; font-weight: 800; color: var(--text); }
+.cs-donut-center span { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.cs-legend { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.cs-legend-item { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.cs-legend-item i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.cs-legend-item b { color: var(--text); font-weight: 700; }
+
+/* ══ 甘特图 ══ */
+.cs-gantt { display: flex; flex-direction: column; gap: 10px; }
+.cs-gantt-row { display: flex; align-items: center; gap: 14px; }
+.cs-gantt-name {
+  flex: 0 0 200px; font-size: 13px; font-weight: 600; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cs-gantt-track { flex: 1; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 8px 0; }
+.cs-gantt-node {
+  display: inline-flex; flex-direction: column; align-items: center;
+  padding: 6px 12px; border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+  border: 1.5px solid;
+}
+.cs-gantt-node small { font-size: 10px; font-weight: 400; opacity: 0.8; margin-top: 1px; }
+.cs-gantt-node.done { background: var(--accent-soft); color: var(--accent-strong); border-color: var(--accent); }
+.cs-gantt-node.pending { background: var(--blue-soft); color: var(--blue); border-color: var(--blue); }
+.cs-gantt-empty { font-size: 12px; color: var(--muted); }
+
+/* ══ 风险提醒列表 ══ */
+.cs-risk-list { display: flex; flex-direction: column; gap: 8px; }
+.cs-risk-ok {
+  padding: 24px; text-align: center; color: var(--ok);
+  font-size: 14px; font-weight: 600;
+  background: var(--ok-soft); border-radius: var(--radius);
+}
+.cs-risk-line {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  background: var(--panel-soft); font-size: 13px;
+}
+.cs-risk-dot { width: 8px; height: 8px; border-radius: 999px; flex-shrink: 0; }
+.cs-risk-high .cs-risk-dot { background: var(--warn); }
+.cs-risk-medium .cs-risk-dot { background: var(--hold); }
+.cs-risk-low .cs-risk-dot { background: var(--ok); }
+.cs-risk-text { flex: 1; color: var(--text); }
+.cs-risk-date { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+/* ══ 筛选栏 ══ */
+.cs-filter-bar {
+  display: flex; flex-direction: column; gap: 12px;
+  margin-bottom: 16px; padding: 14px 16px;
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.cs-filter-years { display: flex; flex-wrap: wrap; gap: 6px; }
+.cs-year-btn {
+  padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--panel); color: var(--text); font-size: 13px; transition: all 0.15s;
+}
+.cs-year-btn:hover { border-color: var(--accent); color: var(--accent-strong); }
+.cs-year-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.cs-filter-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.cs-search {
+  flex: 1; min-width: 180px; max-width: 280px;
+  padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--panel); color: var(--text); font-size: 13px; text-align: left;
+}
+.cs-inline-label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+.cs-inline-label .cs-search { min-width: 140px; }
+
+/* ══ 表格补充 ══ */
+.cs-table-empty { text-align: center; color: var(--muted); padding: 32px !important; }
+.cs-table-foot { padding: 12px 4px 0; text-align: right; color: var(--muted); font-size: 13px; }
+
+/* ══ 风险等级徽章 ══ */
+.cs-risk-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; padding: 3px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 700;
+}
+.cs-risk-badge.cs-risk-high { background: var(--warn-soft); color: var(--warn); }
+.cs-risk-badge.cs-risk-medium { background: var(--hold-soft); color: var(--hold); }
+.cs-risk-badge.cs-risk-low { background: var(--ok-soft); color: var(--ok); }
+
+/* ══ 风险统计卡 ══ */
+.cs-risk-stat-grid {
+  display: grid; grid-template-columns: repeat(6, 1fr);
+  gap: 12px; margin-bottom: 18px;
+}
+.cs-risk-stat {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 20px 12px; border-radius: var(--radius-lg);
+  color: #fff; text-align: center; box-shadow: var(--shadow);
+  transition: transform 0.2s;
+}
+.cs-risk-stat:hover { transform: translateY(-3px); }
+.cs-risk-stat strong { font-size: 28px; font-weight: 800; line-height: 1; }
+.cs-risk-stat span { font-size: 12px; margin-top: 6px; opacity: 0.95; }
+.cs-risk-stat-high { background: linear-gradient(135deg, #ff4d4f, #f5222d); }
+.cs-risk-stat-medium { background: linear-gradient(135deg, #ffa940, #fa8c16); }
+.cs-risk-stat-low { background: linear-gradient(135deg, #73d13d, #52c41a); }
+.cs-risk-stat-open { background: linear-gradient(135deg, #ff7875, #ff4d4f); }
+.cs-risk-stat-closed { background: linear-gradient(135deg, #597ef7, #2f54eb); }
+.cs-risk-stat-total { background: linear-gradient(135deg, #8c8c8c, #595959); }
+
+/* ══ 闭环进度条 ══ */
+.cs-close-bar {
+  width: 100%; max-width: 160px; height: 8px;
+  background: var(--line); border-radius: 999px; overflow: hidden; margin-bottom: 4px;
+}
+.cs-close-fill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+  transition: width 0.4s ease;
+}
+
+/* ══ 资源卡片 ══ */
+.cs-subtabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.cs-subtab {
+  padding: 8px 20px; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--panel); color: var(--muted); font-size: 13px; font-weight: 600; transition: all 0.15s;
+}
+.cs-subtab:hover { border-color: var(--accent); color: var(--accent-strong); }
+.cs-subtab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.cs-res-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+.cs-res-card {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 18px 12px; border-radius: var(--radius);
+  background: var(--panel-soft); border: 1px solid var(--line);
+  text-align: center; transition: all 0.25s;
+}
+.cs-res-card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+.cs-res-icon {
+  width: 40px; height: 40px; border-radius: 12px; margin-bottom: 10px;
+  opacity: 0.9;
+}
+.cs-res-card strong { font-size: 24px; font-weight: 800; color: var(--text); line-height: 1; }
+.cs-res-card span { margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--text); }
+.cs-res-card small { margin-top: 2px; font-size: 11px; color: var(--muted); }
+.cs-res-total { background: linear-gradient(135deg, var(--accent-soft), var(--blue-soft)); border-color: var(--accent); }
+
+/* ══ 响应式 ══ */
+@media (max-width: 1100px) {
+  .cs-chart-row { grid-template-columns: 1fr; }
+  .cs-chart-row-2 { grid-template-columns: 1fr; }
+  .cs-risk-stat-grid { grid-template-columns: repeat(3, 1fr); }
+  .cs-gantt-name { flex: 0 0 140px; }
+}
+@media (max-width: 767px) {
+  .cs-metric-grid { grid-template-columns: 1fr 1fr; }
+  .cs-risk-stat-grid { grid-template-columns: 1fr 1fr; }
+  .cs-res-grid { grid-template-columns: 1fr 1fr; }
+  .cs-view-head h3 { font-size: 18px; }
+  .cs-gantt-row { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .cs-gantt-name { flex: none; }
+}

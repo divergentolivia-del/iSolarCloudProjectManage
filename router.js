@@ -96,6 +96,19 @@ const Router = (() => {
         items.push({ label: mod ? mod.name : '全年度项目管理', href: '#/project' });
         items.push({ label: projectSubLabels[subPath] || subPath });
       }
+    } else if (moduleId === 'csenergy') {
+      const csSubLabels = {
+        board: '立项管理看板',
+        overview: '项目全景图',
+        risk: '风险全景图',
+        resource: '资源管理'
+      };
+      if (!subPath) {
+        items.push({ label: mod ? mod.name : '工商储项目' });
+      } else {
+        items.push({ label: mod ? mod.name : '工商储项目', href: '#/csenergy' });
+        items.push({ label: csSubLabels[subPath] || subPath });
+      }
     } else {
       // Generic fallback
       if (mod) {

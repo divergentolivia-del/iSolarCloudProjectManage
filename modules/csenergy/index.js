@@ -22,6 +22,8 @@ const CsEnergyModule = (() => {
   const STATUS_CLASSES = { planned: 'status-planned', 'in-progress': 'status-active', completed: 'status-done', suspended: 'status-hold' };
   const PRIORITY_LABELS = { high: '高', medium: '中', low: '低' };
   const RISK_LABELS = { high: '高', medium: '中', low: '低' };
+  const VERSION_TYPE_LABELS = { V: 'V', R: 'R', C: 'C', other: '其他' };
+  const PLANNING_LABELS = { in: '规划内', out: '规划外' };
   const RELEASE_LAYER_LABELS = { platform: '平台底座', business: '业务版本', shared: '公共能力' };
   const RELEASE_RISK_LABELS = { high: '高风险', medium: '需关注', low: '正常' };
   const RELEASE_RISK_CLASSES = { high: 'release-risk-high', medium: 'release-risk-medium', low: 'release-risk-low' };
@@ -645,7 +647,7 @@ const CsEnergyModule = (() => {
     const backBtn = document.getElementById('csBackBtn');
     if (backBtn) backBtn.addEventListener('click', () => { location.hash = '#/csenergy/ledger'; });
     const editBtn = document.getElementById('csEditProjectBtn');
-    if (editBtn) editBtn.addEventListener('click', () => showEditForm(project));
+    if (editBtn) editBtn.addEventListener('click', () => { location.hash = '#/csenergy/edit/' + project.id; });
     const addMsBtn = document.getElementById('csAddMsBtn');
     if (addMsBtn) addMsBtn.addEventListener('click', () => showAddMilestone(project));
     container.querySelectorAll('[data-ms-done]').forEach(btn => btn.addEventListener('click', () => markMilestoneDone(project, +btn.dataset.msDone)));
@@ -663,44 +665,124 @@ const CsEnergyModule = (() => {
     const releaseLayerOptions = Object.entries(RELEASE_LAYER_LABELS).map(([k, v]) => `<option value="${k}" ${k === releaseLayer ? 'selected' : ''}>${v}</option>`).join('');
     const releaseRisk = proj.releaseRisk || 'low';
     const releaseRiskOptions = Object.entries(RELEASE_RISK_LABELS).map(([k, v]) => `<option value="${k}" ${k === releaseRisk ? 'selected' : ''}>${v}</option>`).join('');
+    const versionType = proj.versionType || 'V';
+    const versionTypeOptions = Object.entries(VERSION_TYPE_LABELS).map(([k, v]) => `<option value="${k}" ${k === versionType ? 'selected' : ''}>${v}</option>`).join('');
+    const planning = proj.planning || 'in';
     const rs = proj.resourceSummary || {};
     return `
-      <form id="csProjectForm" class="form-grid project-form-grid">
+      <form id="csProjectForm" class="cs-form">
         <input type="hidden" id="pf-id" value="${esc(proj.id || '')}">
-        <div class="form-row"><label>项目名称 *</label><input type="text" id="pf-name" value="${esc(proj.name || '')}" required></div>
-        <div class="form-row"><label>产品线</label><input type="text" id="pf-productLine" value="${esc(proj.productLine || '')}" placeholder="阳光云 / 乐充云 / 平台共性"></div>
-        <div class="form-row"><label>状态</label><select id="pf-status">${statusOptions}</select></div>
-        <div class="form-row"><label>优先级</label><select id="pf-priority">${priorityOptions}</select></div>
-        <div class="form-row"><label>负责人</label><input type="text" id="pf-owner" value="${esc(proj.owner || '')}"></div>
-        <div class="form-row"><label>开始日期</label><input type="text" id="pf-startDate" value="${esc(proj.startDate || '')}" placeholder="YYYY-MM 或 YYYY-MM-DD"></div>
-        <div class="form-row"><label>结束日期</label><input type="text" id="pf-endDate" value="${esc(proj.endDate || '')}" placeholder="YYYY-MM 或 YYYY-MM-DD"></div>
-        <div class="form-row form-section"><label>年度发布计划</label></div>
-        <div class="form-row"><label>版本标识</label><input type="text" id="pf-releaseVersion" value="${esc(proj.releaseVersion || '')}" placeholder="例如：阳光云 2026-9.17 版本"></div>
-        <div class="form-row"><label>发布产品</label><input type="text" id="pf-releaseProduct" value="${esc(proj.releaseProduct || '')}" placeholder="阳光云 / 乐充云 / 平台共性"></div>
-        <div class="form-row"><label>发布层级</label><select id="pf-releaseLayer">${releaseLayerOptions}</select></div>
-        <div class="form-row"><label>计划发布日</label><input type="text" id="pf-releaseDate" value="${esc(proj.releaseDate || '')}" placeholder="YYYY-MM-DD"></div>
-        <div class="form-row"><label>发布风险</label><select id="pf-releaseRisk">${releaseRiskOptions}</select></div>
-        <div class="form-row form-row-wide"><label>影响范围</label><textarea id="pf-impactScope" rows="2" placeholder="会影响哪些业务线、终端、客户或上线窗口">${esc(proj.impactScope || '')}</textarea></div>
-        <div class="form-row form-row-wide"><label>依赖 / 底层变更</label><textarea id="pf-dependency" rows="2" placeholder="例如：平台接口升级、权限模型、数据结构、灰度依赖">${esc(proj.dependency || '')}</textarea></div>
-        <div class="form-row form-section"><label>人力规划</label></div>
-        <div class="form-row"><label>预计总人力(人月)</label><input type="number" id="pf-totalManMonths" value="${rs.totalManMonths || ''}" min="0"></div>
-        <div class="form-row"><label>已投入人力(人月)</label><input type="number" id="pf-usedManMonths" value="${rs.usedManMonths || ''}" min="0"></div>
-        <div class="form-row form-row-wide"><label>涉及团队(逗号分隔)</label><input type="text" id="pf-teams" value="${esc(rs.teams ? Object.keys(rs.teams).join(',') : '')}" placeholder="APP开发-阳光云,后端开发-阳光云"></div>
-        <div class="form-row form-section"><label>成本预算</label></div>
-        <div class="form-row"><label>预计总成本(万元)</label><input type="number" id="pf-totalCost" value="${rs.totalCost || ''}" min="0" step="0.1"></div>
-        <div class="form-row"><label>已使用成本(万元)</label><input type="number" id="pf-usedCost" value="${rs.usedCost || ''}" min="0" step="0.1"></div>
-        <div class="form-row"><label>外包人数</label><input type="number" id="pf-outsourceCount" value="${rs.outsourceCount || ''}" min="0"></div>
-        <div class="form-row"><label>预计工期(月)</label><input type="number" id="pf-durationMonths" value="${rs.durationMonths || ''}" min="0"></div>
-        <div class="form-row form-row-wide"><label>备注</label><textarea id="pf-note" rows="3">${esc(proj.note || '')}</textarea></div>
+
+        <div class="cs-form-section">
+          <div class="cs-form-section-title">基础信息</div>
+          <div class="cs-form-grid">
+            <label class="cs-field"><span class="cs-field-label"><em>*</em> 项目名称</span><input type="text" id="pf-name" value="${esc(proj.name || '')}" placeholder="请输入项目名称+区域版本" required></label>
+            <label class="cs-field"><span class="cs-field-label">项目系列</span><input type="text" id="pf-series" value="${esc(proj.series || '')}" placeholder="请选择或输入项目系列"></label>
+            <label class="cs-field"><span class="cs-field-label"><em>*</em> 所属产品线</span><input type="text" id="pf-productLine" value="${esc(proj.productLine || '')}" placeholder="阳光云 / 乐充云 / 平台共性"></label>
+            <label class="cs-field"><span class="cs-field-label"><em>*</em> 版本类型</span><select id="pf-versionType">${versionTypeOptions}</select></label>
+            <label class="cs-field"><span class="cs-field-label">规划情况</span>
+              <span class="cs-radio-group">
+                <label class="cs-radio"><input type="radio" name="pf-planning" value="in" ${planning === 'in' ? 'checked' : ''}> 规划内</label>
+                <label class="cs-radio"><input type="radio" name="pf-planning" value="out" ${planning === 'out' ? 'checked' : ''}> 规划外</label>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div class="cs-form-section">
+          <div class="cs-form-section-title">项目状态</div>
+          <div class="cs-form-grid">
+            <label class="cs-field"><span class="cs-field-label"><em>*</em> 项目状态</span><select id="pf-status">${statusOptions}</select></label>
+            <label class="cs-field"><span class="cs-field-label">优先级</span><select id="pf-priority">${priorityOptions}</select></label>
+            <label class="cs-field"><span class="cs-field-label">开始日期</span><input type="text" id="pf-startDate" value="${esc(proj.startDate || '')}" placeholder="YYYY-MM 或 YYYY-MM-DD"></label>
+            <label class="cs-field"><span class="cs-field-label">结束日期</span><input type="text" id="pf-endDate" value="${esc(proj.endDate || '')}" placeholder="YYYY-MM 或 YYYY-MM-DD"></label>
+          </div>
+        </div>
+
+        <div class="cs-form-section">
+          <div class="cs-form-section-title">人员信息</div>
+          <div class="cs-form-grid cs-form-grid-3">
+            <label class="cs-field"><span class="cs-field-label"><em>*</em> 产品经理</span><input type="text" id="pf-productManager" value="${esc(proj.productManager || '')}" placeholder="搜索员工姓名"></label>
+            <label class="cs-field"><span class="cs-field-label"><em>*</em> 系统经理</span><input type="text" id="pf-systemManager" value="${esc(proj.systemManager || '')}" placeholder="搜索员工姓名"></label>
+            <label class="cs-field"><span class="cs-field-label"><em>*</em> 项目经理</span><input type="text" id="pf-projectManager" value="${esc(proj.projectManager || proj.owner || '')}" placeholder="搜索员工姓名"></label>
+          </div>
+        </div>
+
+        <div class="cs-form-section">
+          <div class="cs-form-section-title">年度发布计划</div>
+          <div class="cs-form-grid">
+            <label class="cs-field"><span class="cs-field-label">版本标识</span><input type="text" id="pf-releaseVersion" value="${esc(proj.releaseVersion || '')}" placeholder="例如：阳光云 2026-9.17 版本"></label>
+            <label class="cs-field"><span class="cs-field-label">发布产品</span><input type="text" id="pf-releaseProduct" value="${esc(proj.releaseProduct || '')}" placeholder="阳光云 / 乐充云 / 平台共性"></label>
+            <label class="cs-field"><span class="cs-field-label">发布层级</span><select id="pf-releaseLayer">${releaseLayerOptions}</select></label>
+            <label class="cs-field"><span class="cs-field-label">计划发布日</span><input type="text" id="pf-releaseDate" value="${esc(proj.releaseDate || '')}" placeholder="YYYY-MM-DD"></label>
+            <label class="cs-field"><span class="cs-field-label">发布风险</span><select id="pf-releaseRisk">${releaseRiskOptions}</select></label>
+            <label class="cs-field cs-field-wide"><span class="cs-field-label">影响范围</span><textarea id="pf-impactScope" rows="2" placeholder="会影响哪些业务线、终端、客户或上线窗口">${esc(proj.impactScope || '')}</textarea></label>
+            <label class="cs-field cs-field-wide"><span class="cs-field-label">依赖 / 底层变更</span><textarea id="pf-dependency" rows="2" placeholder="例如：平台接口升级、权限模型、数据结构、灰度依赖">${esc(proj.dependency || '')}</textarea></label>
+          </div>
+        </div>
+
+        <div class="cs-form-section">
+          <div class="cs-form-section-title">人力规划</div>
+          <div class="cs-form-grid">
+            <label class="cs-field"><span class="cs-field-label">预计总人力(人月)</span><input type="number" id="pf-totalManMonths" value="${rs.totalManMonths || ''}" min="0"></label>
+            <label class="cs-field"><span class="cs-field-label">已投入人力(人月)</span><input type="number" id="pf-usedManMonths" value="${rs.usedManMonths || ''}" min="0"></label>
+            <label class="cs-field cs-field-wide"><span class="cs-field-label">涉及团队(逗号分隔)</span><input type="text" id="pf-teams" value="${esc(rs.teams ? Object.keys(rs.teams).join(',') : '')}" placeholder="APP开发-阳光云,后端开发-阳光云"></label>
+          </div>
+        </div>
+
+        <div class="cs-form-section">
+          <div class="cs-form-section-title">成本预算</div>
+          <div class="cs-form-grid">
+            <label class="cs-field"><span class="cs-field-label">预计总成本(万元)</span><input type="number" id="pf-totalCost" value="${rs.totalCost || ''}" min="0" step="0.1"></label>
+            <label class="cs-field"><span class="cs-field-label">已使用成本(万元)</span><input type="number" id="pf-usedCost" value="${rs.usedCost || ''}" min="0" step="0.1"></label>
+            <label class="cs-field"><span class="cs-field-label">外包人数</span><input type="number" id="pf-outsourceCount" value="${rs.outsourceCount || ''}" min="0"></label>
+            <label class="cs-field"><span class="cs-field-label">预计工期(月)</span><input type="number" id="pf-durationMonths" value="${rs.durationMonths || ''}" min="0"></label>
+          </div>
+        </div>
+
+        <div class="cs-form-section">
+          <div class="cs-form-section-title">备注</div>
+          <div class="cs-form-grid">
+            <label class="cs-field cs-field-wide"><span class="cs-field-label">功能备注</span><textarea id="pf-note" rows="3" placeholder="简要描述项目主要功能">${esc(proj.note || '')}</textarea></label>
+          </div>
+        </div>
       </form>`;
   }
 
-  function showAddForm() {
-    const formHtml = buildFormHtml({ id: 'proj-' + Date.now().toString(36), name: '', productLine: '', status: 'planned', priority: 'medium', owner: '', startDate: '', endDate: '', releaseVersion: '', releaseProduct: '', releaseLayer: 'business', releaseDate: '', releaseRisk: 'low', impactScope: '', dependency: '', note: '' });
-    SharedUI.confirm('新增项目', formHtml, () => submitForm(true), { confirmText: '保存', cancelText: '取消' });
-  }
-  function showEditForm(project) {
-    SharedUI.confirm('编辑项目', buildFormHtml(project), () => submitForm(false, project.id), { confirmText: '保存', cancelText: '取消' });
+  /* 二级页面：新增/编辑项目表单 */
+  function renderProjectForm(mode, projId) {
+    const isNew = mode === 'new';
+    let proj;
+    if (isNew) {
+      proj = { id: 'proj-' + Date.now().toString(36), name: '', series: '', productLine: '', versionType: 'V', planning: 'in', status: 'planned', priority: 'medium', productManager: '', systemManager: '', projectManager: '', startDate: '', endDate: '', releaseVersion: '', releaseProduct: '', releaseLayer: 'business', releaseDate: '', releaseRisk: 'low', impactScope: '', dependency: '', note: '' };
+    } else {
+      proj = (state.projects || []).find(p => p.id === projId);
+      if (!proj) {
+        container.innerHTML = `<div class="csenergy-page"><div class="cs-form-topbar"><button class="btn back-btn" id="csFormBack">← 返回</button></div><p class="cs-empty">未找到项目: ${esc(projId)}</p></div>`;
+        const b = document.getElementById('csFormBack'); if (b) b.addEventListener('click', () => { location.hash = '#/csenergy/ledger'; });
+        return;
+      }
+    }
+
+    container.innerHTML = `
+      <div class="csenergy-page cs-form-page">
+        <div class="cs-form-topbar">
+          <div class="cs-form-topbar-left">
+            <button class="btn back-btn" id="csFormBack">← 返回</button>
+            <span class="cs-form-title">${isNew ? '新建项目' : '编辑项目'}</span>
+          </div>
+          <div class="cs-form-topbar-right">
+            <button class="btn primary" id="csFormSave">${isNew ? '✓ 创建项目' : '✓ 保存修改'}</button>
+            <button class="btn" id="csFormCancel">取消</button>
+          </div>
+        </div>
+        <div class="cs-form-body">${buildFormHtml(proj)}</div>
+      </div>`;
+
+    const back = () => { location.hash = '#/csenergy/ledger'; };
+    document.getElementById('csFormBack')?.addEventListener('click', back);
+    document.getElementById('csFormCancel')?.addEventListener('click', back);
+    document.getElementById('csFormSave')?.addEventListener('click', () => submitForm(isNew, isNew ? undefined : projId));
   }
 
   async function submitForm(isNew, existingId) {
@@ -731,12 +813,22 @@ const CsEnergyModule = (() => {
 
     const releaseLayer = g('pf-releaseLayer')?.value || 'business';
     const releaseRisk = g('pf-releaseRisk')?.value || 'low';
+    const versionType = g('pf-versionType')?.value || 'V';
+    const planningEl = document.querySelector('input[name="pf-planning"]:checked');
+    const planning = planningEl ? planningEl.value : 'in';
+    const projectManager = g('pf-projectManager')?.value?.trim() || '';
     const project = {
       id, name,
+      series: g('pf-series')?.value?.trim() || '',
       productLine: g('pf-productLine')?.value?.trim() || '',
+      versionType: VERSION_TYPE_LABELS[versionType] ? versionType : 'V',
+      planning: PLANNING_LABELS[planning] ? planning : 'in',
       status: g('pf-status')?.value || 'planned',
       priority: g('pf-priority')?.value || 'medium',
-      owner: g('pf-owner')?.value?.trim() || '',
+      productManager: g('pf-productManager')?.value?.trim() || '',
+      systemManager: g('pf-systemManager')?.value?.trim() || '',
+      projectManager,
+      owner: projectManager,  // 兼容旧字段：owner = 项目经理
       startDate: startDate || '', endDate: endDate || '',
       releaseVersion: g('pf-releaseVersion')?.value?.trim() || '',
       releaseProduct: g('pf-releaseProduct')?.value?.trim() || '',
@@ -766,8 +858,11 @@ const CsEnergyModule = (() => {
     const ok = await saveState(newState);
     if (ok) {
       await fetchState(); await fetchSummary();
-      if (!isNew && currentView === 'detail') renderDetail(id);
-      else render();
+      // 保存后返回台账页
+      location.hash = '#/csenergy/ledger';
+      currentView = 'ledger';
+      currentProjectId = null;
+      render();
     }
   }
 
@@ -926,6 +1021,8 @@ const CsEnergyModule = (() => {
   function render() {
     if (!container) return;
     if (currentView === 'detail' && currentProjectId) { renderDetail(currentProjectId); return; }
+    if (currentView === 'new') { renderProjectForm('new'); return; }
+    if (currentView === 'edit' && currentProjectId) { renderProjectForm('edit', currentProjectId); return; }
 
     const tabs = [
       { id: 'board', icon: '📊', label: '立项管理看板' },
@@ -955,11 +1052,11 @@ const CsEnergyModule = (() => {
     }));
     container.querySelectorAll('[data-year]').forEach(btn => btn.addEventListener('click', () => { filterYear = Number(btn.getAttribute('data-year')); render(); }));
 
-    // 项目 CRUD
+    // 项目 CRUD —— 跳转二级页面
     const addProjBtn = document.getElementById('csAddProjectBtn');
-    if (addProjBtn) addProjBtn.addEventListener('click', showAddForm);
+    if (addProjBtn) addProjBtn.addEventListener('click', () => { location.hash = '#/csenergy/new'; });
     container.querySelectorAll('[data-edit-proj]').forEach(btn => btn.addEventListener('click', () => {
-      const p = (state.projects || []).find(x => x.id === btn.getAttribute('data-edit-proj')); if (p) showEditForm(p);
+      location.hash = '#/csenergy/edit/' + btn.getAttribute('data-edit-proj');
     }));
     container.querySelectorAll('[data-del-proj]').forEach(btn => btn.addEventListener('click', () => deleteProject(btn.getAttribute('data-del-proj'))));
 
@@ -986,6 +1083,12 @@ const CsEnergyModule = (() => {
     if (subPath && subPath.startsWith('detail/')) {
       currentView = 'detail';
       currentProjectId = subPath.replace('detail/', '');
+    } else if (subPath && subPath.startsWith('edit/')) {
+      currentView = 'edit';
+      currentProjectId = subPath.replace('edit/', '');
+    } else if (subPath === 'new') {
+      currentView = 'new';
+      currentProjectId = null;
     } else if (['board', 'ledger', 'timeline', 'release', 'risk', 'resource'].includes(subPath)) {
       currentView = subPath;
       currentProjectId = null;

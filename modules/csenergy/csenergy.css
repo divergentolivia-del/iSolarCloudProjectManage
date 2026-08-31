@@ -488,3 +488,178 @@
   color: var(--accent-strong);
   font-weight: 700;
 }
+
+
+/* ════════════════════════════════════════════════════════════════════
+   二级页面表单（新增/编辑项目）
+   ════════════════════════════════════════════════════════════════════ */
+
+.cs-form-page { width: 100%; max-width: 1200px; margin: 0 auto; }
+
+/* 顶部返回栏 */
+.cs-form-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.cs-form-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.cs-form-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cs-form-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+/* 表单主体 */
+.cs-form-body {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 24px 28px;
+}
+.cs-form {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* 分区 */
+.cs-form-section {
+  padding: 8px 0 20px;
+  border-bottom: 1px dashed var(--line);
+  margin-bottom: 16px;
+}
+.cs-form-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+.cs-form-section-title {
+  position: relative;
+  padding-left: 12px;
+  margin-bottom: 18px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+.cs-form-section-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 15px;
+  border-radius: 2px;
+  background: var(--blue);
+}
+
+/* 两列栅格 */
+.cs-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 32px;
+}
+.cs-form-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* 字段 */
+.cs-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+.cs-field-wide {
+  grid-column: 1 / -1;
+}
+.cs-field-label {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+}
+.cs-field-label em {
+  color: var(--warn);
+  font-style: normal;
+  margin-right: 2px;
+}
+.cs-field input[type="text"],
+.cs-field input[type="number"],
+.cs-field select,
+.cs-field textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.cs-field textarea {
+  resize: vertical;
+  min-height: 60px;
+  font-family: inherit;
+  line-height: 1.6;
+}
+.cs-field input:focus,
+.cs-field select:focus,
+.cs-field textarea:focus {
+  outline: 0;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(82, 119, 255, 0.12);
+}
+.cs-field input::placeholder,
+.cs-field textarea::placeholder {
+  color: var(--muted);
+}
+
+/* 单选按钮组（规划情况） */
+.cs-radio-group {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 40px;
+}
+.cs-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+.cs-radio input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--blue);
+  cursor: pointer;
+}
+
+/* 响应式：窄屏单列 */
+@media (max-width: 900px) {
+  .cs-form-grid,
+  .cs-form-grid-3 {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .cs-form-body { padding: 18px 16px; }
+  .cs-form-topbar-right { width: 100%; }
+}

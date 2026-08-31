@@ -111,6 +111,12 @@ const Router = (() => {
       } else if (subPath.startsWith('detail/')) {
         items.push({ label: csName, href: '#/csenergy' });
         items.push({ label: '项目详情' });
+      } else if (subPath === 'new') {
+        items.push({ label: csName, href: '#/csenergy/ledger' });
+        items.push({ label: '新建项目' });
+      } else if (subPath.startsWith('edit/')) {
+        items.push({ label: csName, href: '#/csenergy/ledger' });
+        items.push({ label: '编辑项目' });
       } else {
         items.push({ label: csName, href: '#/csenergy' });
         items.push({ label: csSubLabels[subPath] || subPath });

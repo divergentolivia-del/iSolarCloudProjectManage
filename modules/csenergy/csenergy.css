@@ -286,3 +286,205 @@
   .cs-gantt-row { flex-direction: column; align-items: flex-start; gap: 6px; }
   .cs-gantt-name { flex: none; }
 }
+
+
+/* ════════════════════════════════════════════════════════════════════
+   融合版补充样式：迁移自 project 模块的组件 + 新增操作按钮
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ══ 小型操作按钮（台账/风险表格行内） ══ */
+.cs-mini-btn {
+  min-height: 28px;
+  padding: 3px 10px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+}
+.cs-del-btn {
+  color: var(--warn);
+  border-color: var(--line);
+}
+.cs-del-btn:hover {
+  background: var(--warn-soft);
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+/* ══ 发布卡片（release-card 子元素） ══ */
+.release-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 72px;
+  padding: 8px 10px;
+  color: var(--text);
+  text-decoration: none;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ok);
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+}
+.release-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
+}
+.release-card.release-risk-high { border-left-color: var(--warn); }
+.release-card.release-risk-medium { border-left-color: var(--hold); }
+.release-card.release-risk-low { border-left-color: var(--ok); }
+
+.release-card-top {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.release-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+}
+.release-card-date {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.release-card-note {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* ══ 发布 chip 标签 ══ */
+.release-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+/* ══ 冲突卡片 ══ */
+.release-conflict {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-soft);
+  margin-bottom: 10px;
+}
+.release-conflict:last-child { margin-bottom: 0; }
+.release-conflict.high { border-left: 3px solid var(--warn); }
+.release-conflict.medium { border-left: 3px solid var(--hold); }
+.release-conflict-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.release-conflict-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.release-conflict-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--warn-soft);
+  color: var(--warn);
+  white-space: nowrap;
+}
+.release-conflict.medium .release-conflict-badge {
+  background: var(--hold-soft);
+  color: var(--hold);
+}
+.release-conflict-desc {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.release-conflict-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ══ 空状态（good） ══ */
+.release-empty {
+  padding: 16px;
+  text-align: center;
+  border-radius: var(--radius);
+  background: var(--panel-soft);
+}
+.release-empty-good { background: var(--ok-soft); }
+.release-empty-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ok);
+  margin-bottom: 4px;
+}
+.release-empty-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ══ 发布矩阵行内滚动优化 ══ */
+.release-cell.has-item { background: var(--panel); }
+
+/* ══ 详情页发布信息网格微调 ══ */
+.csenergy-page .detail-section {
+  padding: 18px 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  margin-bottom: 16px;
+}
+.csenergy-page .detail-section h4 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+.csenergy-page .project-name {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 12px;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+/* ══ section-head compact（详情页发布计划标题栏） ══ */
+.csenergy-page .section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.csenergy-page .section-head h4 { margin: 0; }
+.csenergy-page .section-kicker {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+/* ══ 表单分区标题（新增/编辑项目弹窗） ══ */
+.project-form-grid .form-section label {
+  color: var(--accent-strong);
+  font-weight: 700;
+}

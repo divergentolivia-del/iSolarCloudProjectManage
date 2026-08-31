@@ -1,10 +1,10 @@
-/* modules/csenergy/routes.js — 工商储项目管理模块服务端路由
-   数据存储于 data/csenergy/state.json 和 data/csenergy/history/。
-   与其他模块数据完全隔离，互不影响。
-
+/* modules/csenergy/routes.js — 全年度项目管理看板 · 服务端路由
+   ★ 数据源与现有 project 模块完全统一：共用 data/project/state.json
+     - 在任意模块录入的项目数据双向可见，无需迁移
+     - 本模块额外扩展 risks[] / resources{} 两个顶层字段
    路由：
-     GET  /api/csenergy/state    — 读取完整状态
-     POST /api/csenergy/state    — 提交状态变更（乐观锁）
+     GET  /api/csenergy/state    — 读取完整状态（含 projects/risks/resources）
+     POST /api/csenergy/state    — 提交状态变更（乐观锁，与 project 共享 rev）
      GET  /api/csenergy/summary  — 立项看板汇总指标
 */
 
@@ -13,131 +13,29 @@
 const fs = require('fs');
 const path = require('path');
 
-/* 数据目录配置 */
+/* ★ 复用 project 模块的数据目录，实现数据统一 */
 const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
   : path.join(__dirname, '../../data');
-const CS_DIR = path.join(DATA_DIR, 'csenergy');
-const STATE_FILE = path.join(CS_DIR, 'state.json');
-const HISTORY_DIR = path.join(CS_DIR, 'history');
+const PROJ_DIR = path.join(DATA_DIR, 'project');
+const STATE_FILE = path.join(PROJ_DIR, 'state.json');
+const HISTORY_DIR = path.join(PROJ_DIR, 'history');
 
-/* 枚举 */
+/* 枚举（与 project 模块保持一致 + 风险扩展） */
 const VALID_STATUSES = ['planned', 'in-progress', 'completed', 'suspended'];
+const VALID_RELEASE_LAYERS = ['platform', 'business', 'shared'];
+const VALID_RELEASE_RISKS = ['high', 'medium', 'low'];
 const VALID_RISK_LEVELS = ['high', 'medium', 'low'];
 const VALID_RISK_STATES = ['open', 'closed'];
 
-/* ---------- 示例数据（首次启动时写入，便于直接看到完整 UI） ---------- */
-const SEED_STATE = {
-  rev: 1,
-  updatedAt: '',
-  updatedBy: 'system',
-  year: new Date().getFullYear(),
-  projects: [
-    {
-      id: 'cs-2026-001',
-      code: 'CS-BR0-001',
-      name: '工商储 100kWh 液冷一体机',
-      series: '液冷储能',
-      region: '华东',
-      versionType: '平台版本',
-      status: 'in-progress',
-      progressRisk: 'medium',
-      manager: '陈丹萍',
-      planning: '计划内',
-      milestones: [
-        { name: 'BR0 立项', node: 'BR0', date: '2026-03-01', status: 'done', level: 1 },
-        { name: 'BR1 方案', node: 'BR1', date: '2026-05-15', status: 'done', level: 1 },
-        { name: 'TR3 转产', node: 'TR3', date: '2026-09-30', status: 'pending', level: 1 },
-        { name: 'TR5 量产', node: 'TR5', date: '2026-12-20', status: 'pending', level: 1 }
-      ],
-      nodes: { BR0: '2026-03-01', BR1: '2026-05-15', BR2: '', BR3: '', BR4: '', TR1: '', TR2: '', TR3: '2026-09-30', TR4: '', TR5: '2026-12-20', TR6: '' }
-    },
-    {
-      id: 'cs-2026-002',
-      code: 'CS-BR0-002',
-      name: '工商储 215kWh 风冷柜',
-      series: '风冷储能',
-      region: '华南',
-      versionType: '业务版本',
-      status: 'in-progress',
-      progressRisk: 'high',
-      manager: '陈丹萍',
-      planning: '计划内',
-      milestones: [
-        { name: 'BR0 立项', node: 'BR0', date: '2026-02-10', status: 'done', level: 1 },
-        { name: 'BR2 详设', node: 'BR2', date: '2026-06-30', status: 'pending', level: 1 },
-        { name: 'TR4 试产', node: 'TR4', date: '2026-11-15', status: 'pending', level: 1 }
-      ],
-      nodes: { BR0: '2026-02-10', BR1: '2026-04-20', BR2: '2026-06-30', BR3: '', BR4: '', TR1: '', TR2: '', TR3: '', TR4: '2026-11-15', TR5: '', TR6: '' }
-    },
-    {
-      id: 'cs-2026-003',
-      code: 'CS-BR0-003',
-      name: '工商储 PCS 一体化控制器',
-      series: 'PCS',
-      region: '海外',
-      versionType: '平台版本',
-      status: 'planned',
-      progressRisk: 'low',
-      manager: '李工',
-      planning: '规划中',
-      milestones: [
-        { name: 'BR0 立项', node: 'BR0', date: '2026-08-01', status: 'pending', level: 1 }
-      ],
-      nodes: { BR0: '2026-08-01', BR1: '', BR2: '', BR3: '', BR4: '', TR1: '', TR2: '', TR3: '', TR4: '', TR5: '', TR6: '' }
-    }
-  ],
-  risks: [
-    {
-      id: 'risk-001',
-      star: true,
-      projectId: 'cs-2026-002',
-      projectName: '工商储 215kWh 风冷柜',
-      desc: '电芯供应商交期延迟，影响 TR4 试产节点',
-      impactType: '进度',
-      level: 'high',
-      state: 'open',
-      resourceSupport: '采购部协调备选供应商',
-      closeProgress: 40,
-      planCloseDate: '2026-09-10',
-      createdAt: '2026-08-20'
-    },
-    {
-      id: 'risk-002',
-      star: false,
-      projectId: 'cs-2026-001',
-      projectName: '工商储 100kWh 液冷一体机',
-      desc: '液冷板密封工艺验证未通过，需重新打样',
-      impactType: '质量',
-      level: 'medium',
-      state: 'open',
-      resourceSupport: '结构团队支持',
-      closeProgress: 65,
-      planCloseDate: '2026-09-05',
-      createdAt: '2026-08-18'
-    }
-  ],
-  resources: {
-    month: new Date().toISOString().slice(0, 7),
-    dept: '研发中心',
-    human: [
-      { role: '系统SE', invest: 2.5, color: '#8b6cff' },
-      { role: '电气', invest: 3.0, color: '#5277ff' },
-      { role: '硬件', invest: 2.0, color: '#52c41a' },
-      { role: '结构', invest: 1.5, color: '#f5a524' },
-      { role: '软件', invest: 2.8, color: '#f071a8' },
-      { role: '电芯', invest: 1.2, color: '#13c2c2' },
-      { role: '平台部', invest: 0.8, color: '#597ef7' },
-      { role: '测试', invest: 1.5, color: '#eb2f96' }
-    ],
-    material: []
-  }
-};
-
+/* 空状态模板（与 project 兼容，追加 risks/resources） */
 const EMPTY_STATE = {
-  rev: 0, updatedAt: '', updatedBy: '',
+  rev: 0,
+  updatedAt: '',
+  updatedBy: '',
   year: new Date().getFullYear(),
-  projects: [], risks: [],
+  projects: [],
+  risks: [],
   resources: { month: new Date().toISOString().slice(0, 7), dept: '研发中心', human: [], material: [] }
 };
 
@@ -155,19 +53,44 @@ function sendJson(res, code, obj) {
   res.end(body);
 }
 
+function isValidProjectDateText(value) {
+  if (!value) return true;
+  if (typeof value !== 'string') return false;
+  const m = /^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$/.exec(value.trim());
+  if (!m) return false;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3] || 1);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
+
+/**
+ * 读取统一状态。确保 risks/resources 字段存在（老 project 数据没有这两个字段）。
+ */
 function readState() {
-  if (!fs.existsSync(STATE_FILE)) return JSON.parse(JSON.stringify(EMPTY_STATE));
-  try {
-    return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-  } catch (e) {
-    console.error('[csenergy] state.json 解析失败:', e.message);
-    const snap = latestSnapshot();
-    if (snap) {
-      console.error('[csenergy]   已回退到快照:', snap.name);
-      return snap.data;
+  let state;
+  if (!fs.existsSync(STATE_FILE)) {
+    state = JSON.parse(JSON.stringify(EMPTY_STATE));
+  } else {
+    try {
+      state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    } catch (e) {
+      console.error('[csenergy] state.json 解析失败:', e.message);
+      const snap = latestSnapshot();
+      state = snap ? snap.data : JSON.parse(JSON.stringify(EMPTY_STATE));
     }
-    return JSON.parse(JSON.stringify(EMPTY_STATE));
   }
+  // 补全扩展字段（兼容仅有 projects 的旧数据）
+  if (!Array.isArray(state.projects)) state.projects = [];
+  if (!Array.isArray(state.risks)) state.risks = [];
+  if (!state.resources || typeof state.resources !== 'object') {
+    state.resources = { month: new Date().toISOString().slice(0, 7), dept: '研发中心', human: [], material: [] };
+  }
+  if (!Array.isArray(state.resources.human)) state.resources.human = [];
+  if (!Array.isArray(state.resources.material)) state.resources.material = [];
+  return state;
 }
 
 function latestSnapshot() {
@@ -186,22 +109,24 @@ function latestSnapshot() {
 }
 
 function writeState(s) {
-  ensureDir(CS_DIR);
+  ensureDir(PROJ_DIR);
   const tmp = STATE_FILE + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(s, null, 2), 'utf8');
   fs.renameSync(tmp, STATE_FILE);
 }
 
+/* 历史快照沿用 project- 前缀，与现有模块共用 history 目录 */
 function saveHistory(s) {
   try {
     ensureDir(HISTORY_DIR);
-    const name = 'csenergy-rev' + s.rev + '.json';
+    const name = 'project-rev' + s.rev + '.json';
     fs.writeFileSync(path.join(HISTORY_DIR, name), JSON.stringify(s), 'utf8');
   } catch (e) { /* 归档失败不影响主流程 */ }
 }
 
-/* ---------- 数据校验 ---------- */
+/* ---------- 数据校验（合并 project 项目规则 + risk/resource 规则） ---------- */
 function validateState(next) {
+  // 项目校验（与 project 模块一致）
   if (next.projects != null) {
     if (!Array.isArray(next.projects)) return '项目列表必须为数组';
     const ids = new Set();
@@ -212,11 +137,33 @@ function validateState(next) {
       if (p.status && !VALID_STATUSES.includes(p.status)) {
         return `项目 "${p.id}" 状态无效: "${p.status}"`;
       }
-      if (p.progressRisk && !VALID_RISK_LEVELS.includes(p.progressRisk)) {
-        return `项目 "${p.id}" 进度风险无效: "${p.progressRisk}"`;
+      if (p.startDate && p.endDate && p.startDate > p.endDate) {
+        return `项目 "${p.id}" 开始日期不能晚于结束日期`;
+      }
+      if (p.releaseLayer && !VALID_RELEASE_LAYERS.includes(p.releaseLayer)) {
+        return `项目 "${p.id}" releaseLayer 无效: "${p.releaseLayer}"`;
+      }
+      if (p.releaseRisk && !VALID_RELEASE_RISKS.includes(p.releaseRisk)) {
+        return `项目 "${p.id}" releaseRisk 无效: "${p.releaseRisk}"`;
+      }
+      if (p.releaseDate && !isValidProjectDateText(p.releaseDate)) {
+        return `项目 "${p.id}" releaseDate 必须为 YYYY-MM 或 YYYY-MM-DD`;
+      }
+      if (p.resourceSummary) {
+        const rs = p.resourceSummary;
+        const numFields = ['totalManMonths', 'usedManMonths', 'totalCost', 'usedCost', 'outsourceCount', 'durationMonths'];
+        for (const f of numFields) {
+          if (rs[f] != null && (typeof rs[f] !== 'number' || rs[f] < 0)) {
+            return `项目 "${p.id}" ${f} 必须为非负数`;
+          }
+        }
+        if (rs.teams != null && (typeof rs.teams !== 'object' || Array.isArray(rs.teams))) {
+          return `项目 "${p.id}" teams 必须为对象`;
+        }
       }
     }
   }
+  // 风险校验
   if (next.risks != null) {
     if (!Array.isArray(next.risks)) return '风险列表必须为数组';
     const rids = new Set();
@@ -224,12 +171,8 @@ function validateState(next) {
       if (!r.id || typeof r.id !== 'string') return '每个风险必须有有效的 id';
       if (rids.has(r.id)) return `风险 ID 重复: ${r.id}`;
       rids.add(r.id);
-      if (r.level && !VALID_RISK_LEVELS.includes(r.level)) {
-        return `风险 "${r.id}" 等级无效: "${r.level}"`;
-      }
-      if (r.state && !VALID_RISK_STATES.includes(r.state)) {
-        return `风险 "${r.id}" 状态无效: "${r.state}"`;
-      }
+      if (r.level && !VALID_RISK_LEVELS.includes(r.level)) return `风险 "${r.id}" 等级无效: "${r.level}"`;
+      if (r.state && !VALID_RISK_STATES.includes(r.state)) return `风险 "${r.id}" 状态无效: "${r.state}"`;
       if (r.closeProgress != null && (typeof r.closeProgress !== 'number' || r.closeProgress < 0 || r.closeProgress > 100)) {
         return `风险 "${r.id}" 闭环进度必须为 0-100`;
       }
@@ -244,17 +187,12 @@ function computeSummary(state) {
   const risks = state.risks || [];
   const today = new Date().toISOString().slice(0, 10);
 
-  // 已立项 = 有 BR0 节点日期的项目
-  const approved = projects.filter(p => p.nodes && p.nodes.BR0).length;
-  // 待立项 = planned 且无 BR0 日期
-  const pending = projects.filter(p => p.status === 'planned' && !(p.nodes && p.nodes.BR0)).length;
-  // 进行中
+  const approved = projects.filter(p => (p.nodes && p.nodes.BR0) || (p.milestones || []).some(m => /BR0|立项/.test(m.name || ''))).length;
+  const pending = projects.filter(p => p.status === 'planned').length;
   const inProgress = projects.filter(p => p.status === 'in-progress').length;
-  // 项目经理人数（去重）
-  const managers = new Set(projects.filter(p => p.status === 'in-progress' && p.manager).map(p => p.manager));
+  const managers = new Set(projects.filter(p => p.status === 'in-progress' && (p.manager || p.owner)).map(p => p.manager || p.owner));
   const managerCount = managers.size;
 
-  // 风险等级统计
   const riskHigh = risks.filter(r => r.level === 'high' && r.state === 'open').length;
   const riskMedium = risks.filter(r => r.level === 'medium' && r.state === 'open').length;
   const riskLow = risks.filter(r => r.level === 'low' && r.state === 'open').length;
@@ -262,21 +200,17 @@ function computeSummary(state) {
   const riskOpen = risks.filter(r => r.state === 'open').length;
   const riskTotal = risks.length;
 
-  // 项目进度风险分布
-  const progHigh = projects.filter(p => p.progressRisk === 'high' && p.status === 'in-progress').length;
-  const progMedium = projects.filter(p => p.progressRisk === 'medium' && p.status === 'in-progress').length;
-  const progLow = projects.filter(p => p.progressRisk === 'low' && p.status === 'in-progress').length;
+  const progHigh = projects.filter(p => (p.progressRisk === 'high' || p.releaseRisk === 'high') && p.status === 'in-progress').length;
+  const progMedium = projects.filter(p => (p.progressRisk === 'medium' || p.releaseRisk === 'medium') && p.status === 'in-progress').length;
+  const progLow = projects.filter(p => p.status === 'in-progress' && p.progressRisk !== 'high' && p.progressRisk !== 'medium' && p.releaseRisk !== 'high' && p.releaseRisk !== 'medium').length;
 
-  // 闭环率
   const closeRate = riskTotal > 0 ? Math.round((riskClosed / riskTotal) * 100) : 0;
 
-  // 超时未闭环风险（计划闭环日期已过但仍 open）
   const overdueRisks = risks
     .filter(r => r.state === 'open' && r.planCloseDate && r.planCloseDate < today)
     .map(r => ({ id: r.id, desc: r.desc, projectName: r.projectName, planCloseDate: r.planCloseDate, level: r.level }))
     .sort((a, b) => (a.planCloseDate || '').localeCompare(b.planCloseDate || ''));
 
-  // 近一周需闭环风险
   const weekLater = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
   const rankOrder = { high: 0, medium: 1, low: 2 };
   const upcomingRisks = risks
@@ -284,15 +218,16 @@ function computeSummary(state) {
     .map(r => ({ id: r.id, desc: r.desc, projectName: r.projectName, planCloseDate: r.planCloseDate, level: r.level }))
     .sort((a, b) => (rankOrder[a.level] ?? 3) - (rankOrder[b.level] ?? 3));
 
-  // 里程碑统计（按节点聚合当月计划数）
   const nodeKeys = ['BR0', 'BR1', 'BR2', 'BR3', 'BR4', 'TR1', 'TR2', 'TR3', 'TR4', 'TR5', 'TR6'];
   const milestoneStats = nodeKeys.map(node => {
     let count = 0;
-    projects.forEach(p => { if (p.nodes && p.nodes[node]) count++; });
+    projects.forEach(p => {
+      if (p.nodes && p.nodes[node]) count++;
+      else if ((p.milestones || []).some(m => (m.node === node) || (m.name || '').includes(node))) count++;
+    });
     return { node, count };
   });
 
-  // 进行中项目的里程碑（甘特图数据）
   const ganttProjects = projects
     .filter(p => p.status === 'in-progress')
     .map(p => ({ id: p.id, name: p.name, milestones: p.milestones || [] }));
@@ -316,14 +251,11 @@ module.exports = {
   prefix: '/api/csenergy',
 
   ensureData() {
-    ensureDir(CS_DIR);
+    ensureDir(PROJ_DIR);
     ensureDir(HISTORY_DIR);
-    // 首次启动写入示例数据，方便直接看到完整界面
+    // 不覆盖现有 project 数据；仅在完全无数据时创建空态
     if (!fs.existsSync(STATE_FILE)) {
-      const seed = JSON.parse(JSON.stringify(SEED_STATE));
-      seed.updatedAt = new Date().toLocaleString('zh-CN');
-      writeState(seed);
-      saveHistory(seed);
+      writeState(JSON.parse(JSON.stringify(EMPTY_STATE)));
     }
   },
 
@@ -331,17 +263,14 @@ module.exports = {
     const pathname = u.pathname || '';
     const sub = pathname.replace('/api/csenergy', '');
 
-    // GET /api/csenergy/state
     if (sub === '/state' && req.method === 'GET') {
       return sendJson(res, 200, readState());
     }
 
-    // GET /api/csenergy/summary
     if (sub === '/summary' && req.method === 'GET') {
       return sendJson(res, 200, computeSummary(readState()));
     }
 
-    // POST /api/csenergy/state
     if (sub === '/state' && req.method === 'POST') {
       let body = '';
       req.on('data', c => {
@@ -365,20 +294,30 @@ module.exports = {
         const err = validateState(next);
         if (err) return sendJson(res, 400, { error: err });
 
-        next.rev = Math.max(curRev, isFinite(baseRev) ? baseRev : 0) + 1;
-        next.updatedAt = new Date().toLocaleString('zh-CN');
-        next.updatedBy = String(incoming.by || '未署名').slice(0, 40);
+        // 合并：保证不丢字段（若某次提交只带部分字段，用现有值兜底）
+        const merged = {
+          ...cur,
+          ...next,
+          projects: next.projects != null ? next.projects : cur.projects,
+          risks: next.risks != null ? next.risks : cur.risks,
+          resources: next.resources != null ? next.resources : cur.resources
+        };
 
-        try { writeState(next); }
+        merged.rev = Math.max(curRev, isFinite(baseRev) ? baseRev : 0) + 1;
+        merged.updatedAt = new Date().toLocaleString('zh-CN');
+        merged.updatedBy = String(incoming.by || '未署名').slice(0, 40);
+        if (!merged.year) merged.year = new Date().getFullYear();
+
+        try { writeState(merged); }
         catch (e) { return sendJson(res, 500, { error: '写入失败: ' + e.message }); }
 
-        saveHistory(next);
+        saveHistory(merged);
 
         if (typeof global._broadcast === 'function') {
-          global._broadcast(next.rev, next.updatedBy);
+          global._broadcast(merged.rev, merged.updatedBy);
         }
 
-        sendJson(res, 200, { ok: true, rev: next.rev, updatedAt: next.updatedAt });
+        sendJson(res, 200, { ok: true, rev: merged.rev, updatedAt: merged.updatedAt });
       });
       return;
     }

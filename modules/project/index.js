@@ -1083,10 +1083,12 @@ const ProjectModule = (() => {
 
   return {
     id: 'project',
-    name: '全年度项目管理',
+    name: '全年度项目管理（旧版）',
     icon: '📋',
     order: 2,
-    sidebar: true,
+    // sidebar 已隐藏：功能已融合进「全年度项目管理看板」(csenergy)，
+    // 保留模块代码与路由以便回退，数据与新模块共享同一份 data/project/state.json
+    sidebar: false,
 
     /**
      * init(container, context) — 首次进入模块

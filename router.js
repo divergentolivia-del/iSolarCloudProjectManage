@@ -99,14 +99,20 @@ const Router = (() => {
     } else if (moduleId === 'csenergy') {
       const csSubLabels = {
         board: '立项管理看板',
-        overview: '项目全景图',
-        risk: '风险全景图',
+        ledger: '项目台账',
+        timeline: '周期视图',
+        release: '年度发布',
+        risk: '风险全景',
         resource: '资源管理'
       };
+      const csName = mod ? mod.name : '全年度项目管理看板';
       if (!subPath) {
-        items.push({ label: mod ? mod.name : '工商储项目' });
+        items.push({ label: csName });
+      } else if (subPath.startsWith('detail/')) {
+        items.push({ label: csName, href: '#/csenergy' });
+        items.push({ label: '项目详情' });
       } else {
-        items.push({ label: mod ? mod.name : '工商储项目', href: '#/csenergy' });
+        items.push({ label: csName, href: '#/csenergy' });
         items.push({ label: csSubLabels[subPath] || subPath });
       }
     } else {

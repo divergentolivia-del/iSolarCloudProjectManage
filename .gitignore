@@ -10,6 +10,8 @@ data/budget/state.json
 data/budget/history/
 data/project/state.json
 data/project/history/
+data/csenergy/state.json
+data/csenergy/history/
 data/token/state.json
 data/token/history/
 data/token/logs/

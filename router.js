@@ -96,6 +96,31 @@ const Router = (() => {
         items.push({ label: mod ? mod.name : '全年度项目管理', href: '#/project' });
         items.push({ label: projectSubLabels[subPath] || subPath });
       }
+    } else if (moduleId === 'csenergy') {
+      const csSubLabels = {
+        board: '立项管理看板',
+        ledger: '项目台账',
+        timeline: '周期视图',
+        release: '年度发布',
+        risk: '风险全景',
+        resource: '资源管理'
+      };
+      const csName = mod ? mod.name : '全年度项目管理看板';
+      if (!subPath) {
+        items.push({ label: csName });
+      } else if (subPath.startsWith('detail/')) {
+        items.push({ label: csName, href: '#/csenergy' });
+        items.push({ label: '项目详情' });
+      } else if (subPath === 'new') {
+        items.push({ label: csName, href: '#/csenergy/ledger' });
+        items.push({ label: '新建项目' });
+      } else if (subPath.startsWith('edit/')) {
+        items.push({ label: csName, href: '#/csenergy/ledger' });
+        items.push({ label: '编辑项目' });
+      } else {
+        items.push({ label: csName, href: '#/csenergy' });
+        items.push({ label: csSubLabels[subPath] || subPath });
+      }
     } else {
       // Generic fallback
       if (mod) {

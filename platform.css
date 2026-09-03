@@ -257,15 +257,21 @@ body.dark-theme .sidebar {
 }
 .sidebar-nav-item.active {
   background: var(--accent-soft);
-  color: var(--accent-strong);
+  color: var(--accent);
   font-weight: 700;
+  box-shadow: inset 0 0 0 1px #bfdbfe;
 }
+.sidebar-nav-item.active:hover {
+  background: #dbeafe;
+  transform: none;
+}
+.sidebar-nav-item.active .nav-icon { color: var(--accent); }
 body.dark-theme .sidebar-nav-item.active { color: var(--accent); }
 
 .sidebar-nav-item.active::before {
   content: '';
   position: absolute;
-  left: 0; top: 6px; bottom: 6px;
+  left: 0; top: 5px; bottom: 5px;
   width: 3px;
   background: var(--accent);
   border-radius: 0 3px 3px 0;

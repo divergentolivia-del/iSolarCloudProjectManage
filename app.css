@@ -20,10 +20,17 @@ body {
   margin: 0; background: var(--bg); color: var(--text);
   font: 14px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
+/* 顶部标题栏 + tab 整组吸顶固定 */
+.sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--panel);
+  box-shadow: 0 1px 0 var(--line);
+}
 .topbar {
   display: flex; align-items: center; gap: 12px;
   padding: 14px 24px; background: var(--panel); border-bottom: 1px solid var(--line);
-  position: sticky; top: 0; z-index: 20;
   flex-wrap: wrap;
 }
 .brand { font-size: 16px; font-weight: 700; white-space: nowrap; flex-shrink: 0; color: var(--text); }
@@ -46,7 +53,7 @@ body {
 .tabs {
   display: flex; gap: 2px; padding: 0 24px;
   background: var(--panel); border-bottom: 1px solid var(--line);
-  position: sticky; top: 55px; z-index: 19;
+  overflow-x: auto;
 }
 .tab {
   padding: 11px 16px; border: 0; background: none; cursor: pointer;
@@ -114,7 +121,6 @@ input:focus, select:focus { outline: 0; border-color: var(--accent); box-shadow:
 /* 协同服务断连横幅：常驻顶部，直到服务恢复 */
 .banner {
   padding: 10px 20px; font-size: 13px; line-height: 1.7;
-  position: sticky; top: 53px; z-index: 21;
 }
 .banner.hidden { display: none; }
 .banner.off {

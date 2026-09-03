@@ -431,3 +431,58 @@ body.archive-readonly .archive-btn { display: none; }
   margin-bottom: 14px;
 }
 .manual-import-body .card:last-child { margin-bottom: 0; }
+
+
+/* ==================== 表格排版：对齐 + 列宽收敛 ==================== */
+/* 数字列 / 短内容列居中（表头与单元格一致） */
+.col-num, th.col-num,
+.col-mid, th.col-mid,
+.col-pick, th.col-pick { text-align: center; }
+.col-num input[type=number] { text-align: center; }
+
+/* 强调数值（合计、开发周期等派生值） */
+.col-strong { font-weight: 700; color: var(--text); }
+
+/* 窄内容列固定较窄宽度，主内容列自适应占余下空间 */
+.col-pick { width: 64px; }          /* 采用（单选） */
+.col-op   { width: 72px; text-align: center; }   /* 操作 */
+.col-mid  { width: 160px; }         /* 当前口径 / 口径操作 */
+
+/* 采用单选居中 */
+.col-pick input[type=radio] {
+  width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer;
+}
+
+/* 方案名 + 采用徽章 同行 */
+.cell-name { display: flex; align-items: center; gap: 8px; }
+.cell-name input { flex: 1; min-width: 0; }
+
+/* 「采用」徽章 */
+.badge-adopt {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid #bfdbfe;
+  font-size: 12px; font-weight: 600;
+  white-space: nowrap;
+}
+
+/* 被采用方案整行浅蓝高亮 */
+.cycle-active > td { background: rgba(30, 64, 175, 0.04); }
+
+/* 口径标签（替代裸文字，视觉更聚拢，减少空列观感） */
+.caliber-tag {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 13px; font-weight: 500;
+}
+.caliber-tag.story { background: var(--panel-soft); color: var(--text); }
+.caliber-tag.est { background: #fef3c7; color: #92400e; }
+
+/* 紧凑表：口径配置这类窄内容表，主列自适应，整体不铺满过宽 */
+.table-compact { max-width: 720px; }
+.table-compact .col-mid select { max-width: 130px; margin: 0 auto; }

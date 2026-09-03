@@ -298,18 +298,23 @@ document.getElementById('btnSave').addEventListener('click', () => save());
 /* ---------- ① 版本周期 ---------- */
 RENDERERS.cycle = function () {
   const rows = state.cycles.map((c, i) => `
-    <tr>
-      <td class="txt"><input type="text" data-c="${i}" data-f="name" value="${esc(c.name)}"></td>
+    <tr class="${c.active ? 'cycle-active' : ''}">
+      <td class="txt">
+        <div class="cell-name">
+          <input type="text" data-c="${i}" data-f="name" value="${esc(c.name)}">
+          ${c.active ? '<span class="badge-adopt">采用</span>' : ''}
+        </div>
+      </td>
       <td class="txt"><input type="text" data-c="${i}" data-f="seal" value="${esc(c.seal)}" placeholder="如 8.1"></td>
       <td class="txt"><input type="text" data-c="${i}" data-f="online" value="${esc(c.online)}" placeholder="如 8.13"></td>
-      <td><input type="number" step="0.5" data-c="${i}" data-f="workdays" value="${c.workdays}"></td>
-      <td><input type="number" step="0.5" data-c="${i}" data-f="saturdays" value="${c.saturdays}"></td>
-      <td>${cycleDays(c)}</td>
-      <td class="row-actions">
+      <td class="col-num"><input type="number" step="0.5" data-c="${i}" data-f="workdays" value="${c.workdays}"></td>
+      <td class="col-num"><input type="number" step="0.5" data-c="${i}" data-f="saturdays" value="${c.saturdays}"></td>
+      <td class="col-num col-strong">${cycleDays(c)}</td>
+      <td class="col-pick">
         <input type="radio" name="activeCycle" data-c="${i}" data-f="active" ${c.active ? 'checked' : ''}>
       </td>
       <td class="txt"><input type="text" data-c="${i}" data-f="note" value="${esc(c.note)}" placeholder="备注"></td>
-      <td class="row-actions"><button class="link" data-del="${i}">删除</button></td>
+      <td class="col-op"><button class="link" data-del="${i}">删除</button></td>
     </tr>`).join('');
 
   document.getElementById('view-cycle').innerHTML = `
@@ -319,8 +324,8 @@ RENDERERS.cycle = function () {
       <div class="scroll"><table>
         <thead><tr>
           <th class="txt">方案</th><th class="txt">封版时间</th><th class="txt">上线时间</th>
-          <th>工作日</th><th>周六天数</th><th>开发周期</th><th>采用</th>
-          <th class="txt">备注</th><th>操作</th>
+          <th class="col-num">工作日</th><th class="col-num">周六天数</th><th class="col-num">开发周期</th><th class="col-pick">采用</th>
+          <th class="txt">备注</th><th class="col-op">操作</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table></div>
@@ -368,10 +373,10 @@ RENDERERS.headcount = function () {
     html += `
       <tr>
         <td class="txt">${esc(t.key)}</td>
-        <td><input type="number" step="0.1" data-t="${esc(t.key)}" data-f="regular" value="${h.regular == null ? '' : h.regular}"></td>
-        <td><input type="number" step="0.1" data-t="${esc(t.key)}" data-f="outsource" value="${h.outsource == null ? '' : h.outsource}"></td>
-        <td>${fmt(total)}</td>
-        <td>${fmt(locked[t.key])}</td>
+        <td class="col-num"><input type="number" step="0.1" data-t="${esc(t.key)}" data-f="regular" value="${h.regular == null ? '' : h.regular}"></td>
+        <td class="col-num"><input type="number" step="0.1" data-t="${esc(t.key)}" data-f="outsource" value="${h.outsource == null ? '' : h.outsource}"></td>
+        <td class="col-num col-strong">${fmt(total)}</td>
+        <td class="col-num">${fmt(locked[t.key])}</td>
         <td class="txt"><input type="text" data-t="${esc(t.key)}" data-f="owner" value="${esc(h.owner)}" placeholder="填报人"></td>
       </tr>`;
   });
@@ -384,13 +389,13 @@ RENDERERS.headcount = function () {
       <p class="hint">按组填写正式与外包人数，支持 0.5 等小数（部分投入）。可投入迭代人数 = 正式 + 外包，直接作为产能计算基数。「其中专项锁定」来自第③页，仅作参考展示。</p>
       <div class="scroll"><table>
         <thead><tr>
-          <th class="txt">组-方向</th><th>正式</th><th>外包</th>
-          <th>可投入迭代人数</th><th>其中专项锁定</th><th class="txt">填报人</th>
+          <th class="txt">组-方向</th><th class="col-num">正式</th><th class="col-num">外包</th>
+          <th class="col-num">可投入迭代人数</th><th class="col-num">其中专项锁定</th><th class="txt">填报人</th>
         </tr></thead>
         <tbody>${html}</tbody>
         <tfoot><tr class="sum">
           <td class="txt">合计</td><td colspan="2"></td>
-          <td>${fmt(sum)}</td><td colspan="2"></td>
+          <td class="col-num col-strong">${fmt(sum)}</td><td colspan="2"></td>
         </tr></tfoot>
       </table></div>
     </div>`;
@@ -714,17 +719,18 @@ RENDERERS.import = function () {
     <div class="card">
       <h2>统计口径配置</h2>
       <p class="hint">按团队设置工时取数规则。默认来自系统配置，可按需切换。仅对偏差分析计算生效。</p>
-      <div class="scroll"><table>
-        <thead><tr><th class="txt">团队</th><th>当前口径</th><th>操作</th></tr></thead>
+      <div class="scroll"><table class="table-compact">
+        <thead><tr><th class="txt">团队</th><th class="col-mid">当前口径</th><th class="col-mid">操作</th></tr></thead>
         <tbody>${TEAMS.map(t => {
           const override = (state.sourceOverrides || {})[t.key];
           const current = override || t.source;
+          const isEst = current === 'est';
           return '<tr>' +
             '<td class="txt">' + esc(t.key) + '</td>' +
-            '<td>' + (current === 'est' ? '预估故事点' : '故事点') + '</td>' +
-            '<td><select class="source-sel" data-team="' + esc(t.key) + '">' +
+            '<td class="col-mid"><span class="caliber-tag ' + (isEst ? 'est' : 'story') + '">' + (isEst ? '预估故事点' : '故事点') + '</span></td>' +
+            '<td class="col-mid"><select class="source-sel" data-team="' + esc(t.key) + '">' +
               '<option value="story"' + (current === 'story' ? ' selected' : '') + '>故事点</option>' +
-              '<option value="est"' + (current === 'est' ? ' selected' : '') + '>预估故事点</option>' +
+              '<option value="est"' + (isEst ? ' selected' : '') + '>预估故事点</option>' +
             '</select></td></tr>';
         }).join('')}</tbody>
       </table></div>

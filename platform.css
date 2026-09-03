@@ -256,25 +256,31 @@ body.dark-theme .sidebar {
   transform: translateX(3px);
 }
 .sidebar-nav-item.active {
-  background: var(--accent-soft);
-  color: var(--accent);
+  /* 用较饱和的浅蓝实底，与浅灰 sidebar 背景拉开对比 */
+  background: #dbeafe;
+  color: #1e3a8a;
   font-weight: 700;
-  box-shadow: inset 0 0 0 1px #bfdbfe;
+  box-shadow: inset 0 0 0 1px #93c5fd;
 }
 .sidebar-nav-item.active:hover {
-  background: #dbeafe;
+  background: #c7ddfc;
+  color: #1e3a8a;
   transform: none;
 }
 .sidebar-nav-item.active .nav-icon { color: var(--accent); }
-body.dark-theme .sidebar-nav-item.active { color: var(--accent); }
+body.dark-theme .sidebar-nav-item.active {
+  background: rgba(96,165,250,0.22);
+  color: #bfdbfe;
+  box-shadow: inset 0 0 0 1px rgba(96,165,250,0.4);
+}
 
 .sidebar-nav-item.active::before {
   content: '';
   position: absolute;
-  left: 0; top: 5px; bottom: 5px;
-  width: 3px;
+  left: 0; top: 4px; bottom: 4px;
+  width: 4px;
   background: var(--accent);
-  border-radius: 0 3px 3px 0;
+  border-radius: 0 4px 4px 0;
 }
 
 .nav-icon { font-size: 16px; flex-shrink: 0; width: 24px; text-align: center; line-height: 1; }

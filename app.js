@@ -547,6 +547,101 @@ function sourceCard(kind, title, hint) {
     </div>`;
 }
 
+/* ---------- 任务明细同步（TB 视图）---------- */
+/* TB = Teambition。阶段一：界面 + 结构 + 手动导入兜底；「自动同步 TB」为占位。
+   阶段二拿到 TB 开放 API 凭证后再实现真正的自动拉取。 */
+
+const TB_VIEW_TABS = [
+  { key: 'cloud', label: '阳光云迭代工作量', kind: 'totals' },
+  { key: 'middle', label: '阳光云迭代中后台工作量', kind: 'totalsMiddle' }
+];
+
+/* TB 视图占位映射：不同 tab 对应不同的 Teambition 视图名 */
+const TB_VIEW_NAMES = {
+  cloud: '阳光云迭代工作量 (2026-08 迭代)',
+  middle: '阳光云迭代中后台工作量 (2026-08 迭代)'
+};
+
+/* 从已导入的工时明细里取任务级数据用于表格展示（TB 关联前的降级展示）。
+   若无明细行则返回空数组，表格显示空态引导。 */
+function tbTaskRows(tabKey) {
+  const rows = tabKey === 'middle' ? (state._totalsMiddle || []) : (state._totalsCloud || []);
+  return rows.map(r => ({
+    id: r.taskId || r['任务ID'] || r.id || '—',
+    title: r.taskTitle || r['任务标题'] || r.title || r.name || '—',
+    team: r.team || r['所在团队'] || r['所属团队'] || '—',
+    story: r.story != null ? r.story : (r['故事点'] != null ? r['故事点'] : '—'),
+    est: r.est != null ? r.est : (r['预估故事点'] != null ? r['预估故事点'] : '—'),
+    iteration: r.iteration || r['迭代'] || '—'
+  }));
+}
+
+function renderTbSyncCard() {
+  const tab = state.tbViewTab || 'cloud';
+  const activeTab = TB_VIEW_TABS.find(t => t.key === tab) || TB_VIEW_TABS[0];
+  const rows = tbTaskRows(tab);
+  const viewName = TB_VIEW_NAMES[tab] || '';
+  const iterFilter = state.tbIterFilter || '阳光云 2026-8 C版本迭代';
+
+  const tabsHtml = TB_VIEW_TABS.map(t =>
+    `<button class="tb-tab ${t.key === tab ? 'active' : ''}" data-tb-tab="${t.key}">${esc(t.label)}</button>`
+  ).join('');
+
+  const tableRows = rows.length
+    ? rows.map(r => `
+      <tr>
+        <td class="txt">${esc(r.id)}</td>
+        <td class="txt">${esc(r.title)}</td>
+        <td class="txt">${esc(r.team)}</td>
+        <td>${esc(r.story)}</td>
+        <td>${esc(r.est)}</td>
+        <td class="txt">${esc(r.iteration)}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="6" class="txt tb-empty">暂无任务明细。点击「自动同步 TB」从 Teambition 拉取，或「导入 CSV」手动上传。</td></tr>`;
+
+  return `
+    <div class="card tb-sync-card">
+      <h2>🔗 任务明细同步（TB 视图）</h2>
+      <p class="hint">打通 Teambition 视图，将任务明细同步至本平台。当前为人工 CSV 导入，后续接入 TB 开放接口后支持「自动同步 + 手动兜底」（TB 调整后随时再拉取）。</p>
+
+      <div class="tb-tabs">${tabsHtml}</div>
+
+      <div class="tb-toolbar">
+        <label class="tb-field">
+          <span>视图</span>
+          <select class="tb-view-select" disabled title="阶段二接入 TB API 后可选">
+            <option>${esc(viewName)}</option>
+          </select>
+        </label>
+        <label class="tb-field">
+          <span>迭代筛选</span>
+          <input type="text" class="tb-iter-filter" value="${esc(iterFilter)}" placeholder="如：阳光云 2026-8 C版本迭代">
+        </label>
+        <button class="btn primary tb-sync-btn" data-tb-kind="${activeTab.kind}">⚡ 自动同步 TB</button>
+        <button class="btn tb-import-btn" data-tb-kind="${activeTab.kind}">导入 CSV</button>
+      </div>
+
+      <div class="scroll">
+        <table class="tb-table">
+          <thead>
+            <tr>
+              <th class="txt">任务 ID</th>
+              <th class="txt">任务标题</th>
+              <th class="txt">所属团队</th>
+              <th>故事点</th>
+              <th>预估故事点</th>
+              <th class="txt">迭代</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+      <p class="note tb-foot">
+        「阳光云迭代工作量」对应 Teambition 第一个视图，「阳光云迭代中后台工作量」为第二个视图；结构相同，按团队所属「故事点 / 预估故事点」字段归集到⑥偏差分析。
+      </p>
+    </div>`;
+}
+
 RENDERERS.import = function () {
   const res = compute(state);
 
@@ -619,7 +714,9 @@ RENDERERS.import = function () {
         · 全零行（故事点与预估均为 0）自动跳过，原始导出中这类行占多数。<br>
         · 导入后请到第⑤页勾选本期迭代，否则所有工时为 0。
       </p>
-    </div>`;
+    </div>
+
+    ${renderTbSyncCard()}`;
 
   const view = document.getElementById('view-import');
   view.querySelectorAll('.drop').forEach(drop => {
@@ -654,6 +751,44 @@ RENDERERS.import = function () {
       save(true); renderAll();
     });
   });
+
+  // ---------- 任务明细同步（TB 视图）event binding ----------
+  // tab 切换（仅切换展示视图，不落库，避免误触 save）
+  view.querySelectorAll('[data-tb-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.tbViewTab = btn.dataset.tbTab;
+      RENDERERS.import();
+    });
+  });
+
+  // 迭代筛选输入记忆（仅前端状态，不入库）
+  const iterInput = view.querySelector('.tb-iter-filter');
+  if (iterInput) {
+    iterInput.addEventListener('change', () => { state.tbIterFilter = iterInput.value; });
+  }
+
+  // 「自动同步 TB」占位：阶段一提示未接入，阶段二实现真正拉取
+  const syncBtn = view.querySelector('.tb-sync-btn');
+  if (syncBtn) {
+    syncBtn.addEventListener('click', () => {
+      toast('TB 自动同步尚未接入（需先配置 Teambition 开放接口凭证）。当前请使用「导入 CSV」手动上传。');
+    });
+  }
+
+  // 「导入 CSV」复用现有 handleImport，按当前 tab 对应的 kind 导入
+  const importBtn = view.querySelector('.tb-import-btn');
+  if (importBtn) {
+    importBtn.addEventListener('click', () => {
+      const kind = importBtn.dataset.tbKind || 'totals';
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.csv,.xlsx,.xls';
+      input.addEventListener('change', () => {
+        if (input.files[0]) handleImport(input.files[0], kind);
+      });
+      input.click();
+    });
+  }
 };
 
 /* ---------- ⑤ 迭代口径 ---------- */

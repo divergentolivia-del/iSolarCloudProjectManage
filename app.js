@@ -561,25 +561,29 @@ function sourceCard(kind, title, hint) {
    筛选条件（视图名即含迭代信息），因此只需选视图，不再单独设迭代筛选。
    看板模板（团队/迭代/维度）在服务端 tb-config.js 配置，切换迭代只需改 sprintId。 */
 
-/* 明细表格用的 tab（仅切换下方任务明细表的展示源，不决定同步范围）。
-   同步范围由服务端 tb-config.js 的看板模板决定，前端不重复设迭代筛选。 */
+/* 明细表格用的 tab（仅切换下方分布表的展示源，不决定同步范围）。
+   同步范围由服务端 tb-config.js 的看板模板决定，前端不重复设迭代筛选。
+   rows: 从 state 取哪个字段；kind: 导入 CSV 兜底时写入哪个 source。 */
 const TB_VIEW_TABS = [
-  { key: 'cloud', label: '阳光云迭代工作量', kind: 'totals' },
-  { key: 'middle', label: '阳光云迭代中后台工作量', kind: 'totalsMiddle' }
+  { key: 'cloud', label: '阳光云迭代', rows: '_totalsCloud', kind: 'totals' },
+  { key: 'middle', label: '阳光云迭代中后台', rows: '_totalsMiddle', kind: 'totalsMiddle' },
+  { key: 'productLine', label: '产品线维度', rows: 'board', kind: 'board' }
 ];
 
-/* 从已导入的工时明细里取任务级数据用于表格展示（TB 关联前的降级展示）。
-   若无明细行则返回空数组，表格显示空态引导。 */
-function tbTaskRows(tabKey) {
-  const rows = tabKey === 'middle' ? (state._totalsMiddle || []) : (state._totalsCloud || []);
-  return rows.map(r => ({
-    id: r.taskId || r['任务ID'] || r.id || '—',
-    title: r.taskTitle || r['任务标题'] || r.title || r.name || '—',
-    team: r.team || r['所在团队'] || r['所属团队'] || '—',
-    story: r.story != null ? r.story : (r['故事点'] != null ? r['故事点'] : '—'),
-    est: r.est != null ? r.est : (r['预估故事点'] != null ? r['预估故事点'] : '—'),
-    iteration: r.iteration || r['迭代'] || '—'
-  }));
+/* 按团队聚合某数据源的工时分布：任务数 + 故事点 + 预估故事点 + 合计。
+   按合计降序。空数据返回 []（表格显示空态）。 */
+function tbTeamDistribution(rows) {
+  if (!rows || !rows.length) return [];
+  const byTeam = {};
+  rows.forEach(r => {
+    const team = r.team || r['所在团队'] || r['所属团队'] || '（未填写）';
+    if (!byTeam[team]) byTeam[team] = { team: team, count: 0, story: 0, est: 0 };
+    byTeam[team].count += 1;
+    byTeam[team].story += num(r.story);
+    byTeam[team].est += num(r.est);
+  });
+  return Object.keys(byTeam).map(k => byTeam[k])
+    .sort((a, b) => (b.story + b.est) - (a.story + a.est));
 }
 
 /* 汇总某组行：任务数 + 故事点/预估故事点/总点数。空数据返回 null（显示「未同步」）。 */
@@ -598,13 +602,13 @@ function currentSprintMap() {
 function renderTbSyncCard() {
   const tab = state.tbViewTab || 'cloud';
   const activeTab = TB_VIEW_TABS.find(t => t.key === tab) || TB_VIEW_TABS[0];
-  const rows = tbTaskRows(tab);
+  const dist = tbTeamDistribution(state[activeTab.rows]);
 
   const tabsHtml = TB_VIEW_TABS.map(t =>
     `<button class="tb-tab ${t.key === tab ? 'active' : ''}" data-tb-tab="${t.key}">${esc(t.label)}</button>`
   ).join('');
 
-  /* 三源状态汇总（来自已同步的 state 行） */
+  /* 三源状态汇总（来自已同步的 state 行，每源一行总览） */
   const cloud = tbSumRows(state._totalsCloud);
   const middle = tbSumRows(state._totalsMiddle);
   const board = tbSumRows(state.board);
@@ -634,29 +638,29 @@ function renderTbSyncCard() {
     ? `${esc(state.updatedBy || '未署名')} · ${esc(state.updatedAt)}`
     : '尚未同步';
 
-  const tableRows = rows.length
-    ? rows.map(r => `
+  /* 选中数据源的团队工时分布表 */
+  const distRows = dist.length
+    ? dist.map(d => `
       <tr>
-        <td class="txt">${esc(r.id)}</td>
-        <td class="txt">${esc(r.title)}</td>
-        <td class="txt">${esc(r.team)}</td>
-        <td>${esc(r.story)}</td>
-        <td>${esc(r.est)}</td>
-        <td class="txt">${esc(r.iteration)}</td>
+        <td class="txt">${esc(d.team)}</td>
+        <td>${d.count}</td>
+        <td>${fmt(d.story, 2)}</td>
+        <td>${fmt(d.est, 2)}</td>
+        <td>${fmt(d.story + d.est, 2)}</td>
       </tr>`).join('')
-    : `<tr><td colspan="6" class="txt tb-empty">暂无任务明细。点击「自动同步 TB」拉取，或「导入 CSV」手动上传。</td></tr>`;
+    : `<tr><td colspan="5" class="txt tb-empty">该数据源暂无数据。点击「自动同步 TB」拉取，或「导入 CSV」手动上传。</td></tr>`;
 
   return `
     <div class="card tb-sync-card">
       <h2>🔗 TB 工时同步 <span class="tb-config-badge" title="Token 是否已配置">…</span></h2>
-      <p class="hint">从 Teambition 一次性拉取阳光云、中后台、产品线三个看板的任务故事点，自动按团队/产品线聚合并写入本期工时。Token 在服务端 data/tb/secret.json 配置，前端不接触明文；迭代映射可在下方直接配置。</p>
+      <p class="hint">从 Teambition 一次性拉取阳光云、中后台、产品线三个看板的任务故事点，按团队聚合并写入本期工时。Token 在服务端 data/tb/secret.json 配置，前端不接触明文；迭代映射可在下方直接配置。</p>
 
       <div class="tb-scroll">
         <table class="tb-table tb-src-table">
           <thead><tr><th class="txt">数据源</th><th class="col-mid">当前同步结果</th><th class="col-mid txt">说明</th></tr></thead>
           <tbody>
             ${srcRow('阳光云迭代', cloud, '按团队 → ⑥偏差分析')}
-            ${srcRow('中后台迭代', middle, '中后台团队 → ⑥偏差分析')}
+            ${srcRow('阳光云迭代中后台', middle, '中后台团队 → ⑥偏差分析')}
             ${srcRow('产品线维度', board, '产线×团队 → 产线分布')}
           </tbody>
         </table>
@@ -688,19 +692,18 @@ function renderTbSyncCard() {
         <table class="tb-table">
           <thead>
             <tr>
-              <th class="txt">任务 ID</th>
-              <th class="txt">任务标题</th>
               <th class="txt">所属团队</th>
+              <th>任务数</th>
               <th>故事点</th>
               <th>预估故事点</th>
-              <th class="txt">迭代</th>
+              <th>合计</th>
             </tr>
           </thead>
-          <tbody>${tableRows}</tbody>
+          <tbody>${distRows}</tbody>
         </table>
       </div>
       <p class="note tb-foot">
-        同步范围由服务端 tb-config.js 的看板模板决定；「自动同步 TB」一次性拉取三个看板并落库，完成后页面自动刷新。
+        同步范围由服务端 tb-config.js 的看板模板决定；「自动同步 TB」一次性拉取三个看板并落库，完成后页面自动刷新。此处按团队聚合展示，不逐条列任务。
       </p>
     </div>`;
 }

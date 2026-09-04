@@ -17,3 +17,8 @@ data/token/history/
 data/token/logs/
 data/platform.json
 *.xlsx
+
+data/tb/secret.json
+data/tb/state.json
+data/tb/history/
+tb-secret.json

@@ -553,11 +553,13 @@ function sourceCard(kind, title, hint) {
 }
 
 /* ---------- 任务明细同步（TB 视图）---------- */
-/* TB = Teambition。阶段一：界面 + 结构 + 手动导入兜底；「自动同步 TB」为占位。
-   阶段二拿到 TB 开放 API 凭证后再实现真正的自动拉取。
+/* TB = Teambition。阶段二：已打通开放接口，「自动同步 TB」一次性拉取三个看板
+   （阳光云迭代 / 中后台 / 产品线维度）的任务故事点，按团队/产品线聚合后写入 state；
+   手动导入 CSV 作为同步失败时的兜底。token 存服务端配置，前端不接触明文。
 
    方案 X：一个 tab（工作量类型）对应若干「TB 统计视图」，视图本身已内置迭代等
-   筛选条件（视图名即含迭代信息），因此只需选视图，不再单独设迭代筛选。 */
+   筛选条件（视图名即含迭代信息），因此只需选视图，不再单独设迭代筛选。
+   看板模板（团队/迭代/维度）在服务端 tb-config.js 配置，切换迭代只需改 sprintId。 */
 
 const TB_VIEW_TABS = [
   { key: 'cloud', label: '阳光云迭代工作量', kind: 'totals' },
@@ -621,7 +623,7 @@ function renderTbSyncCard() {
   return `
     <div class="card tb-sync-card">
       <h2>🔗 任务明细同步（TB 视图）</h2>
-      <p class="hint">打通 Teambition 视图，将任务明细同步至本平台。选择一个已配置好筛选条件的 TB 统计视图即可拉取对应迭代的任务明细。当前为人工 CSV 导入，后续接入 TB 开放接口后支持「自动同步 + 手动兜底」。</p>
+      <p class="hint">已打通 Teambition 开放接口。点击「自动同步 TB」即可一次性拉取阳光云迭代、中后台、产品线三个看板的任务故事点，自动按团队/产品线聚合并写入本期工时；无需手动导出 CSV。若同步失败（凭证过期、网络等），可用「导入 CSV」手动兜底。</p>
 
       <div class="tb-tabs">${tabsHtml}</div>
 
@@ -811,12 +813,10 @@ RENDERERS.import = function () {
     });
   }
 
-  // 「自动同步 TB」占位：阶段一提示未接入，阶段二实现真正拉取
+  // 「自动同步 TB」：调用后端 /api/tb/sync 一次性拉取三个看板并写入 state
   const syncBtn = view.querySelector('.tb-sync-btn');
   if (syncBtn) {
-    syncBtn.addEventListener('click', () => {
-      toast('TB 自动同步尚未接入（需先配置 Teambition 开放接口凭证）。当前请使用「导入 CSV」手动上传。');
-    });
+    syncBtn.addEventListener('click', () => runTbSync(syncBtn));
   }
 
   // 「导入 CSV」复用现有 handleImport，按当前 tab 对应的 kind 导入
@@ -834,6 +834,54 @@ RENDERERS.import = function () {
     });
   }
 };
+
+/* ---------- TB 自动同步（阶段二）----------
+   调用后端 /api/tb/sync，一次性拉取三个看板（阳光云/中后台/产品线）并写入 state。
+   后端写入后会通过 SSE 广播，前端 onRemote 自动刷新；这里再显式提示同步结果。
+   token 存服务端配置（data/tb/secret.json 或环境变量 TB_TOKEN），前端不接触明文。 */
+function runTbSync(btn) {
+  if (Sync.mode !== 'server') {
+    toast('自动同步需在服务端模式下使用（通过 node server.js 启动后用 http 访问）。当前请用「导入 CSV」。');
+    return;
+  }
+  const origHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ 同步中…';
+
+  fetch('api/tb/sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ by: (typeof Sync.whoami === 'function' ? Sync.whoami() : '') || 'TB同步' })
+  })
+    .then(r => r.json().then(j => ({ status: r.status, body: j })))
+    .then(({ status, body }) => {
+      if (status !== 200 || !body.ok) {
+        const msg = body && body.error ? body.error : ('同步失败（HTTP ' + status + '）');
+        toast('❌ ' + msg);
+        return;
+      }
+      const s = body.stats || {};
+      const c = s.cloud || {}, m = s.middle || {}, p = s.productLine || {};
+      toast('✅ TB 同步完成：阳光云 ' + (c.taskCount || 0) + ' 任务/' + (c.totalPoints || 0) +
+        ' 点，中后台 ' + (m.taskCount || 0) + ' 任务/' + (m.totalPoints || 0) +
+        ' 点，产品线 ' + (p.taskCount || 0) + ' 任务/' + (p.totalPoints || 0) + ' 点');
+      // 显式拉取最新 state（SSE 也会触发，双保险，避免自身 rev 判定误跳过）
+      fetch('api/state', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(remote => {
+          if (remote.totals && remote.totals.length && !remote._totalsCloud) remote._totalsCloud = remote.totals;
+          if (!remote._totalsMiddle) remote._totalsMiddle = [];
+          state = remote;
+          renderAll();
+        })
+        .catch(() => { /* SSE 会兜底刷新 */ });
+    })
+    .catch(e => toast('❌ 同步请求失败：' + e.message))
+    .finally(() => {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    });
+}
 
 /* ---------- ⑤ 迭代口径 ---------- */
 RENDERERS.iteration = function () {

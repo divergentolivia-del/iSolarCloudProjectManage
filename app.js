@@ -298,18 +298,23 @@ document.getElementById('btnSave').addEventListener('click', () => save());
 /* ---------- ① 版本周期 ---------- */
 RENDERERS.cycle = function () {
   const rows = state.cycles.map((c, i) => `
-    <tr>
-      <td class="txt"><input type="text" data-c="${i}" data-f="name" value="${esc(c.name)}"></td>
+    <tr class="${c.active ? 'cycle-active' : ''}">
+      <td class="txt">
+        <div class="cell-name">
+          <input type="text" data-c="${i}" data-f="name" value="${esc(c.name)}">
+          ${c.active ? '<span class="badge-adopt">采用</span>' : ''}
+        </div>
+      </td>
       <td class="txt"><input type="text" data-c="${i}" data-f="seal" value="${esc(c.seal)}" placeholder="如 8.1"></td>
       <td class="txt"><input type="text" data-c="${i}" data-f="online" value="${esc(c.online)}" placeholder="如 8.13"></td>
-      <td><input type="number" step="0.5" data-c="${i}" data-f="workdays" value="${c.workdays}"></td>
-      <td><input type="number" step="0.5" data-c="${i}" data-f="saturdays" value="${c.saturdays}"></td>
-      <td>${cycleDays(c)}</td>
-      <td class="row-actions">
+      <td class="col-num"><input type="number" step="0.5" data-c="${i}" data-f="workdays" value="${c.workdays}"></td>
+      <td class="col-num"><input type="number" step="0.5" data-c="${i}" data-f="saturdays" value="${c.saturdays}"></td>
+      <td class="col-num col-strong">${cycleDays(c)}</td>
+      <td class="col-pick">
         <input type="radio" name="activeCycle" data-c="${i}" data-f="active" ${c.active ? 'checked' : ''}>
       </td>
       <td class="txt"><input type="text" data-c="${i}" data-f="note" value="${esc(c.note)}" placeholder="备注"></td>
-      <td class="row-actions"><button class="link" data-del="${i}">删除</button></td>
+      <td class="col-op"><button class="link" data-del="${i}">删除</button></td>
     </tr>`).join('');
 
   document.getElementById('view-cycle').innerHTML = `
@@ -319,8 +324,8 @@ RENDERERS.cycle = function () {
       <div class="scroll"><table>
         <thead><tr>
           <th class="txt">方案</th><th class="txt">封版时间</th><th class="txt">上线时间</th>
-          <th>工作日</th><th>周六天数</th><th>开发周期</th><th>采用</th>
-          <th class="txt">备注</th><th>操作</th>
+          <th class="col-num">工作日</th><th class="col-num">周六天数</th><th class="col-num">开发周期</th><th class="col-pick">采用</th>
+          <th class="txt">备注</th><th class="col-op">操作</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table></div>
@@ -368,10 +373,10 @@ RENDERERS.headcount = function () {
     html += `
       <tr>
         <td class="txt">${esc(t.key)}</td>
-        <td><input type="number" step="0.1" data-t="${esc(t.key)}" data-f="regular" value="${h.regular == null ? '' : h.regular}"></td>
-        <td><input type="number" step="0.1" data-t="${esc(t.key)}" data-f="outsource" value="${h.outsource == null ? '' : h.outsource}"></td>
-        <td>${fmt(total)}</td>
-        <td>${fmt(locked[t.key])}</td>
+        <td class="col-num"><input type="number" step="0.1" data-t="${esc(t.key)}" data-f="regular" value="${h.regular == null ? '' : h.regular}"></td>
+        <td class="col-num"><input type="number" step="0.1" data-t="${esc(t.key)}" data-f="outsource" value="${h.outsource == null ? '' : h.outsource}"></td>
+        <td class="col-num col-strong">${fmt(total)}</td>
+        <td class="col-num">${fmt(locked[t.key])}</td>
         <td class="txt"><input type="text" data-t="${esc(t.key)}" data-f="owner" value="${esc(h.owner)}" placeholder="填报人"></td>
       </tr>`;
   });
@@ -384,13 +389,13 @@ RENDERERS.headcount = function () {
       <p class="hint">按组填写正式与外包人数，支持 0.5 等小数（部分投入）。可投入迭代人数 = 正式 + 外包，直接作为产能计算基数。「其中专项锁定」来自第③页，仅作参考展示。</p>
       <div class="scroll"><table>
         <thead><tr>
-          <th class="txt">组-方向</th><th>正式</th><th>外包</th>
-          <th>可投入迭代人数</th><th>其中专项锁定</th><th class="txt">填报人</th>
+          <th class="txt">组-方向</th><th class="col-num">正式</th><th class="col-num">外包</th>
+          <th class="col-num">可投入迭代人数</th><th class="col-num">其中专项锁定</th><th class="txt">填报人</th>
         </tr></thead>
         <tbody>${html}</tbody>
         <tfoot><tr class="sum">
           <td class="txt">合计</td><td colspan="2"></td>
-          <td>${fmt(sum)}</td><td colspan="2"></td>
+          <td class="col-num col-strong">${fmt(sum)}</td><td colspan="2"></td>
         </tr></tfoot>
       </table></div>
     </div>`;
@@ -547,18 +552,139 @@ function sourceCard(kind, title, hint) {
     </div>`;
 }
 
+/* ---------- 任务明细同步（TB 视图）---------- */
+/* TB = Teambition。阶段一：界面 + 结构 + 手动导入兜底；「自动同步 TB」为占位。
+   阶段二拿到 TB 开放 API 凭证后再实现真正的自动拉取。
+
+   方案 X：一个 tab（工作量类型）对应若干「TB 统计视图」，视图本身已内置迭代等
+   筛选条件（视图名即含迭代信息），因此只需选视图，不再单独设迭代筛选。 */
+
+const TB_VIEW_TABS = [
+  { key: 'cloud', label: '阳光云迭代工作量', kind: 'totals' },
+  { key: 'middle', label: '阳光云迭代中后台工作量', kind: 'totalsMiddle' }
+];
+
+/* 每个 tab 可选的 TB 统计视图列表（占位数据，阶段二从 TB API 拉取真实视图清单）。
+   视图名内已含迭代口径，选定视图即等于选定了迭代范围。 */
+const TB_VIEWS = {
+  cloud: [
+    { id: 'v-cloud-2026-08c', name: '阳光云迭代工作量 · 2026-8月 C版本迭代' },
+    { id: 'v-cloud-2026-07', name: '阳光云迭代工作量 · 2026-7月迭代' }
+  ],
+  middle: [
+    { id: 'v-middle-2026-08', name: '阳光云迭代中后台工作量 · 中后台 2026-8月迭代' },
+    { id: 'v-middle-2026-07', name: '阳光云迭代中后台工作量 · 中后台 2026-7月迭代' }
+  ]
+};
+
+/* 从已导入的工时明细里取任务级数据用于表格展示（TB 关联前的降级展示）。
+   若无明细行则返回空数组，表格显示空态引导。 */
+function tbTaskRows(tabKey) {
+  const rows = tabKey === 'middle' ? (state._totalsMiddle || []) : (state._totalsCloud || []);
+  return rows.map(r => ({
+    id: r.taskId || r['任务ID'] || r.id || '—',
+    title: r.taskTitle || r['任务标题'] || r.title || r.name || '—',
+    team: r.team || r['所在团队'] || r['所属团队'] || '—',
+    story: r.story != null ? r.story : (r['故事点'] != null ? r['故事点'] : '—'),
+    est: r.est != null ? r.est : (r['预估故事点'] != null ? r['预估故事点'] : '—'),
+    iteration: r.iteration || r['迭代'] || '—'
+  }));
+}
+
+function renderTbSyncCard() {
+  const tab = state.tbViewTab || 'cloud';
+  const activeTab = TB_VIEW_TABS.find(t => t.key === tab) || TB_VIEW_TABS[0];
+  const rows = tbTaskRows(tab);
+  const views = TB_VIEWS[tab] || [];
+  const selectedViewId = (state.tbSelectedView && state.tbSelectedView[tab]) || (views[0] && views[0].id);
+
+  const tabsHtml = TB_VIEW_TABS.map(t =>
+    `<button class="tb-tab ${t.key === tab ? 'active' : ''}" data-tb-tab="${t.key}">${esc(t.label)}</button>`
+  ).join('');
+
+  const viewOptions = views.map(v =>
+    `<option value="${esc(v.id)}" ${v.id === selectedViewId ? 'selected' : ''}>${esc(v.name)}</option>`
+  ).join('');
+
+  const tableRows = rows.length
+    ? rows.map(r => `
+      <tr>
+        <td class="txt">${esc(r.id)}</td>
+        <td class="txt">${esc(r.title)}</td>
+        <td class="txt">${esc(r.team)}</td>
+        <td>${esc(r.story)}</td>
+        <td>${esc(r.est)}</td>
+        <td class="txt">${esc(r.iteration)}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="6" class="txt tb-empty">暂无任务明细。选择 TB 视图后点击「自动同步 TB」拉取，或「导入 CSV」手动上传。</td></tr>`;
+
+  return `
+    <div class="card tb-sync-card">
+      <h2>🔗 任务明细同步（TB 视图）</h2>
+      <p class="hint">打通 Teambition 视图，将任务明细同步至本平台。选择一个已配置好筛选条件的 TB 统计视图即可拉取对应迭代的任务明细。当前为人工 CSV 导入，后续接入 TB 开放接口后支持「自动同步 + 手动兜底」。</p>
+
+      <div class="tb-tabs">${tabsHtml}</div>
+
+      <div class="tb-toolbar">
+        <label class="tb-field tb-field-grow">
+          <span>TB 统计视图</span>
+          <select class="tb-view-select">${viewOptions || '<option>（暂无可用视图）</option>'}</select>
+        </label>
+        <div class="tb-actions">
+          <button class="btn primary tb-sync-btn" data-tb-kind="${activeTab.kind}">⚡ 自动同步 TB</button>
+          <button class="btn tb-import-btn" data-tb-kind="${activeTab.kind}">导入 CSV</button>
+        </div>
+      </div>
+
+      <div class="scroll">
+        <table class="tb-table">
+          <thead>
+            <tr>
+              <th class="txt">任务 ID</th>
+              <th class="txt">任务标题</th>
+              <th class="txt">所属团队</th>
+              <th>故事点</th>
+              <th>预估故事点</th>
+              <th class="txt">迭代</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+      <p class="note tb-foot">
+        「阳光云迭代工作量」对应 Teambition 第一个视图，「阳光云迭代中后台工作量」为第二个视图；结构相同，按团队所属「故事点 / 预估故事点」字段归集到⑥偏差分析。视图清单在接入 TB 接口后自动拉取。
+      </p>
+    </div>`;
+}
+
 RENDERERS.import = function () {
   const res = compute(state);
 
+  // 手动导入的三份数据源；有任一已导入则默认展开，否则收起（主推 TB 同步）
+  const anyManualImported = !!(state.sources.totals || state.sources.totalsMiddle || state.sources.board);
+  const manualOpen = state.manualImportOpen != null ? state.manualImportOpen : anyManualImported;
+  const importedCount = [state.sources.totals, state.sources.totalsMiddle, state.sources.board].filter(Boolean).length;
+
   document.getElementById('view-import').innerHTML = `
-    ${sourceCard('totals', '① 阳光云迭代工作量统计（必需）',
-      '各团队在阳光云迭代中的工时统计（含中台团队投入阳光云迭代的部分）。与下方中后台数据合并构成完整版本工作量。')}
+    ${renderTbSyncCard()}
 
-    ${sourceCard('totalsMiddle', '①-2 阳光云迭代中后台工作量统计（必需）',
-      '中后台各组在中后台迭代中的工时统计。中台团队需合并两份表的工时才是完整投入，合并后与人力看板数据可相互对账。')}
+    <div class="manual-import ${manualOpen ? 'open' : ''}">
+      <button class="manual-import-head" id="manualToggle" aria-expanded="${manualOpen}">
+        <span class="manual-import-caret">▸</span>
+        <span class="manual-import-title">手动导入工时数据</span>
+        <span class="manual-import-sub">TB 关联失败或未接入时的兜底方式${importedCount ? ` · 已导入 ${importedCount}/3` : ''}</span>
+      </button>
+      <div class="manual-import-body">
+        ${sourceCard('totals', '① 阳光云迭代工作量统计（必需）',
+          '各团队在阳光云迭代中的工时统计（含中台团队投入阳光云迭代的部分）。与下方中后台数据合并构成完整版本工作量。')}
 
-    ${sourceCard('board', '② 月底版本项目人力看板（可选）',
-      '产线维度明细，仅用于「产品线版本工作量汇总」的分布展示，不参与产能偏差计算。不导入则分类分布表为空，偏差分析仍可正常使用。')}
+        ${sourceCard('totalsMiddle', '①-2 阳光云迭代中后台工作量统计（必需）',
+          '中后台各组在中后台迭代中的工时统计。中台团队需合并两份表的工时才是完整投入，合并后与人力看板数据可相互对账。')}
+
+        ${sourceCard('board', '② 月底版本项目人力看板（可选）',
+          '产线维度明细，仅用于「产品线版本工作量汇总」的分布展示，不参与产能偏差计算。不导入则分类分布表为空，偏差分析仍可正常使用。')}
+      </div>
+    </div>
 
     ${res.unknownTeams.length ? `
     <div class="card" style="border-left:3px solid var(--hold)">
@@ -593,17 +719,18 @@ RENDERERS.import = function () {
     <div class="card">
       <h2>统计口径配置</h2>
       <p class="hint">按团队设置工时取数规则。默认来自系统配置，可按需切换。仅对偏差分析计算生效。</p>
-      <div class="scroll"><table>
-        <thead><tr><th class="txt">团队</th><th>当前口径</th><th>操作</th></tr></thead>
+      <div class="scroll"><table class="table-compact">
+        <thead><tr><th class="txt">团队</th><th class="col-mid">当前口径</th><th class="col-mid">操作</th></tr></thead>
         <tbody>${TEAMS.map(t => {
           const override = (state.sourceOverrides || {})[t.key];
           const current = override || t.source;
+          const isEst = current === 'est';
           return '<tr>' +
             '<td class="txt">' + esc(t.key) + '</td>' +
-            '<td>' + (current === 'est' ? '预估故事点' : '故事点') + '</td>' +
-            '<td><select class="source-sel" data-team="' + esc(t.key) + '">' +
+            '<td class="col-mid"><span class="caliber-tag ' + (isEst ? 'est' : 'story') + '">' + (isEst ? '预估故事点' : '故事点') + '</span></td>' +
+            '<td class="col-mid"><select class="source-sel" data-team="' + esc(t.key) + '">' +
               '<option value="story"' + (current === 'story' ? ' selected' : '') + '>故事点</option>' +
-              '<option value="est"' + (current === 'est' ? ' selected' : '') + '>预估故事点</option>' +
+              '<option value="est"' + (isEst ? ' selected' : '') + '>预估故事点</option>' +
             '</select></td></tr>';
         }).join('')}</tbody>
       </table></div>
@@ -654,6 +781,58 @@ RENDERERS.import = function () {
       save(true); renderAll();
     });
   });
+
+  // ---------- 手动导入折叠 event binding ----------
+  const manualToggle = document.getElementById('manualToggle');
+  if (manualToggle) {
+    manualToggle.addEventListener('click', () => {
+      state.manualImportOpen = !(state.manualImportOpen != null ? state.manualImportOpen
+        : !!(state.sources.totals || state.sources.totalsMiddle || state.sources.board));
+      RENDERERS.import();
+    });
+  }
+
+  // ---------- 任务明细同步（TB 视图）event binding ----------
+  // tab 切换（仅切换展示视图，不落库，避免误触 save）
+  view.querySelectorAll('[data-tb-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.tbViewTab = btn.dataset.tbTab;
+      RENDERERS.import();
+    });
+  });
+
+  // TB 视图选择记忆（仅前端状态，不入库；阶段二据此调 TB API）
+  const viewSelect = view.querySelector('.tb-view-select');
+  if (viewSelect) {
+    viewSelect.addEventListener('change', () => {
+      const tab = state.tbViewTab || 'cloud';
+      if (!state.tbSelectedView) state.tbSelectedView = {};
+      state.tbSelectedView[tab] = viewSelect.value;
+    });
+  }
+
+  // 「自动同步 TB」占位：阶段一提示未接入，阶段二实现真正拉取
+  const syncBtn = view.querySelector('.tb-sync-btn');
+  if (syncBtn) {
+    syncBtn.addEventListener('click', () => {
+      toast('TB 自动同步尚未接入（需先配置 Teambition 开放接口凭证）。当前请使用「导入 CSV」手动上传。');
+    });
+  }
+
+  // 「导入 CSV」复用现有 handleImport，按当前 tab 对应的 kind 导入
+  const importBtn = view.querySelector('.tb-import-btn');
+  if (importBtn) {
+    importBtn.addEventListener('click', () => {
+      const kind = importBtn.dataset.tbKind || 'totals';
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.csv,.xlsx,.xls';
+      input.addEventListener('change', () => {
+        if (input.files[0]) handleImport(input.files[0], kind);
+      });
+      input.click();
+    });
+  }
 };
 
 /* ---------- ⑤ 迭代口径 ---------- */

@@ -251,24 +251,39 @@ body.dark-theme .sidebar {
   white-space: nowrap; overflow: hidden;
   transition: all 0.18s;
 }
+/* ── 悬浮态：明显灰底 ── */
 .sidebar-nav-item:hover {
-  background: var(--panel-soft);
-  transform: translateX(3px);
+  background: #e5e8ec;
 }
-.sidebar-nav-item.active {
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-  font-weight: 700;
+body.dark-theme .sidebar-nav-item:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
-body.dark-theme .sidebar-nav-item.active { color: var(--accent); }
 
+/* ── 选中态：明显灰底 + 左侧色条 + 加粗（浅色主题）── */
+.sidebar-nav-item.active,
+.sidebar-nav-item.active:hover {
+  background: #dfe3e8 !important;
+  color: #1d2129;
+  font-weight: 700;
+  transform: none;
+}
+.sidebar-nav-item.active .nav-icon { color: var(--accent); }
+
+/* ── 选中态（暗色主题）：明显亮灰底 ── */
+body.dark-theme .sidebar-nav-item.active,
+body.dark-theme .sidebar-nav-item.active:hover {
+  background: rgba(255, 255, 255, 0.16) !important;
+  color: #ffffff;
+}
+
+/* 左侧强调色条 */
 .sidebar-nav-item.active::before {
   content: '';
   position: absolute;
-  left: 0; top: 6px; bottom: 6px;
-  width: 3px;
+  left: 0; top: 4px; bottom: 4px;
+  width: 4px;
   background: var(--accent);
-  border-radius: 0 3px 3px 0;
+  border-radius: 0 4px 4px 0;
 }
 
 .nav-icon { font-size: 16px; flex-shrink: 0; width: 24px; text-align: center; line-height: 1; }

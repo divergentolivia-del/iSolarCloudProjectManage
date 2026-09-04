@@ -488,6 +488,19 @@ const Platform = (() => {
     // Initialize the router with the module map
     if (typeof Router !== 'undefined' && Router.init) {
       Router.init(modules);
+
+      // 每次路由变化都同步侧栏选中态（兜底，防止首次时序错位导致高亮扑空）
+      if (typeof Router.onChange === 'function') {
+        Router.onChange(function (route) {
+          if (route && route.moduleId) highlightNav(route.moduleId);
+        });
+      }
+
+      // 初始化后立即按当前路由高亮一次（此时侧栏 DOM 已渲染）
+      if (typeof Router.current === 'function') {
+        var cur = Router.current();
+        if (cur && cur.moduleId) highlightNav(cur.moduleId);
+      }
     }
   }
 

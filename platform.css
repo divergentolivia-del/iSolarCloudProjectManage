@@ -251,29 +251,32 @@ body.dark-theme .sidebar {
   white-space: nowrap; overflow: hidden;
   transition: all 0.18s;
 }
+/* ── 悬浮态：明显灰底 ── */
 .sidebar-nav-item:hover {
-  background: var(--panel-soft);
-  transform: translateX(3px);
+  background: #e5e8ec;
 }
-.sidebar-nav-item.active {
-  /* 用较饱和的浅蓝实底，与浅灰 sidebar 背景拉开对比 */
-  background: #dbeafe;
-  color: #1e3a8a;
-  font-weight: 700;
-  box-shadow: inset 0 0 0 1px #93c5fd;
+body.dark-theme .sidebar-nav-item:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
+
+/* ── 选中态：明显灰底 + 左侧色条 + 加粗（浅色主题）── */
+.sidebar-nav-item.active,
 .sidebar-nav-item.active:hover {
-  background: #c7ddfc;
-  color: #1e3a8a;
+  background: #dfe3e8 !important;
+  color: #1d2129;
+  font-weight: 700;
   transform: none;
 }
 .sidebar-nav-item.active .nav-icon { color: var(--accent); }
-body.dark-theme .sidebar-nav-item.active {
-  background: rgba(96,165,250,0.22);
-  color: #bfdbfe;
-  box-shadow: inset 0 0 0 1px rgba(96,165,250,0.4);
+
+/* ── 选中态（暗色主题）：明显亮灰底 ── */
+body.dark-theme .sidebar-nav-item.active,
+body.dark-theme .sidebar-nav-item.active:hover {
+  background: rgba(255, 255, 255, 0.16) !important;
+  color: #ffffff;
 }
 
+/* 左侧强调色条 */
 .sidebar-nav-item.active::before {
   content: '';
   position: absolute;

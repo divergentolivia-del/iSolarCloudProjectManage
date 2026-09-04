@@ -88,7 +88,8 @@ async function searchAllTaskIds(tql, token) {
     const resp = await tbGet('v2/all-task/search?' + qs.toString(), token);
     const list = resp.result || resp.tasks || resp.data || [];
     for (const t of list) {
-      const id = t.id || t._id || t.taskId;
+      // v2/all-task/search 的 result 是「任务 id 字符串数组」，也可能兼容 {id} 对象
+      const id = (typeof t === 'string') ? t : (t.id || t._id || t.taskId);
       if (id) ids.push(id);
     }
     pageToken = resp.nextPageToken || '';

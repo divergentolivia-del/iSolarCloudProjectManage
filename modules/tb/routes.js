@@ -81,6 +81,14 @@ function readIterState() {
   }
 }
 
+/** 读取迭代映射：state.tbSprintMap（前端配置） > tb-config.TB_SPRINTS 默认值 */
+function readSprintMap() {
+  const s = readIterState();
+  const configured = (s.tbSprintMap || {});
+  // 合并默认表（后端兜底），前端配置优先
+  return Object.assign({}, tbConfig.TB_SPRINTS || {}, configured);
+}
+
 function writeIterState(s) {
   ensureDir(ITER_DIR);
   ensureDir(ITER_HISTORY_DIR);
@@ -111,9 +119,12 @@ function rebuildIterations(s) {
 }
 
 /* ---------- 同步结果写入 iteration state ---------- */
-function applySyncToState(result, by) {
+function applySyncToState(result, by, sprintMap) {
   const s = readIterState();
   const now = new Date().toLocaleString('zh-CN');
+
+  // 保存迭代映射（前端配置供下次读取）
+  if (sprintMap && Object.keys(sprintMap).length) s.tbSprintMap = sprintMap;
 
   s._totalsCloud = result.cloudRows;
   s._totalsMiddle = result.middleRows;
@@ -190,6 +201,7 @@ module.exports = {
       return sendJson(res, 200, {
         projectId: tbConfig.TB_PROJECT_ID,
         tokenConfigured: !!readToken(),
+        sprintMap: readSprintMap(),
         boards: boards
       });
     }
@@ -204,7 +216,8 @@ module.exports = {
     }
 
     /* POST /api/tb/sync — 触发同步
-       body: { boardOverrides?: { cloud:{sprintId}, middle:{sprintId}, productLine:{sprintIds} }, by?: string } */
+       body: { boardOverrides?: { cloud:{sprintId}, middle:{sprintId}, productLine:{sprintIds} },
+               sprintMap?: { sprintId: 迭代名 }, by?: string } */
     if (sub === '/sync' && req.method === 'POST') {
       const token = readToken();
       if (!token) {
@@ -219,8 +232,10 @@ module.exports = {
           catch (e) { return sendJson(res, 400, { error: 'JSON 解析失败' }); }
         }
         try {
-          const result = await tbSync.syncAll(token, incoming.boardOverrides || {});
-          const rev = applySyncToState(result, incoming.by);
+          // 迭代映射：优先取请求体传入，否则回退到 state 里已存的 tbSprintMap
+          const sprintMap = Object.assign({}, readSprintMap(), incoming.sprintMap || {});
+          const result = await tbSync.syncAll(token, incoming.boardOverrides || {}, sprintMap);
+          const rev = applySyncToState(result, incoming.by, sprintMap);
 
           // 落盘同步状态
           const status = {
@@ -252,5 +267,6 @@ module.exports = {
   },
 
   readToken,
+  readSprintMap,
   applySyncToState
 };

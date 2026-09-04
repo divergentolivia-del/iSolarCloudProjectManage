@@ -37,42 +37,60 @@ const TB_TEAM_SOURCE = {
   // 其余团队默认 'story'
 };
 
+/* ---------- 迭代映射（sprintId → 迭代名）----------
+   TB 任务详情只给 sprintId(ID)，不给迭代名；而 /sprint/list 等接口需更高权限(403)。
+   所以这里维护一张「sprintId → 迭代名」对照表，由前端可配置（后端读 state.tbSprintMap 优先，
+   其次用本表默认值）。每月换迭代时，在前端「迭代配置」里改 sprintId 即可，不用改代码。 */
+const TB_SPRINTS = {
+  '6a54cad1565616b581fcb14b': '阳光云2026-8月C版本迭代',
+  '6a6b1f08249c49d80744bbfe': '中后台-2026年8月迭代'
+};
+
+// 阳光云前后端研测团队清单（截图①的「所在团队」筛选）
+// ⚠️ TQL 大小写敏感，必须是 TB 实际存储名（WEB 用大写，与 config.js 里显示用的小写不同）
+const CLOUD_TEAMS = [
+  'APP开发-阳光云', 'APP开发-平台',
+  '后端开发-阳光云', '后端开发-平台',
+  'WEB开发-阳光云', 'WEB开发-平台',
+  '测试部-应用软件测试-云服务', '测试部-应用软件测试-中后台'
+];
+
+// 中后台团队清单（截图②的「所在团队」筛选）
+const MIDDLE_TEAMS = [
+  '中台开发-IoT中台', '中台开发-技术中台', '中台开发-数据中台',
+  '中台开发-平台运维', '中台开发-业务中台（平台）'
+];
+
 /* ---------- 三个看板模板 ----------
-   每个模板声明：显示名、涉及团队、迭代 sprintId、是否带三级任务筛选、维度。
-   sprintId 是「动态」的：每月切换版本迭代时只需更新对应模板的 sprintId。
+   每个模板声明：显示名、涉及团队、迭代 sprint/sprintIds、是否带三级任务筛选、维度。
+   sprintId 是「动态」的：每月切换版本迭代时只需更新前端配置的 sprintId。
    前端也允许在同步时临时覆盖 sprintId（覆盖优先于模板默认值）。 */
 const TB_BOARDS = {
-  /* 看板 1：阳光云迭代工作量（按团队维度，无三级任务筛选） */
+  /* 看板 1：阳光云迭代工作量（按团队维度，复刻截图①）
+     ⚠️ 截图①的筛选条件是「所在团队 + 迭代 + 任务类型=任务」，没有「任务类别=三级任务」，
+        所以 filterTaskLevel 必须为 false（与截图②③不同）。 */
   cloud: {
     key: 'cloud',
     name: '阳光云迭代工作量',
     dimension: 'team',
     filterTaskLevel: false,
-    sprintId: '6a54cad1565616b581fcb14b',   // 阳光云 2026-8月C版本迭代（示例，按月更新）
+    sprintId: '6a54cad1565616b581fcb14b',   // 阳光云 8月C版本迭代（示例，前端可改）
     sprintName: '阳光云2026-8月C版本迭代',
-    teams: [
-      'APP开发-阳光云', 'APP开发-平台',
-      '后端开发-阳光云', '后端开发-平台',
-      'Web开发-阳光云', 'Web开发-平台',
-      '测试部-应用软件测试-云服务', '测试部-应用软件测试-中后台'
-    ]
+    teams: CLOUD_TEAMS
   },
 
-  /* 看板 2：中后台工作量（按团队维度，带三级任务筛选） */
+  /* 看板 2：中后台工作量（按团队维度，带三级任务筛选，复刻截图②） */
   middle: {
     key: 'middle',
     name: '中后台工作量',
     dimension: 'team',
     filterTaskLevel: true,
-    sprintId: '6a6b1f08249c49d80744bbfe',   // 中后台 8月迭代（示例，按月更新）
-    sprintName: '中后台2026-8月迭代',
-    teams: [
-      '中台开发-IoT中台', '中台开发-技术中台', '中台开发-数据中台',
-      '中台开发-平台运维', '中台开发-业务中台（平台）'
-    ]
+    sprintId: '6a6b1f08249c49d80744bbfe',   // 中后台 8月迭代（示例，前端可改）
+    sprintName: '中后台-2026年8月迭代',
+    teams: MIDDLE_TEAMS
   },
 
-  /* 看板 3：月度版本项目人力（按产品线维度，带三级任务筛选，两 sprint 合并）
+  /* 看板 3：月度版本项目人力（按产品线维度，带三级任务筛选，两 sprint 合并，复刻截图③）
      全部团队参与，额外按「所属产品线」聚合，用于与团队维度对账。 */
   productLine: {
     key: 'productLine',
@@ -80,8 +98,8 @@ const TB_BOARDS = {
     dimension: 'productLine',
     filterTaskLevel: true,
     sprintIds: ['6a54cad1565616b581fcb14b', '6a6b1f08249c49d80744bbfe'],
-    sprintName: '2026-8月全量迭代',
-    teams: null // null = 不限团队（全部 19 团队）
+    sprintName: '阳光云+中后台 8月全量',
+    teams: null // null = 不限团队（全部团队）
   }
 };
 
@@ -92,5 +110,8 @@ module.exports = {
   TB_TASK_LEVEL_VALUE,
   TB_SCENARIO_FIELD_CONFIG_ID,
   TB_TEAM_SOURCE,
+  TB_SPRINTS,
+  CLOUD_TEAMS,
+  MIDDLE_TEAMS,
   TB_BOARDS
 };

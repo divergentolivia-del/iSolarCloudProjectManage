@@ -138,6 +138,9 @@ function applySyncToState(result, by, sprintMap) {
 
   rebuildIterations(s);
 
+  // TB 同步后迭代已自动勾选，无需再提示"请重新勾选"
+  s.iterDirty = false;
+
   s.rev = Number(s.rev || 0) + 1;
   s.updatedAt = now;
   s.updatedBy = String(by || 'TB同步').slice(0, 40);

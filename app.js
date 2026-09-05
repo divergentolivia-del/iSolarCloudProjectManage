@@ -1064,7 +1064,9 @@ RENDERERS.iteration = function () {
     <div class="card">
       <h2>本期迭代口径 ${selected.length ? `<span class="tag ok">已选 ${selected.length} 个</span>` : '<span class="tag warn">未选择</span>'}</h2>
       ${state.iterDirty ? '<p class="tag warn" style="display:inline-block">数据刚重新导入，迭代清单已按新文件重建，此前勾选已清空，请重新勾选</p>' : ''}
-      <p class="hint">勾选本期核算包含的迭代。阳光云版本通常需同时勾选<b>「阳光云2026-M月C版本迭代」和「中后台-2026年M月迭代」</b>—— 中台各组的工时挂在后者下。支持跨月合并：需要两月并算时同时勾选两个月份的迭代即可，配合第①页的开发周期天数使用。</p>
+      <p class="hint">${state.sources?.totals?.tb || state.sources?.totalsMiddle?.tb || state.sources?.board?.tb
+        ? '数据来自 <b>TB 自动同步</b>：本轮涉及的迭代已自动勾选，本页视为<b>确认页</b>，核对无误即可，无需手动勾选。若需<b>跨月合并</b>（两月并算）再额外勾上相邻月份的迭代，配合第①页开发周期天数使用。'
+        : '勾选本期核算包含的迭代。阳光云版本通常需同时勾选<b>「阳光云2026-M月C版本迭代」和「中后台-2026年M月迭代」</b>—— 中台各组的工时挂在后者下。支持跨月合并：需要两月并算时同时勾选两个月份的迭代即可，配合第①页的开发周期天数使用。'}</p>
       ${selected.length ? `<p class="note">当前口径：${selected.map(s => esc(s.name)).join(' ＋ ')}</p>` : ''}
       <div class="scroll"><table>
         <thead><tr><th>选择</th><th class="txt">迭代名称</th><th>工时权重</th></tr></thead>

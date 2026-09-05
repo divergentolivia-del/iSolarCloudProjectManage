@@ -570,8 +570,8 @@ const TB_VIEW_TABS = [
   { key: 'productLine', label: '产品线维度', rows: 'board', kind: 'board' }
 ];
 
-/* 按团队聚合某数据源的工时分布：任务数 + 故事点 + 预估故事点 + 合计。
-   按合计降序。空数据返回 []（表格显示空态）。 */
+/* 按团队聚合某数据源的工时分布：任务数 + 故事点 + 预估故事点。
+   按合计降序。空数据返回 []（表格显示空态）。合计仅用于排序，不在表格中单列展示。 */
 function tbTeamDistribution(rows) {
   if (!rows || !rows.length) return [];
   const byTeam = {};
@@ -584,6 +584,33 @@ function tbTeamDistribution(rows) {
   });
   return Object.keys(byTeam).map(k => byTeam[k])
     .sort((a, b) => (b.story + b.est) - (a.story + a.est));
+}
+
+/* 产品线维度：按产品线(层级1)分组 → 各团队工时分布。两级结构，供「产品线维度」tab 展示。
+   返回 [{ line, teams:[{team,count,story,est}] }]，按产品线合计降序，团队内按合计降序。 */
+function tbLineTeams(rows) {
+  if (!rows || !rows.length) return [];
+  const byLine = {};
+  rows.forEach(r => {
+    const line = r.productLine || r['所属产品线'] || r['项目'] || '（未填写）';
+    const team = r.team || r['所在团队'] || r['所属团队'] || '（未填写）';
+    if (!byLine[line]) byLine[line] = {};
+    if (!byLine[line][team]) byLine[line][team] = { team: team, count: 0, story: 0, est: 0 };
+    byLine[line][team].count += 1;
+    byLine[line][team].story += num(r.story);
+    byLine[line][team].est += num(r.est);
+  });
+  return Object.keys(byLine).map(line => {
+    const teams = Object.keys(byLine[line]).map(k => byLine[line][k])
+      .sort((a, b) => (b.story + b.est) - (a.story + a.est));
+    return {
+      line: line,
+      teams: teams,
+      story: teams.reduce((s, t) => s + t.story, 0),
+      est: teams.reduce((s, t) => s + t.est, 0),
+      count: teams.reduce((s, t) => s + t.count, 0)
+    };
+  }).sort((a, b) => (b.story + b.est) - (a.story + a.est));
 }
 
 /* 汇总某组行：任务数 + 故事点/预估故事点/总点数。空数据返回 null（显示「未同步」）。 */
@@ -602,7 +629,6 @@ function currentSprintMap() {
 function renderTbSyncCard() {
   const tab = state.tbViewTab || 'cloud';
   const activeTab = TB_VIEW_TABS.find(t => t.key === tab) || TB_VIEW_TABS[0];
-  const dist = tbTeamDistribution(state[activeTab.rows]);
 
   const tabsHtml = TB_VIEW_TABS.map(t =>
     `<button class="tb-tab ${t.key === tab ? 'active' : ''}" data-tb-tab="${t.key}">${esc(t.label)}</button>`
@@ -638,17 +664,45 @@ function renderTbSyncCard() {
     ? `${esc(state.updatedBy || '未署名')} · ${esc(state.updatedAt)}`
     : '尚未同步';
 
-  /* 选中数据源的团队工时分布表 */
-  const distRows = dist.length
-    ? dist.map(d => `
-      <tr>
-        <td class="txt">${esc(d.team)}</td>
-        <td>${d.count}</td>
-        <td>${fmt(d.story, 2)}</td>
-        <td>${fmt(d.est, 2)}</td>
-        <td>${fmt(d.story + d.est, 2)}</td>
-      </tr>`).join('')
-    : `<tr><td colspan="5" class="txt tb-empty">该数据源暂无数据。点击「自动同步 TB」拉取，或「导入 CSV」手动上传。</td></tr>`;
+  /* 选中数据源的工时分布表。
+     产品线维度 tab 用两级结构（产品线 → 团队），其余 tab 用单层团队分布。 */
+  const isProductLine = activeTab.key === 'productLine';
+  const distBody = isProductLine
+    ? (() => {
+        const lines = tbLineTeams(state[activeTab.rows]);
+        if (!lines.length) return null;
+        return lines.map(l => `
+          <tr class="tb-line-row">
+            <td class="txt" colspan="4">
+              <span class="tb-line-name">${esc(l.line)}</span>
+              <span class="tb-line-sub">${l.count} 任务 · 故事点 ${fmt(l.story, 2)} / 预估 ${fmt(l.est, 2)}</span>
+            </td>
+          </tr>
+          ${l.teams.map(d => `
+            <tr>
+              <td class="txt tb-team-indent">${esc(d.team)}</td>
+              <td>${d.count}</td>
+              <td>${fmt(d.story, 2)}</td>
+              <td>${fmt(d.est, 2)}</td>
+            </tr>`).join('')}`).join('');
+      })()
+    : (() => {
+        const dist = tbTeamDistribution(state[activeTab.rows]);
+        if (!dist.length) return null;
+        return dist.map(d => `
+          <tr>
+            <td class="txt">${esc(d.team)}</td>
+            <td>${d.count}</td>
+            <td>${fmt(d.story, 2)}</td>
+            <td>${fmt(d.est, 2)}</td>
+          </tr>`).join('');
+      })();
+  const distRowHead = isProductLine
+    ? `<th class="txt">所属产品线 / 团队</th>`
+    : `<th class="txt">所属团队</th>`;
+  const innerRows = distBody
+    ? distBody
+    : `<tr><td colspan="4" class="txt tb-empty">该数据源暂无数据。点击「自动同步 TB」拉取，或「导入 CSV」手动上传。</td></tr>`;
 
   return `
     <div class="card tb-sync-card">
@@ -661,7 +715,7 @@ function renderTbSyncCard() {
           <tbody>
             ${srcRow('阳光云迭代', cloud, '按团队 → ⑥偏差分析')}
             ${srcRow('阳光云迭代中后台', middle, '中后台团队 → ⑥偏差分析')}
-            ${srcRow('产品线维度', board, '产线×团队 → 产线分布')}
+            ${srcRow('产品线维度', board, '产品线×团队 → 产线分布')}
           </tbody>
         </table>
       </div>
@@ -692,14 +746,13 @@ function renderTbSyncCard() {
         <table class="tb-table">
           <thead>
             <tr>
-              <th class="txt">所属团队</th>
+              ${distRowHead}
               <th>任务数</th>
               <th>故事点</th>
               <th>预估故事点</th>
-              <th>合计</th>
             </tr>
           </thead>
-          <tbody>${distRows}</tbody>
+          <tbody>${innerRows}</tbody>
         </table>
       </div>
       <p class="note tb-foot">

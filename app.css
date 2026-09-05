@@ -454,6 +454,22 @@ body.archive-readonly .archive-btn { display: none; }
   color: var(--muted);
 }
 
+/* 产品线维度：产品线分组行 + 团队缩进行 */
+.tb-line-row td {
+  background: var(--panel-soft);
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--line);
+}
+.tb-line-row:hover { background: var(--panel-soft); }
+.tb-line-name { margin-right: 8px; }
+.tb-line-sub {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 12px;
+}
+.tb-team-indent { padding-left: 24px !important; color: var(--muted); }
+
 /* ==================== 手动导入折叠区 ==================== */
 .manual-import {
   border: 1px solid var(--line);

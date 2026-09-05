@@ -119,12 +119,14 @@ function rebuildIterations(s) {
 }
 
 /* ---------- 同步结果写入 iteration state ---------- */
-function applySyncToState(result, by, sprintMap) {
+function applySyncToState(result, by, sprintMap, boardSprints) {
   const s = readIterState();
   const now = new Date().toLocaleString('zh-CN');
 
   // 保存迭代映射（前端配置供下次读取）
   if (sprintMap && Object.keys(sprintMap).length) s.tbSprintMap = sprintMap;
+  // 保存迭代映射完整配置（含每行 sid/name），供前端刷新后仍能回显
+  if (boardSprints && typeof boardSprints === 'object') s.tbBoardSprints = boardSprints;
 
   s._totalsCloud = result.cloudRows;
   s._totalsMiddle = result.middleRows;
@@ -238,7 +240,7 @@ module.exports = {
           // 迭代映射：优先取请求体传入，否则回退到 state 里已存的 tbSprintMap
           const sprintMap = Object.assign({}, readSprintMap(), incoming.sprintMap || {});
           const result = await tbSync.syncAll(token, incoming.boardOverrides || {}, sprintMap);
-          const rev = applySyncToState(result, incoming.by, sprintMap);
+          const rev = applySyncToState(result, incoming.by, sprintMap, incoming.tbBoardSprints);
 
           // 落盘同步状态
           const status = {

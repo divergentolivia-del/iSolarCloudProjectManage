@@ -131,7 +131,10 @@ function mergeStates(base, server, mine) {
     iterDirty: mine.iterDirty || server.iterDirty,
     showAllIterations: mine.showAllIterations,
     sourceOverrides: pickWhole('sourceOverrides', '统计口径配置'),
-    deviationOverrides: pickWhole('deviationOverrides', '偏差手动调整')
+    deviationOverrides: pickWhole('deviationOverrides', '偏差手动调整'),
+    // 迭代映射配置（按看板的 sprintId/迭代名 + 兼容旧 tbSprintMap）：整份取一方，避免拆散
+    tbBoardSprints: pickWhole('tbBoardSprints', '迭代映射配置'),
+    tbSprintMap: pickWhole('tbSprintMap', '迭代映射（兼容）')
   };
   // 工时源被一方整份换掉时，迭代清单必须跟着那一方走，否则会出现清单里有已不存在的迭代
   if (!eq(base.totals, merged.totals) || !eq(base.board, merged.board) || !eq(base._totalsCloud, merged._totalsCloud) || !eq(base._totalsMiddle, merged._totalsMiddle)) {
@@ -275,12 +278,35 @@ function switchView(name) {
   document.querySelectorAll('.view').forEach(v =>
     v.classList.toggle('hidden', v.id !== 'view-' + name));
   RENDERERS[name]();
+  requestParentSpace();
 }
 
 function renderAll() {
   document.getElementById('cycleLabel').textContent = cycleLabelText();
   updateModeBadge();
   RENDERERS[currentView]();
+  requestParentSpace();
+}
+
+/* 当前视图在 iframe 内是否横向溢出（拥挤）。若溢出且外层侧栏未展开，向父页申请收起侧栏，
+   为宽表腾出空间；父页只响应一次，用户手动展开后失效。
+   宽表本身包在 .scroll 容器里（独立出横向滚动条），因此要看容器内部是否可滚动，
+   而不是浏览器是否整体横滚。 */
+let parentSpaceRequested = false;
+function requestParentSpace() {
+  const scrollers = document.querySelectorAll('.scroll');
+  let overflowX = false;
+  for (let i = 0; i < scrollers.length; i++) {
+    if (scrollers[i].scrollWidth > scrollers[i].clientWidth + 4) { overflowX = true; break; }
+  }
+  if (!overflowX) { parentSpaceRequested = false; return; }
+  if (parentSpaceRequested) return;
+  parentSpaceRequested = true;
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ source: 'iterationFrame', type: 'autoCollapseSidebar' }, '*');
+    }
+  } catch (e) { /* 跨源或已卸载，忽略 */ }
 }
 
 function cycleLabelText() {
@@ -621,9 +647,43 @@ function tbSumRows(rows) {
   return { rows: rows.length, story: story, est: est, total: story + est };
 }
 
-/* 当前同步的迭代映射（前端配置优先，缺省用已入库的 tbSprintMap）。 */
+/* ---------- 迭代映射（按看板配置，阶段二）----------
+   旧结构 state.tbSprintMap = { sprintId: 迭代名 }（只有「改名」，不能解锁换月）。
+   新结构 state.tbBoardSprints = { cloud:[{sid,name}], middle:[{sid,name}], productLine:[{sid,name}] }，
+   按看板分别编辑 sprintId + 迭代名，同步时据此构造 boardOverrides（决定拉哪个迭代）。
+   两者并存并互相同步：save 时同时写 tbSprintMap，保证旧读取逻辑兼容。 */
+function boardSprints() {
+  const b = state.tbBoardSprints;
+  return {
+    cloud: ((b && b.cloud) || []).map(x => ({ sid: x.sid || '', name: x.name || '' })),
+    middle: ((b && b.middle) || []).map(x => ({ sid: x.sid || '', name: x.name || '' })),
+    productLine: ((b && b.productLine) || []).map(x => ({ sid: x.sid || '', name: x.name || '' }))
+  };
+}
 function currentSprintMap() {
   return state.tbSprintMap || {};
+}
+/* 由看板配置反推 sprintMap：仅收录已填完「sid + name」的行。 */
+function sprintMapFromBoards() {
+  const map = Object.assign({}, currentSprintMap());
+  const b = boardSprints();
+  [].concat(b.cloud, b.middle, b.productLine).forEach(r => {
+    if (r.sid && r.name) map[r.sid] = r.name;
+  });
+  return map;
+}
+/* 由看板配置构造 boardOverrides：仅给「该看板至少填了一个 sid」的行覆盖。
+   cloud/middle 取第一个 sid；productLine 取全部非空 sid（合并迭代）。 */
+function boardOverridesFromBoards() {
+  const b = boardSprints();
+  const out = {};
+  const cloud = b.cloud.filter(x => x.sid).map(x => x.sid);
+  const middle = b.middle.filter(x => x.sid).map(x => x.sid);
+  const pl = b.productLine.filter(x => x.sid).map(x => x.sid);
+  if (cloud.length) out.cloud = { sprintId: cloud[0] };
+  if (middle.length) out.middle = { sprintId: middle[0] };
+  if (pl.length) out.productLine = { sprintIds: pl };
+  return out;
 }
 
 function renderTbSyncCard() {
@@ -649,27 +709,21 @@ function renderTbSyncCard() {
     </tr>`;
   };
 
-  /* 迭代映射编辑：sprintId → 迭代名。未入库的 sprintId 也显示为空行供补充。 */
-  const sprintMap = currentSprintMap();
-  const sprintKeys = Object.keys(sprintMap);
-  const mapRows = sprintKeys.length
-    ? sprintKeys.map(sid => `<tr>
-        <td class="txt tb-sid">${esc(sid)}</td>
-        <td class="txt"><input class="tb-map-name" data-sid="${esc(sid)}" value="${esc(sprintMap[sid] || '')}" placeholder="迭代名（如 阳光云2026-8月C版本迭代）"></td>
-        <td class="col-mid"><button class="btn tb-map-del" data-sid="${esc(sid)}">删除</button></td>
-      </tr>`).join('')
-    : `<tr><td colspan="3" class="txt tb-empty">暂无迭代映射。点击下方「+ 新增迭代映射」添加，或直接点「自动同步 TB」由后端按 tb-config 默认映射落库。</td></tr>`;
-
+  /* 迭代映射：按看板分别编辑 sprintId + 迭代名（决定同步拉哪个迭代） */
   const lastSync = state.updatedAt
     ? `${esc(state.updatedBy || '未署名')} · ${esc(state.updatedAt)}`
     : '尚未同步';
 
   /* 选中数据源的工时分布表。
-     产品线维度 tab 用两级结构（产品线 → 团队），其余 tab 用单层团队分布。 */
+     产品线维度 tab 用两级结构（产品线 → 团队），并只统计「本期选中迭代」的行，
+     与第⑤页迭代口径、第⑥页 boardByLine 保持一致，才能真正对上。 */
   const isProductLine = activeTab.key === 'productLine';
   const distBody = isProductLine
     ? (() => {
-        const lines = tbLineTeams(state[activeTab.rows]);
+        const picked = {};
+        selectedIterations(state).forEach(n => { picked[normLine(n)] = true; });
+        const rows = (state[activeTab.rows] || []).filter(r => picked[normLine(r.iteration)]);
+        const lines = tbLineTeams(rows);
         if (!lines.length) return null;
         return lines.map(l => `
           <tr class="tb-line-row">
@@ -702,12 +756,51 @@ function renderTbSyncCard() {
     : `<th class="txt">所属团队</th>`;
   const innerRows = distBody
     ? distBody
-    : `<tr><td colspan="4" class="txt tb-empty">该数据源暂无数据。点击「自动同步 TB」拉取，或「导入 CSV」手动上传。</td></tr>`;
+    : `<tr><td colspan="4" class="txt tb-empty">该数据源暂无数据。点击「自动同步 TB」拉取，或下方「手动导入工时数据」上传。</td></tr>`;
+
+  /* 按看板渲染映射行。canDelete 仅 productLine 每个合并迭代提供删行。 */
+  const bs = boardSprints();
+  const mapRow = (bKey, r, ri, canDelete) => `
+      <tr class="tb-map-row">
+        <td class="txt"><input class="tb-map-sid" data-board="${bKey}" data-ri="${ri}" value="${esc(r.sid)}" placeholder="24位sprintId"></td>
+        <td class="txt">
+          <input class="tb-map-name" data-board="${bKey}" data-ri="${ri}" value="${esc(r.name)}" placeholder="迭代名（如 阳光云2026-8月C版本迭代）">
+          ${canDelete ? `<button class="btn tb-map-row-del" data-board="${bKey}" data-ri="${ri}" title="删除这行">✕</button>` : ''}
+        </td>
+      </tr>`;
+  const mapBlock = (bKey, bName, desc, canAdd) => {
+    const rows = bs[bKey] && bs[bKey].length ? bs[bKey] : [{ sid: '', name: '' }];
+    const rowsHtml = rows.map((r, ri) => mapRow(bKey, r, ri, canAdd)).join('');
+    return `<div class="tb-map-board" data-board="${bKey}">
+      <div class="tb-map-board-head"><b>${esc(bName)}</b><span class="tb-map-board-desc">${desc}</span></div>
+      <div class="scroll"><table class="tb-table tb-map-table">
+        <thead><tr><th class="txt">sprintId（TB迭代ID）</th><th class="txt">迭代名（可编辑）</th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table></div>
+      <div class="tb-actions">
+        ${canAdd ? '<button class="btn tb-map-add">+ 新增迭代（合并）</button>' : ''}
+        <button class="btn primary tb-map-save">保存映射</button>
+      </div>
+    </div>`;
+  };
+  const mapDetailsHtml =
+    `<details class="tb-map-details" data-details="cloud"><summary>🗂 迭代映射配置 · 阳光云迭代</summary>
+       <p class="hint">此看板同步 <b>1 个迭代</b>。sprintId 为 TB 里该迭代的唯一 ID，迭代名仅用于展示并与第⑤页勾选对应。</p>
+       ${mapBlock('cloud', '阳光云迭代工作量', '', false)}
+     </details>` +
+    `<details class="tb-map-details" data-details="middle"><summary>🗂 迭代映射配置 · 中后台</summary>
+       <p class="hint">此看板同步 <b>1 个迭代</b>（中台各组工时挂在它下面）。</p>
+       ${mapBlock('middle', '中后台工作量', '', false)}
+     </details>` +
+    `<details class="tb-map-details" data-details="productLine"><summary>🗂 迭代映射配置 · 产品线维度</summary>
+       <p class="hint">此看板把上面两个迭代<b>合并</b>统计（「+ 新增迭代」可继续并算更多月份）。</p>
+       ${mapBlock('productLine', '月度版本项目人力（产品线维度）', '合并的迭代可多行', true)}
+     </details>`;
 
   return `
     <div class="card tb-sync-card">
       <h2>🔗 TB 工时同步 <span class="tb-config-badge" title="Token 是否已配置">…</span></h2>
-      <p class="hint">从 Teambition 一次性拉取阳光云、中后台、产品线三个看板的任务故事点，按团队聚合并写入本期工时。Token 在服务端 data/tb/secret.json 配置，前端不接触明文；迭代映射可在下方直接配置。</p>
+      <p class="hint">从 Teambition 一次性拉取阳光云、中后台、产品线三个看板的任务故事点，按团队聚合并写入本期工时。Token 在服务端 data/tb/secret.json 配置，前端不接触明文；每个看板同步哪个迭代，在下方「迭代映射配置」里改 sprintId 即可，换月无需改动代码。</p>
 
       <div class="tb-scroll">
         <table class="tb-table tb-src-table">
@@ -722,24 +815,14 @@ function renderTbSyncCard() {
 
       <div class="tb-toolbar">
         <div class="tb-actions">
-          <button class="btn primary tb-sync-btn" data-tb-kind="${activeTab.kind}">⚡ 自动同步 TB</button>
-          <button class="btn tb-import-btn" data-tb-kind="${activeTab.kind}">导入 CSV（兜底）</button>
+          <button class="btn primary tb-sync-btn">⚡ 自动同步 TB</button>
           <span class="tb-lastsync">上次同步：${lastSync}</span>
         </div>
       </div>
 
-      <details class="tb-map-details">
-        <summary>🗂 迭代映射配置（sprintId → 迭代名）· 共 ${sprintKeys.length} 条</summary>
-        <p class="hint">把 TB 里的迭代 sprintId 映射成平台可读的迭代名。迭代名每月变化，改这里即可，不用动代码。点「保存映射」落库，下次同步生效。</p>
-        <div class="scroll"><table class="tb-table">
-          <thead><tr><th class="txt">sprintId</th><th class="txt">迭代名（可编辑）</th><th class="col-mid">操作</th></tr></thead>
-          <tbody>${mapRows}</tbody>
-        </table></div>
-        <div class="tb-actions">
-          <button class="btn tb-map-add">+ 新增迭代映射</button>
-          <button class="btn primary tb-map-save">保存映射</button>
-        </div>
-      </details>
+      <div class="tb-map-wrap">
+        ${mapDetailsHtml}
+      </div>
 
       <div class="tb-tabs">${tabsHtml}</div>
       <div class="scroll">
@@ -756,7 +839,7 @@ function renderTbSyncCard() {
         </table>
       </div>
       <p class="note tb-foot">
-        同步范围由服务端 tb-config.js 的看板模板决定；「自动同步 TB」一次性拉取三个看板并落库，完成后页面自动刷新。此处按团队聚合展示，不逐条列任务。
+        同步范围由下方「迭代映射配置」中每个看板的 sprintId 决定；「自动同步 TB」一次性拉取三个看板并落库，完成后页面自动刷新。此处按团队聚合展示，不逐条列任务。
       </p>
     </div>`;
 }
@@ -905,7 +988,8 @@ RENDERERS.import = function () {
     });
   });
 
-  // Token 配置状态 & 迭代映射默认值：从 /api/tb/config 拉取（仅服务端模式）
+  // Token 配置状态 & 迭代映射默认值：从 /api/tb/config 拉取（仅服务端模式）。
+  // 播种规则：state 里尚无映射时，用服务端看板模板（cfg.boards）的 sprintId/name 初始化。
   if (Sync.mode === 'server') {
     fetch('api/tb/config', { cache: 'no-store' })
       .then(r => r.ok ? r.json() : {})
@@ -915,7 +999,24 @@ RENDERERS.import = function () {
           badge.textContent = cfg.tokenConfigured ? 'Token 已配置' : 'Token 未配置';
           badge.className = 'tb-config-badge ' + (cfg.tokenConfigured ? 'ok' : 'warn');
         }
-        // 若前端 state 里还没映射，把服务端默认映射填进来供编辑（不落库，点保存才落）
+        const seed = b => {
+          const ids = (b && (b.sprintIds || (b.sprintId ? [b.sprintId] : null))) || [];
+          const name = (b && b.sprintName) || '';
+          return ids.map(sid => ({ sid: sid || '', name: sid ? name : '' }));
+        };
+        // 前端无配置时播种（不落库，点「保存映射」才落）
+        const bs = state.tbBoardSprints;
+        if (!bs || !bs.cloud || !bs.middle || !bs.productLine) {
+          const cloud = (cfg.boards || []).find(x => x.key === 'cloud');
+          const middle = (cfg.boards || []).find(x => x.key === 'middle');
+          const pl = (cfg.boards || []).find(x => x.key === 'productLine');
+          state.tbBoardSprints = {
+            cloud: seed(cloud),
+            middle: seed(middle),
+            productLine: seed(pl)
+          };
+          RENDERERS.import();
+        }
         if (cfg.sprintMap && !Object.keys(currentSprintMap()).length) {
           state.tbSprintMap = Object.assign({}, cfg.sprintMap);
           RENDERERS.import();
@@ -930,62 +1031,68 @@ RENDERERS.import = function () {
     syncBtn.addEventListener('click', () => runTbSync(syncBtn));
   }
 
-  // 「导入 CSV」复用现有 handleImport，按当前 tab 对应的 kind 导入
-  const importBtn = view.querySelector('.tb-import-btn');
-  if (importBtn) {
-    importBtn.addEventListener('click', () => {
-      const kind = importBtn.dataset.tbKind || 'totals';
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.csv,.xlsx,.xls';
-      input.addEventListener('change', () => {
-        if (input.files[0]) handleImport(input.files[0], kind);
-      });
-      input.click();
+  // 映射细节展开态：用户在面板里开/关，重渲染时保持（否则每次 tab 切换/保存都收起）
+  view.querySelectorAll('.tb-map-details').forEach(det => {
+    det.addEventListener('toggle', () => {
+      if (!state.mapDetailsOpen) state.mapDetailsOpen = {};
+      state.mapDetailsOpen[det.dataset.details] = det.open;
     });
-  }
+  });
 
-  // 「+ 新增迭代映射」：加一行空 sprintId/迭代名
-  const addBtn = view.querySelector('.tb-map-add');
-  if (addBtn) {
+  // 「+ 新增迭代」：给 productLine 加一行空 sid/name（仅当最后一行已填，避免无限累加空行）
+  view.querySelectorAll('.tb-map-add').forEach(addBtn => {
     addBtn.addEventListener('click', () => {
-      if (!state.tbSprintMap) state.tbSprintMap = {};
-      // 找一个尚未使用的空 sid 键位，避免覆盖已有映射
-      let k = '', n = 1;
-      while (!k || state.tbSprintMap[k] !== undefined) k = 'new-sprint-' + (n++);
-      state.tbSprintMap[k] = '';
+      const bKey = (addBtn.closest('.tb-map-board') || {}).dataset ? addBtn.closest('.tb-map-board').dataset.board : 'productLine';
+      const b = boardSprints()[bKey] || [];
+      const last = b[b.length - 1];
+      if (last && (!last.sid.trim() && !last.name.trim())) { toast('请先填写上一行，再新增下一行。'); return; }
+      state.tbBoardSprints = state.tbBoardSprints || {};
+      state.tbBoardSprints[bKey] = b.concat([{ sid: '', name: '' }]);
+      // 保持细节展开（details 的 open 已由 toggle 事件写入 state.mapDetailsOpen）
       RENDERERS.import();
-      const inp = view.querySelector('.tb-map-name[data-sid="' + k + '"]');
+      const inp = view.querySelector('.tb-map-board[data-board="' + bKey + '"] .tb-map-row:last-of-type .tb-map-sid');
       if (inp) { inp.focus(); inp.select(); }
     });
-  }
+  });
 
-  // 「删除」一条映射
-  view.querySelectorAll('.tb-map-del').forEach(btn => {
+  // 「删除」一行（仅 productLine 支持删行；cloud/middle 恒保留一行）
+  view.querySelectorAll('.tb-map-row-del').forEach(btn => {
     btn.addEventListener('click', () => {
-      if (!state.tbSprintMap) return;
-      delete state.tbSprintMap[btn.dataset.sid];
+      const bKey = btn.dataset.board, ri = +btn.dataset.ri;
+      state.tbBoardSprints = state.tbBoardSprints || {};
+      const arr = (state.tbBoardSprints[bKey] || []).slice();
+      arr.splice(ri, 1);
+      state.tbBoardSprints[bKey] = arr.length ? arr : [{ sid: '', name: '' }];
       RENDERERS.import();
     });
   });
 
-  // 「保存映射」：把可编辑行回填到 state.tbSprintMap 并落库
-  const saveMapBtn = view.querySelector('.tb-map-save');
-  if (saveMapBtn) {
+  // 「保存映射」：逐行回填 sid + name，并同步写 tbSprintMap（兼容旧逻辑）
+  view.querySelectorAll('.tb-map-save').forEach(saveMapBtn => {
     saveMapBtn.addEventListener('click', () => {
-      const map = {};
-      view.querySelectorAll('.tb-map-name').forEach(inp => {
-        const sid = inp.dataset.sid;
-        const name = inp.value.trim();
-        if (sid && name) map[sid] = name;
+      const bs = boardSprints();
+      // 从 DOM 收集最新值到 state.tbBoardSprints
+      view.querySelectorAll('.tb-map-board').forEach(boardEl => {
+        const bKey = boardEl.dataset.board;
+        const pairs = [];
+        boardEl.querySelectorAll('.tb-map-row').forEach(rowEl => {
+          const sid = (rowEl.querySelector('.tb-map-sid') || {}).value || '';
+          const name = (rowEl.querySelector('.tb-map-name') || {}).value || '';
+          pairs.push({ sid: sid.trim(), name: name.trim() });
+        });
+        bs[bKey] = pairs;
       });
-      if (!Object.keys(map).length) { toast('请先填写至少一条迭代映射（sprintId + 迭代名）。'); return; }
-      state.tbSprintMap = map;
+      state.tbBoardSprints = bs;
+      // 反推 sprintMap 一并落库（供 resolveSprintName 解析每行迭代名）
+      state.tbSprintMap = sprintMapFromBoards();
+      if (!state.tbSprintMap || !Object.keys(state.tbSprintMap).length) {
+        toast('请至少为一组看板填写完整的一行（sprintId + 迭代名）。'); return;
+      }
       save(true);
-      toast('✅ 已保存迭代映射（' + Object.keys(map).length + ' 条），下次「自动同步 TB」生效');
+      toast('✅ 已保存迭代映射，下次「自动同步 TB」生效');
       RENDERERS.import();
     });
-  }
+  });
 };
 
 /* ---------- TB 自动同步（阶段二）----------
@@ -1006,8 +1113,12 @@ function runTbSync(btn) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       by: (typeof Sync.whoami === 'function' ? Sync.whoami() : '') || 'TB同步',
-      // 把前端配置的迭代映射随同步发出；后端合并进 tbSprintMap 并落库，同步即生效
-      sprintMap: currentSprintMap()
+      // 按看板的 sprintId/迭代名配置：决定同步拉哪个迭代（覆盖服务端模板默认值）
+      boardOverrides: boardOverridesFromBoards(),
+      // 迭代映射：sprintId → 迭代名；后端合并进 tbSprintMap 并落库，同步即生效
+      sprintMap: sprintMapFromBoards(),
+      // 迭代映射的完整配置（含每行 sid/name），同步时一并落库，刷新后仍在
+      tbBoardSprints: state.tbBoardSprints
     })
   })
     .then(r => r.json().then(j => ({ status: r.status, body: j })))
@@ -1110,7 +1221,7 @@ function matrixTable(title, hint, rows, sumRow, sumLabel) {
     <div class="card">
       <h2>${esc(title)}</h2>
       <p class="hint">${esc(hint)}</p>
-      <div class="scroll"><table>
+      <div class="scroll"><table class="tb-wide">
         <thead><tr><th class="txt">分类</th>${th}<th>合计（人天）</th></tr></thead>
         <tbody>${body}</tbody>
         ${foot}
@@ -1123,15 +1234,16 @@ RENDERERS.analysis = function () {
 
   const c = res.cycle;
   let warn = '';
-  // Data source indicator - shows exactly what data the system is using
-  warn += '<div class="card" style="border-left:3px solid var(--accent)">' +
-    '<details><summary style="cursor:pointer;font-size:13px;color:var(--accent)">📊 数据源确认 — 点击展开查看（工时表 ' + (state.totals || []).length + ' 行，已选 ' + res.iterations.length + ' 个迭代）</summary>' +
-    '<p class="hint" style="margin-top:8px">当前 state.totals 行数: <b>' + (state.totals || []).length + '</b>，' +
-    '_totalsCloud: <b>' + (state._totalsCloud || []).length + '</b>，' +
-    '_totalsMiddle: <b>' + (state._totalsMiddle || []).length + '</b></p>' +
-    '<p class="hint">已选迭代: <b>' + (res.iterations.length ? res.iterations.join('、') : '无') + '</b></p>' +
-    '<p class="hint">各团队 authoritative 值（工时表直接汇总）:</p>' +
-    '<div class="scroll" style="max-height:200px;overflow:auto"><table><thead><tr><th>团队</th><th>工时表值</th></tr></thead><tbody>' +
+  // 数据源确认：一行摘要（用到了哪几份数据 + 已选迭代），明细收进折叠，避免占满屏幕
+  warn += '<div class="card tb-src-confirm" style="border-left:3px solid var(--accent)">' +
+    '<details><summary>📊 数据源确认 — 工时表 ' + ((state.totals || []).length + (state._totalsCloud || []).length + (state._totalsMiddle || []).length) +
+    ' 行 · 已选 ' + res.iterations.length + ' 个迭代</summary>' +
+    '<p class="hint" style="margin-top:8px">当前口径：总计表（totals）<b>' + ((state.totals || []).length) + '</b> 行，' +
+    '阳光云明细（_totalsCloud）<b>' + ((state._totalsCloud || []).length) + '</b> 行，' +
+    '中后台明细（_totalsMiddle）<b>' + ((state._totalsMiddle || []).length) + '</b> 行，' +
+    '人力看板（board）<b>' + ((state.board || []).length) + '</b> 行。</p>' +
+    '<p class="hint">已选迭代: <b>' + (res.iterations.length ? res.iterations.join('、') : '无（请到第⑤页勾选）') + '</b></p>' +
+    '<div class="scroll"><table><thead><tr><th>团队</th><th>工时表值（人天）</th></tr></thead><tbody>' +
     TEAMS.map(function(t) { return '<tr><td class="txt">' + esc(t.key) + '</td><td>' + fmt(res.authoritative[t.key]) + '</td></tr>'; }).join('') +
     '</tbody></table></div></details></div>';
   if (!res.iterations.length)
@@ -1190,7 +1302,7 @@ RENDERERS.analysis = function () {
         <td>${fmt(d.over)}</td>
         <td>${d.capacity ? pct(d.ratio) : '—'}</td>
         <td style="width:120px"><div class="bar"><i class="${d.over > 0 ? 'over' : ''}" style="width:${(ratio * 100).toFixed(0)}%"></i></div></td>
-        <td class="txt"><span class="tag ${cls}">${esc(d.verdict)}</span></td>
+        <td class="txt wrap"><span class="tag ${cls}">${esc(d.verdict)}</span></td>
         ${schemeCells}
       </tr>`;
   }).join('');
@@ -1223,13 +1335,13 @@ RENDERERS.analysis = function () {
     <div class="card">
       <h2>团队版本工作量与产能偏差分析</h2>
       <p class="hint">超出工作量 = 版本工作量 − 总产能；总产能 = 可投入人数 × 开发周期。为正说明产能不足需裁剪需求，为负说明产能富余可继续导入需求，${(DEVIATION_TOLERANCE * 100).toFixed(0)}% 以内属正常偏差由团队自行消化。${multiScheme ? '下方同时展示多个方案的产能对比。' : ''}可直接编辑「版本工作量」和「可投入人数」列进行假设分析，黄底表示手动修改值。</p>
-      <div class="scroll"><table>
+      <div class="scroll"><table class="tb-dev">
         <thead>
           ${multiScheme ? `<tr><th colspan="8"></th>${schemeHeaders}</tr>` : ''}
           <tr>
             <th class="txt">团队</th><th>版本工作量<br>（人天）</th><th>可投入人数</th>
             <th>总产能<br>（人天）</th><th>超出工作量</th><th>超出比例</th>
-            <th>偏差</th><th class="txt">结论</th>
+            <th>偏差</th><th class="txt wrap">结论</th>
             ${multiScheme ? schemeSubHeaders : ''}
           </tr>
         </thead>

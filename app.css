@@ -254,8 +254,10 @@ body.archive-readonly .archive-btn { display: none; }
 
 
 /* ---------- Deviation editable inputs ---------- */
-.dev-input { width: 70px; padding: 3px 6px; font-size: 12px; text-align: right; }
+.dev-input { width: 90px; padding: 3px 6px; font-size: 12px; text-align: right; }
 .dev-input.overridden { background: #fffbe6; border-color: var(--hold); }
+/* 可投入人数通常为个位数，列宽收窄使两侧数字列对齐 */
+.dev-input[data-field=head] { width: 70px; }
 
 
 /* ==================== 任务明细同步（TB 视图）==================== */
@@ -435,6 +437,19 @@ body.archive-readonly .archive-btn { display: none; }
 .tb-map-details summary:hover { color: var(--accent); }
 .tb-map-details .hint { margin: 8px 0; }
 .tb-map-details .tb-actions { margin-top: 10px; }
+.tb-map-board { margin-bottom: 16px; }
+.tb-map-board:last-child { margin-bottom: 0; }
+.tb-map-board-head {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 6px 0 8px;
+}
+.tb-map-board-desc { color: var(--muted); font-size: 12px; font-weight: 400; }
+.tb-map-table { width: 100%; }
+/* sid 列固定较窄，迭代名列自适应；只约束这两列宽度，其余勿动 */
+.tb-map-table td:first-child { width: 260px; min-width: 260px; }
+.tb-map-table td:nth-child(2) { min-width: 240px; }
+.tb-map-table .tb-map-row td { padding: 4px 6px; }
+.tb-map-table .tb-map-sid { min-width: 230px; }
 .tb-map-name {
   width: 100%;
   padding: 6px 10px;
@@ -576,3 +591,46 @@ body.archive-readonly .archive-btn { display: none; }
 /* 紧凑表：口径配置这类窄内容表，主列自适应，整体不铺满过宽 */
 .table-compact { max-width: 720px; }
 .table-compact .col-mid select { max-width: 130px; margin: 0 auto; }
+
+/* ==================== 宽表：拥挤时横向滚动 ==================== */
+/* 列多/内容长的表：单元格不再换行，给表一个最小宽度，容器过窄即出横向滚动条 */
+.tb-wide {
+  min-width: 1000px;
+  white-space: nowrap;
+}
+.tb-dev {
+  min-width: 860px;
+  white-space: nowrap;
+}
+/* 结论这类长文本列允许换行，避免被截断 */
+.tb-wide td.wrap,
+.tb-wide th.wrap,
+.tb-dev td.wrap,
+.tb-dev th.wrap { white-space: normal; min-width: 140px; }
+
+/* ==================== 迭代映射：sid 列收窄 ==================== */
+.tb-map-sid {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  color: var(--text);
+}
+.tb-map-sid:focus {
+  outline: 0;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+}
+
+/* ==================== 数据源确认（折叠摘要）==================== */
+.tb-src-confirm summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+  user-select: none;
+}
+.tb-src-confirm summary:hover { color: var(--accent); }
+/* 内部权威口径表：窄内容、不铺满，避免大留白 */
+.tb-src-confirm table { max-width: 380px; }

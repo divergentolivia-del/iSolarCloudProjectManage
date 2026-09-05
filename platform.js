@@ -100,6 +100,33 @@ const Platform = (() => {
     try {
       localStorage.setItem(SIDEBAR_KEY, sidebarCollapsed ? 'true' : 'false');
     } catch (e) { /* localStorage might be unavailable */ }
+    // 用户手动展开侧栏后，重新允许子页因内容拥挤而发起自动收起
+    if (!sidebarCollapsed) autoCollapseFired = false;
+  }
+
+  /*
+   * 子页（迭代工作台 iframe）因内容拥挤发起自动收起侧栏。
+   * 只在侧栏当前展开且尚未曾自动收起时响应一次，避免每次渲染都强行打断用户手动展开。
+   */
+  let autoCollapseFired = false;
+  function collapseSidebar() {
+    if (sidebarCollapsed || autoCollapseFired) return;
+    sidebarCollapsed = true;
+    autoCollapseFired = true;
+    applySidebarState();
+    try {
+      localStorage.setItem(SIDEBAR_KEY, 'true');
+    } catch (e) { /* localStorage might be unavailable */ }
+  }
+
+  /* 接收 iframe 发送的「内容拥挤 → 收起侧栏」请求 */
+  function handleFrameMessage(event) {
+    const data = event.data;
+    if (!data || typeof data !== 'object') return;
+    if (data.source !== 'iterationFrame' || data.type !== 'autoCollapseSidebar') return;
+    // 同源校验：仅接受本平台自己 iframe 的消息
+    if (event.origin && event.source && event.origin !== window.location.origin) return;
+    collapseSidebar();
   }
 
   /**
@@ -429,6 +456,9 @@ const Platform = (() => {
       collapseBtn.addEventListener('click', toggleSidebar);
     }
 
+    // Listen for iteration-frame auto-collapse requests
+    window.addEventListener('message', handleFrameMessage);
+
     // Bind hamburger button (mobile)
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     if (hamburgerBtn) {
@@ -530,6 +560,7 @@ const Platform = (() => {
     setBreadcrumb,
     setBadge,
     toggleSidebar,
+    collapseSidebar,
     whoami,
 
     // Internal helper exposed for Router to call

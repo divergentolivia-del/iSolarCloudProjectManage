@@ -553,106 +553,210 @@ function sourceCard(kind, title, hint) {
 }
 
 /* ---------- 任务明细同步（TB 视图）---------- */
-/* TB = Teambition。阶段一：界面 + 结构 + 手动导入兜底；「自动同步 TB」为占位。
-   阶段二拿到 TB 开放 API 凭证后再实现真正的自动拉取。
+/* TB = Teambition。阶段二：已打通开放接口，「自动同步 TB」一次性拉取三个看板
+   （阳光云迭代 / 中后台 / 产品线维度）的任务故事点，按团队/产品线聚合后写入 state；
+   手动导入 CSV 作为同步失败时的兜底。token 存服务端配置，前端不接触明文。
 
    方案 X：一个 tab（工作量类型）对应若干「TB 统计视图」，视图本身已内置迭代等
-   筛选条件（视图名即含迭代信息），因此只需选视图，不再单独设迭代筛选。 */
+   筛选条件（视图名即含迭代信息），因此只需选视图，不再单独设迭代筛选。
+   看板模板（团队/迭代/维度）在服务端 tb-config.js 配置，切换迭代只需改 sprintId。 */
 
+/* 明细表格用的 tab（仅切换下方分布表的展示源，不决定同步范围）。
+   同步范围由服务端 tb-config.js 的看板模板决定，前端不重复设迭代筛选。
+   rows: 从 state 取哪个字段；kind: 导入 CSV 兜底时写入哪个 source。 */
 const TB_VIEW_TABS = [
-  { key: 'cloud', label: '阳光云迭代工作量', kind: 'totals' },
-  { key: 'middle', label: '阳光云迭代中后台工作量', kind: 'totalsMiddle' }
+  { key: 'cloud', label: '阳光云迭代', rows: '_totalsCloud', kind: 'totals' },
+  { key: 'middle', label: '阳光云迭代中后台', rows: '_totalsMiddle', kind: 'totalsMiddle' },
+  { key: 'productLine', label: '产品线维度', rows: 'board', kind: 'board' }
 ];
 
-/* 每个 tab 可选的 TB 统计视图列表（占位数据，阶段二从 TB API 拉取真实视图清单）。
-   视图名内已含迭代口径，选定视图即等于选定了迭代范围。 */
-const TB_VIEWS = {
-  cloud: [
-    { id: 'v-cloud-2026-08c', name: '阳光云迭代工作量 · 2026-8月 C版本迭代' },
-    { id: 'v-cloud-2026-07', name: '阳光云迭代工作量 · 2026-7月迭代' }
-  ],
-  middle: [
-    { id: 'v-middle-2026-08', name: '阳光云迭代中后台工作量 · 中后台 2026-8月迭代' },
-    { id: 'v-middle-2026-07', name: '阳光云迭代中后台工作量 · 中后台 2026-7月迭代' }
-  ]
-};
+/* 按团队聚合某数据源的工时分布：任务数 + 故事点 + 预估故事点。
+   按合计降序。空数据返回 []（表格显示空态）。合计仅用于排序，不在表格中单列展示。 */
+function tbTeamDistribution(rows) {
+  if (!rows || !rows.length) return [];
+  const byTeam = {};
+  rows.forEach(r => {
+    const team = r.team || r['所在团队'] || r['所属团队'] || '（未填写）';
+    if (!byTeam[team]) byTeam[team] = { team: team, count: 0, story: 0, est: 0 };
+    byTeam[team].count += 1;
+    byTeam[team].story += num(r.story);
+    byTeam[team].est += num(r.est);
+  });
+  return Object.keys(byTeam).map(k => byTeam[k])
+    .sort((a, b) => (b.story + b.est) - (a.story + a.est));
+}
 
-/* 从已导入的工时明细里取任务级数据用于表格展示（TB 关联前的降级展示）。
-   若无明细行则返回空数组，表格显示空态引导。 */
-function tbTaskRows(tabKey) {
-  const rows = tabKey === 'middle' ? (state._totalsMiddle || []) : (state._totalsCloud || []);
-  return rows.map(r => ({
-    id: r.taskId || r['任务ID'] || r.id || '—',
-    title: r.taskTitle || r['任务标题'] || r.title || r.name || '—',
-    team: r.team || r['所在团队'] || r['所属团队'] || '—',
-    story: r.story != null ? r.story : (r['故事点'] != null ? r['故事点'] : '—'),
-    est: r.est != null ? r.est : (r['预估故事点'] != null ? r['预估故事点'] : '—'),
-    iteration: r.iteration || r['迭代'] || '—'
-  }));
+/* 产品线维度：按产品线(层级1)分组 → 各团队工时分布。两级结构，供「产品线维度」tab 展示。
+   返回 [{ line, teams:[{team,count,story,est}] }]，按产品线合计降序，团队内按合计降序。 */
+function tbLineTeams(rows) {
+  if (!rows || !rows.length) return [];
+  const byLine = {};
+  rows.forEach(r => {
+    const line = r.productLine || r['所属产品线'] || r['项目'] || '（未填写）';
+    const team = r.team || r['所在团队'] || r['所属团队'] || '（未填写）';
+    if (!byLine[line]) byLine[line] = {};
+    if (!byLine[line][team]) byLine[line][team] = { team: team, count: 0, story: 0, est: 0 };
+    byLine[line][team].count += 1;
+    byLine[line][team].story += num(r.story);
+    byLine[line][team].est += num(r.est);
+  });
+  return Object.keys(byLine).map(line => {
+    const teams = Object.keys(byLine[line]).map(k => byLine[line][k])
+      .sort((a, b) => (b.story + b.est) - (a.story + a.est));
+    return {
+      line: line,
+      teams: teams,
+      story: teams.reduce((s, t) => s + t.story, 0),
+      est: teams.reduce((s, t) => s + t.est, 0),
+      count: teams.reduce((s, t) => s + t.count, 0)
+    };
+  }).sort((a, b) => (b.story + b.est) - (a.story + a.est));
+}
+
+/* 汇总某组行：任务数 + 故事点/预估故事点/总点数。空数据返回 null（显示「未同步」）。 */
+function tbSumRows(rows) {
+  if (!rows || !rows.length) return null;
+  let story = 0, est = 0;
+  rows.forEach(r => { story += num(r.story); est += num(r.est); });
+  return { rows: rows.length, story: story, est: est, total: story + est };
+}
+
+/* 当前同步的迭代映射（前端配置优先，缺省用已入库的 tbSprintMap）。 */
+function currentSprintMap() {
+  return state.tbSprintMap || {};
 }
 
 function renderTbSyncCard() {
   const tab = state.tbViewTab || 'cloud';
   const activeTab = TB_VIEW_TABS.find(t => t.key === tab) || TB_VIEW_TABS[0];
-  const rows = tbTaskRows(tab);
-  const views = TB_VIEWS[tab] || [];
-  const selectedViewId = (state.tbSelectedView && state.tbSelectedView[tab]) || (views[0] && views[0].id);
 
   const tabsHtml = TB_VIEW_TABS.map(t =>
     `<button class="tb-tab ${t.key === tab ? 'active' : ''}" data-tb-tab="${t.key}">${esc(t.label)}</button>`
   ).join('');
 
-  const viewOptions = views.map(v =>
-    `<option value="${esc(v.id)}" ${v.id === selectedViewId ? 'selected' : ''}>${esc(v.name)}</option>`
-  ).join('');
+  /* 三源状态汇总（来自已同步的 state 行，每源一行总览） */
+  const cloud = tbSumRows(state._totalsCloud);
+  const middle = tbSumRows(state._totalsMiddle);
+  const board = tbSumRows(state.board);
+  const srcRow = (name, s, note) => {
+    const body = s
+      ? `${s.rows} 任务 · 故事点 ${fmt(s.story, 2)} / 预估 ${fmt(s.est, 2)}`
+      : '未同步';
+    return `<tr>
+      <td class="txt">${esc(name)}</td>
+      <td class="col-mid tb-src-val ${s ? '' : 'tb-empty'}">${body}</td>
+      <td class="col-mid txt tb-src-note">${esc(note)}</td>
+    </tr>`;
+  };
 
-  const tableRows = rows.length
-    ? rows.map(r => `
-      <tr>
-        <td class="txt">${esc(r.id)}</td>
-        <td class="txt">${esc(r.title)}</td>
-        <td class="txt">${esc(r.team)}</td>
-        <td>${esc(r.story)}</td>
-        <td>${esc(r.est)}</td>
-        <td class="txt">${esc(r.iteration)}</td>
+  /* 迭代映射编辑：sprintId → 迭代名。未入库的 sprintId 也显示为空行供补充。 */
+  const sprintMap = currentSprintMap();
+  const sprintKeys = Object.keys(sprintMap);
+  const mapRows = sprintKeys.length
+    ? sprintKeys.map(sid => `<tr>
+        <td class="txt tb-sid">${esc(sid)}</td>
+        <td class="txt"><input class="tb-map-name" data-sid="${esc(sid)}" value="${esc(sprintMap[sid] || '')}" placeholder="迭代名（如 阳光云2026-8月C版本迭代）"></td>
+        <td class="col-mid"><button class="btn tb-map-del" data-sid="${esc(sid)}">删除</button></td>
       </tr>`).join('')
-    : `<tr><td colspan="6" class="txt tb-empty">暂无任务明细。选择 TB 视图后点击「自动同步 TB」拉取，或「导入 CSV」手动上传。</td></tr>`;
+    : `<tr><td colspan="3" class="txt tb-empty">暂无迭代映射。点击下方「+ 新增迭代映射」添加，或直接点「自动同步 TB」由后端按 tb-config 默认映射落库。</td></tr>`;
+
+  const lastSync = state.updatedAt
+    ? `${esc(state.updatedBy || '未署名')} · ${esc(state.updatedAt)}`
+    : '尚未同步';
+
+  /* 选中数据源的工时分布表。
+     产品线维度 tab 用两级结构（产品线 → 团队），其余 tab 用单层团队分布。 */
+  const isProductLine = activeTab.key === 'productLine';
+  const distBody = isProductLine
+    ? (() => {
+        const lines = tbLineTeams(state[activeTab.rows]);
+        if (!lines.length) return null;
+        return lines.map(l => `
+          <tr class="tb-line-row">
+            <td class="txt" colspan="4">
+              <span class="tb-line-name">${esc(l.line)}</span>
+              <span class="tb-line-sub">${l.count} 任务 · 故事点 ${fmt(l.story, 2)} / 预估 ${fmt(l.est, 2)}</span>
+            </td>
+          </tr>
+          ${l.teams.map(d => `
+            <tr>
+              <td class="txt tb-team-indent">${esc(d.team)}</td>
+              <td>${d.count}</td>
+              <td>${fmt(d.story, 2)}</td>
+              <td>${fmt(d.est, 2)}</td>
+            </tr>`).join('')}`).join('');
+      })()
+    : (() => {
+        const dist = tbTeamDistribution(state[activeTab.rows]);
+        if (!dist.length) return null;
+        return dist.map(d => `
+          <tr>
+            <td class="txt">${esc(d.team)}</td>
+            <td>${d.count}</td>
+            <td>${fmt(d.story, 2)}</td>
+            <td>${fmt(d.est, 2)}</td>
+          </tr>`).join('');
+      })();
+  const distRowHead = isProductLine
+    ? `<th class="txt">所属产品线 / 团队</th>`
+    : `<th class="txt">所属团队</th>`;
+  const innerRows = distBody
+    ? distBody
+    : `<tr><td colspan="4" class="txt tb-empty">该数据源暂无数据。点击「自动同步 TB」拉取，或「导入 CSV」手动上传。</td></tr>`;
 
   return `
     <div class="card tb-sync-card">
-      <h2>🔗 任务明细同步（TB 视图）</h2>
-      <p class="hint">打通 Teambition 视图，将任务明细同步至本平台。选择一个已配置好筛选条件的 TB 统计视图即可拉取对应迭代的任务明细。当前为人工 CSV 导入，后续接入 TB 开放接口后支持「自动同步 + 手动兜底」。</p>
+      <h2>🔗 TB 工时同步 <span class="tb-config-badge" title="Token 是否已配置">…</span></h2>
+      <p class="hint">从 Teambition 一次性拉取阳光云、中后台、产品线三个看板的任务故事点，按团队聚合并写入本期工时。Token 在服务端 data/tb/secret.json 配置，前端不接触明文；迭代映射可在下方直接配置。</p>
 
-      <div class="tb-tabs">${tabsHtml}</div>
+      <div class="tb-scroll">
+        <table class="tb-table tb-src-table">
+          <thead><tr><th class="txt">数据源</th><th class="col-mid">当前同步结果</th><th class="col-mid txt">说明</th></tr></thead>
+          <tbody>
+            ${srcRow('阳光云迭代', cloud, '按团队 → ⑥偏差分析')}
+            ${srcRow('阳光云迭代中后台', middle, '中后台团队 → ⑥偏差分析')}
+            ${srcRow('产品线维度', board, '产品线×团队 → 产线分布')}
+          </tbody>
+        </table>
+      </div>
 
       <div class="tb-toolbar">
-        <label class="tb-field tb-field-grow">
-          <span>TB 统计视图</span>
-          <select class="tb-view-select">${viewOptions || '<option>（暂无可用视图）</option>'}</select>
-        </label>
         <div class="tb-actions">
           <button class="btn primary tb-sync-btn" data-tb-kind="${activeTab.kind}">⚡ 自动同步 TB</button>
-          <button class="btn tb-import-btn" data-tb-kind="${activeTab.kind}">导入 CSV</button>
+          <button class="btn tb-import-btn" data-tb-kind="${activeTab.kind}">导入 CSV（兜底）</button>
+          <span class="tb-lastsync">上次同步：${lastSync}</span>
         </div>
       </div>
 
+      <details class="tb-map-details">
+        <summary>🗂 迭代映射配置（sprintId → 迭代名）· 共 ${sprintKeys.length} 条</summary>
+        <p class="hint">把 TB 里的迭代 sprintId 映射成平台可读的迭代名。迭代名每月变化，改这里即可，不用动代码。点「保存映射」落库，下次同步生效。</p>
+        <div class="scroll"><table class="tb-table">
+          <thead><tr><th class="txt">sprintId</th><th class="txt">迭代名（可编辑）</th><th class="col-mid">操作</th></tr></thead>
+          <tbody>${mapRows}</tbody>
+        </table></div>
+        <div class="tb-actions">
+          <button class="btn tb-map-add">+ 新增迭代映射</button>
+          <button class="btn primary tb-map-save">保存映射</button>
+        </div>
+      </details>
+
+      <div class="tb-tabs">${tabsHtml}</div>
       <div class="scroll">
         <table class="tb-table">
           <thead>
             <tr>
-              <th class="txt">任务 ID</th>
-              <th class="txt">任务标题</th>
-              <th class="txt">所属团队</th>
+              ${distRowHead}
+              <th>任务数</th>
               <th>故事点</th>
               <th>预估故事点</th>
-              <th class="txt">迭代</th>
             </tr>
           </thead>
-          <tbody>${tableRows}</tbody>
+          <tbody>${innerRows}</tbody>
         </table>
       </div>
       <p class="note tb-foot">
-        「阳光云迭代工作量」对应 Teambition 第一个视图，「阳光云迭代中后台工作量」为第二个视图；结构相同，按团队所属「故事点 / 预估故事点」字段归集到⑥偏差分析。视图清单在接入 TB 接口后自动拉取。
+        同步范围由服务端 tb-config.js 的看板模板决定；「自动同步 TB」一次性拉取三个看板并落库，完成后页面自动刷新。此处按团队聚合展示，不逐条列任务。
       </p>
     </div>`;
 }
@@ -801,22 +905,29 @@ RENDERERS.import = function () {
     });
   });
 
-  // TB 视图选择记忆（仅前端状态，不入库；阶段二据此调 TB API）
-  const viewSelect = view.querySelector('.tb-view-select');
-  if (viewSelect) {
-    viewSelect.addEventListener('change', () => {
-      const tab = state.tbViewTab || 'cloud';
-      if (!state.tbSelectedView) state.tbSelectedView = {};
-      state.tbSelectedView[tab] = viewSelect.value;
-    });
+  // Token 配置状态 & 迭代映射默认值：从 /api/tb/config 拉取（仅服务端模式）
+  if (Sync.mode === 'server') {
+    fetch('api/tb/config', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : {})
+      .then(cfg => {
+        const badge = view.querySelector('.tb-config-badge');
+        if (badge) {
+          badge.textContent = cfg.tokenConfigured ? 'Token 已配置' : 'Token 未配置';
+          badge.className = 'tb-config-badge ' + (cfg.tokenConfigured ? 'ok' : 'warn');
+        }
+        // 若前端 state 里还没映射，把服务端默认映射填进来供编辑（不落库，点保存才落）
+        if (cfg.sprintMap && !Object.keys(currentSprintMap()).length) {
+          state.tbSprintMap = Object.assign({}, cfg.sprintMap);
+          RENDERERS.import();
+        }
+      })
+      .catch(() => { /* 本地模式忽略 */ });
   }
 
-  // 「自动同步 TB」占位：阶段一提示未接入，阶段二实现真正拉取
+  // 「自动同步 TB」：调用后端 /api/tb/sync 一次性拉取三个看板并写入 state
   const syncBtn = view.querySelector('.tb-sync-btn');
   if (syncBtn) {
-    syncBtn.addEventListener('click', () => {
-      toast('TB 自动同步尚未接入（需先配置 Teambition 开放接口凭证）。当前请使用「导入 CSV」手动上传。');
-    });
+    syncBtn.addEventListener('click', () => runTbSync(syncBtn));
   }
 
   // 「导入 CSV」复用现有 handleImport，按当前 tab 对应的 kind 导入
@@ -833,7 +944,101 @@ RENDERERS.import = function () {
       input.click();
     });
   }
+
+  // 「+ 新增迭代映射」：加一行空 sprintId/迭代名
+  const addBtn = view.querySelector('.tb-map-add');
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      if (!state.tbSprintMap) state.tbSprintMap = {};
+      // 找一个尚未使用的空 sid 键位，避免覆盖已有映射
+      let k = '', n = 1;
+      while (!k || state.tbSprintMap[k] !== undefined) k = 'new-sprint-' + (n++);
+      state.tbSprintMap[k] = '';
+      RENDERERS.import();
+      const inp = view.querySelector('.tb-map-name[data-sid="' + k + '"]');
+      if (inp) { inp.focus(); inp.select(); }
+    });
+  }
+
+  // 「删除」一条映射
+  view.querySelectorAll('.tb-map-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!state.tbSprintMap) return;
+      delete state.tbSprintMap[btn.dataset.sid];
+      RENDERERS.import();
+    });
+  });
+
+  // 「保存映射」：把可编辑行回填到 state.tbSprintMap 并落库
+  const saveMapBtn = view.querySelector('.tb-map-save');
+  if (saveMapBtn) {
+    saveMapBtn.addEventListener('click', () => {
+      const map = {};
+      view.querySelectorAll('.tb-map-name').forEach(inp => {
+        const sid = inp.dataset.sid;
+        const name = inp.value.trim();
+        if (sid && name) map[sid] = name;
+      });
+      if (!Object.keys(map).length) { toast('请先填写至少一条迭代映射（sprintId + 迭代名）。'); return; }
+      state.tbSprintMap = map;
+      save(true);
+      toast('✅ 已保存迭代映射（' + Object.keys(map).length + ' 条），下次「自动同步 TB」生效');
+      RENDERERS.import();
+    });
+  }
 };
+
+/* ---------- TB 自动同步（阶段二）----------
+   调用后端 /api/tb/sync，一次性拉取三个看板（阳光云/中后台/产品线）并写入 state。
+   后端写入后会通过 SSE 广播，前端 onRemote 自动刷新；这里再显式提示同步结果。
+   token 存服务端配置（data/tb/secret.json 或环境变量 TB_TOKEN），前端不接触明文。 */
+function runTbSync(btn) {
+  if (Sync.mode !== 'server') {
+    toast('自动同步需在服务端模式下使用（通过 node server.js 启动后用 http 访问）。当前请用「导入 CSV」。');
+    return;
+  }
+  const origHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ 同步中…';
+
+  fetch('api/tb/sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      by: (typeof Sync.whoami === 'function' ? Sync.whoami() : '') || 'TB同步',
+      // 把前端配置的迭代映射随同步发出；后端合并进 tbSprintMap 并落库，同步即生效
+      sprintMap: currentSprintMap()
+    })
+  })
+    .then(r => r.json().then(j => ({ status: r.status, body: j })))
+    .then(({ status, body }) => {
+      if (status !== 200 || !body.ok) {
+        const msg = body && body.error ? body.error : ('同步失败（HTTP ' + status + '）');
+        toast('❌ ' + msg);
+        return;
+      }
+      const s = body.stats || {};
+      const c = s.cloud || {}, m = s.middle || {}, p = s.productLine || {};
+      toast('✅ TB 同步完成：阳光云 ' + (c.taskCount || 0) + ' 任务/' + (c.totalPoints || 0) +
+        ' 点，中后台 ' + (m.taskCount || 0) + ' 任务/' + (m.totalPoints || 0) +
+        ' 点，产品线 ' + (p.taskCount || 0) + ' 任务/' + (p.totalPoints || 0) + ' 点');
+      // 显式拉取最新 state（SSE 也会触发，双保险，避免自身 rev 判定误跳过）
+      fetch('api/state', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(remote => {
+          if (remote.totals && remote.totals.length && !remote._totalsCloud) remote._totalsCloud = remote.totals;
+          if (!remote._totalsMiddle) remote._totalsMiddle = [];
+          state = remote;
+          renderAll();
+        })
+        .catch(() => { /* SSE 会兜底刷新 */ });
+    })
+    .catch(e => toast('❌ 同步请求失败：' + e.message))
+    .finally(() => {
+      btn.disabled = false;
+      btn.innerHTML = origHtml;
+    });
+}
 
 /* ---------- ⑤ 迭代口径 ---------- */
 RENDERERS.iteration = function () {
@@ -859,7 +1064,9 @@ RENDERERS.iteration = function () {
     <div class="card">
       <h2>本期迭代口径 ${selected.length ? `<span class="tag ok">已选 ${selected.length} 个</span>` : '<span class="tag warn">未选择</span>'}</h2>
       ${state.iterDirty ? '<p class="tag warn" style="display:inline-block">数据刚重新导入，迭代清单已按新文件重建，此前勾选已清空，请重新勾选</p>' : ''}
-      <p class="hint">勾选本期核算包含的迭代。阳光云版本通常需同时勾选<b>「阳光云2026-M月C版本迭代」和「中后台-2026年M月迭代」</b>—— 中台各组的工时挂在后者下。支持跨月合并：需要两月并算时同时勾选两个月份的迭代即可，配合第①页的开发周期天数使用。</p>
+      <p class="hint">${state.sources?.totals?.tb || state.sources?.totalsMiddle?.tb || state.sources?.board?.tb
+        ? '数据来自 <b>TB 自动同步</b>：本轮涉及的迭代已自动勾选，本页视为<b>确认页</b>，核对无误即可，无需手动勾选。若需<b>跨月合并</b>（两月并算）再额外勾上相邻月份的迭代，配合第①页开发周期天数使用。'
+        : '勾选本期核算包含的迭代。阳光云版本通常需同时勾选<b>「阳光云2026-M月C版本迭代」和「中后台-2026年M月迭代」</b>—— 中台各组的工时挂在后者下。支持跨月合并：需要两月并算时同时勾选两个月份的迭代即可，配合第①页的开发周期天数使用。'}</p>
       ${selected.length ? `<p class="note">当前口径：${selected.map(s => esc(s.name)).join(' ＋ ')}</p>` : ''}
       <div class="scroll"><table>
         <thead><tr><th>选择</th><th class="txt">迭代名称</th><th>工时权重</th></tr></thead>

@@ -100,13 +100,17 @@ const Platform = (() => {
     try {
       localStorage.setItem(SIDEBAR_KEY, sidebarCollapsed ? 'true' : 'false');
     } catch (e) { /* localStorage might be unavailable */ }
-    // 用户手动展开侧栏后，重新允许子页因内容拥挤而发起自动收起
-    if (!sidebarCollapsed) autoCollapseFired = false;
+    // 用户手动切换（无论收/展），都清除「自动收起」标记：
+    // - 手动展开 → 允许 iframe 日后因拥挤再自动收起
+    // - 手动收起 → 若再自动展开会打扰用户，故也清除，避免 iframe 误恢复
+    autoCollapseFired = false;
+    notifySidebarState(true);
   }
 
   /*
-   * 子页（迭代工作台 iframe）因内容拥挤发起自动收起侧栏。
-   * 只在侧栏当前展开且尚未曾自动收起时响应一次，避免每次渲染都强行打断用户手动展开。
+   * 子页（迭代工作台 iframe）因内容拥挤发起自动收起侧栏，
+   * 或内容不再拥挤时发起恢复展开。
+   * 收起只在侧栏当前展开且尚未曾自动收起时响应一次，避免每次渲染都强行打断用户手动展开。
    */
   let autoCollapseFired = false;
   function collapseSidebar() {
@@ -117,16 +121,56 @@ const Platform = (() => {
     try {
       localStorage.setItem(SIDEBAR_KEY, 'true');
     } catch (e) { /* localStorage might be unavailable */ }
+    notifySidebarState();
+  }
+  /* 子页请求恢复展开：收起是自动发起的才恢复，用户手动收起不打扰 */
+  function expandSidebar() {
+    if (!sidebarCollapsed) return;
+    if (!autoCollapseFired) return; // 用户手动收起 → 不自动展开
+    sidebarCollapsed = false;
+    autoCollapseFired = false;
+    applySidebarState();
+    try {
+      localStorage.setItem(SIDEBAR_KEY, 'false');
+    } catch (e) { /* localStorage might be unavailable */ }
+    notifySidebarState();
   }
 
-  /* 接收 iframe 发送的「内容拥挤 → 收起侧栏」请求 */
+  /* 向子树广播当前侧栏状态，供 iframe 判断是否需要恢复。
+     manual=true 表示用户手动切换（此时应解除 iframe 的防闪避、允许再次自动收起）。 */
+  function notifySidebarState(manual) {
+    try {
+      const frame = document.getElementById('iterationFrame');
+      if (frame && frame.contentWindow) {
+        frame.contentWindow.postMessage(
+          { source: 'platform', type: 'sidebarState', collapsed: sidebarCollapsed, auto: autoCollapseFired, manual: !!manual },
+          window.location.origin
+        );
+      }
+    } catch (e) { /* 跨源或已卸载，忽略 */ }
+  }
+
+  /* 接收 iframe 的「内容拥挤 → 收起侧栏」/「内容不再拥挤 → 恢复展开」/「查询当前状态」请求 */
   function handleFrameMessage(event) {
     const data = event.data;
     if (!data || typeof data !== 'object') return;
-    if (data.source !== 'iterationFrame' || data.type !== 'autoCollapseSidebar') return;
+    if (data.source !== 'iterationFrame') return;
+    if (data.type !== 'autoCollapseSidebar' && data.type !== 'restoreSidebar' && data.type !== 'getSidebarState') return;
     // 同源校验：仅接受本平台自己 iframe 的消息
     if (event.origin && event.source && event.origin !== window.location.origin) return;
-    collapseSidebar();
+    if (data.type === 'getSidebarState') {
+      try {
+        if (event.source) {
+          event.source.postMessage(
+            { source: 'platform', type: 'sidebarState', collapsed: sidebarCollapsed, auto: autoCollapseFired },
+            window.location.origin
+          );
+        }
+      } catch (e) { /* 已卸载，忽略 */ }
+      return;
+    }
+    if (data.type === 'autoCollapseSidebar') collapseSidebar();
+    else expandSidebar();
   }
 
   /**
@@ -561,6 +605,7 @@ const Platform = (() => {
     setBadge,
     toggleSidebar,
     collapseSidebar,
+    expandSidebar,
     whoami,
 
     // Internal helper exposed for Router to call

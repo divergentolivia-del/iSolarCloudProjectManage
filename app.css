@@ -602,11 +602,16 @@ body.archive-readonly .archive-btn { display: none; }
   min-width: 860px;
   white-space: nowrap;
 }
+/* 结论列只装 4 字以内结论，收窄并把宽度让给数值列 */
+.tb-dev td.wrap .tag { white-space: nowrap; }
+/* 版本工作量（可编辑输入）：放宽避免 5-6 位数截断 */
+.tb-dev .dev-input[data-field="workload"] { width: 112px; }
+.tb-dev .dev-input[data-field="head"] { width: 84px; }
 /* 结论这类长文本列允许换行，避免被截断 */
 .tb-wide td.wrap,
-.tb-wide th.wrap,
-.tb-dev td.wrap,
-.tb-dev th.wrap { white-space: normal; min-width: 140px; }
+.tb-wide th.wrap { white-space: normal; min-width: 140px; }
+.tb-dev th.wrap,
+.tb-dev td.wrap { white-space: normal; min-width: 76px; }
 
 /* ==================== 迭代映射：sid 列收窄 ==================== */
 .tb-map-sid {
@@ -624,13 +629,5 @@ body.archive-readonly .archive-btn { display: none; }
   box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
 }
 
-/* ==================== 数据源确认（折叠摘要）==================== */
-.tb-src-confirm summary {
-  cursor: pointer;
-  font-weight: 600;
-  color: var(--text);
-  user-select: none;
-}
-.tb-src-confirm summary:hover { color: var(--accent); }
-/* 内部权威口径表：窄内容、不铺满，避免大留白 */
-.tb-src-confirm table { max-width: 380px; }
+/* ==================== 数据源确认 ==================== */
+/* 已并入 matrixTable 同款卡片宽表（app.js RENDERERS.analysis），无需额外样式 */

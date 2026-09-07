@@ -278,6 +278,7 @@ function switchView(name) {
   document.querySelectorAll('.view').forEach(v =>
     v.classList.toggle('hidden', v.id !== 'view-' + name));
   RENDERERS[name]();
+  swingGuard = false; // 切换视图后重新按内容判断是否拥挤
   requestParentSpace();
 }
 
@@ -285,29 +286,91 @@ function renderAll() {
   document.getElementById('cycleLabel').textContent = cycleLabelText();
   updateModeBadge();
   RENDERERS[currentView]();
+  swingGuard = false;
   requestParentSpace();
 }
+
+/* 窗口尺寸变化（侧栏收起/展开引起 iframe 变宽变窄）也重新测量，
+   否则收起后子页不再重渲染，无法感知「拥挤已消失」从而发起恢复 */
+window.addEventListener('resize', function () {
+  requestParentSpace();
+});
 
 /* 当前视图在 iframe 内是否横向溢出（拥挤）。若溢出且外层侧栏未展开，向父页申请收起侧栏，
    为宽表腾出空间；父页只响应一次，用户手动展开后失效。
    宽表本身包在 .scroll 容器里（独立出横向滚动条），因此要看容器内部是否可滚动，
-   而不是浏览器是否整体横滚。 */
-let parentSpaceRequested = false;
+   而不是浏览器是否整体横滚。
+   双向协议：拥挤→发「收起」，不再拥挤→发「恢复展开」；父页广播侧栏状态回传，
+   以确认父页已按请求动作。恢复后若又被挤到（单页宽表恰好卡在临界宽度），
+   触发一次 swingGuard 保持收起语义，避免收起↔展开来回闪。 */
+let parentCollapsed = false;      // 父页侧栏当前是否收起（由 sidebarState 回传维护）
+let parentAutoCollapsed = false;  // 父页本次收起是否为自动发起
+let swingGuard = false;           // 恢复后立即又拥挤 → 本视图不再反复
+let lastSidebarState = '';
+let settleTimer = null;
+
 function requestParentSpace() {
   const scrollers = document.querySelectorAll('.scroll');
   let overflowX = false;
   for (let i = 0; i < scrollers.length; i++) {
     if (scrollers[i].scrollWidth > scrollers[i].clientWidth + 4) { overflowX = true; break; }
   }
-  if (!overflowX) { parentSpaceRequested = false; return; }
-  if (parentSpaceRequested) return;
-  parentSpaceRequested = true;
+  if (swingGuard) return;               // 已闪避过，交给用户手动展开
+  const wantCollapse = overflowX && !parentCollapsed;
+  const wantRestore = !overflowX && parentCollapsed && parentAutoCollapsed;
+  if (!wantCollapse && !wantRestore) { lastSidebarState = ''; return; }
+  const need = wantCollapse ? 'collapse' : 'restore';
+  if (lastSidebarState === need) return; // 已请求过，父页未回执前不重复发
+  lastSidebarState = need;
   try {
     if (window.parent && window.parent !== window) {
-      window.parent.postMessage({ source: 'iterationFrame', type: 'autoCollapseSidebar' }, '*');
+      window.parent.postMessage({
+        source: 'iterationFrame',
+        type: wantCollapse ? 'autoCollapseSidebar' : 'restoreSidebar'
+      }, '*');
     }
   } catch (e) { /* 跨源或已卸载，忽略 */ }
 }
+
+/* 父页回传侧栏状态：更新本地判断依据；恢复后重新测量，若仍拥挤则触发一次性避闪 */
+function handleSidebarState(e) {
+  const d = e.data;
+  if (!d || d.source !== 'platform' || d.type !== 'sidebarState') return;
+  if (e.origin && e.origin !== window.location.origin) return;
+  const wasCollapsed = parentCollapsed;
+  const wasRestoreRequest = lastSidebarState === 'restore'; // 刚向父页申请过恢复
+  parentCollapsed = !!d.collapsed;
+  parentAutoCollapsed = !!d.auto;
+  if (d.manual && !parentCollapsed) swingGuard = false; // 用户手动展开 → 解除避闪，重新允许自动收起
+  lastSidebarState = '';
+  if (wasCollapsed !== parentCollapsed) {
+    // 等过渡动画（platform.css 0.25s）结束再测量
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(function () {
+      const scrollers = document.querySelectorAll('.scroll');
+      let overflowX = false;
+      for (let i = 0; i < scrollers.length; i++) {
+        if (scrollers[i].scrollWidth > scrollers[i].clientWidth + 4) { overflowX = true; break; }
+      }
+      // 恢复展开后仍被挤到（宽表恰卡在临界宽度）：本次会话不再自动折腾，交给用户手动展开
+      if (wasRestoreRequest && overflowX) swingGuard = true;
+      requestParentSpace();
+    }, 320);
+    return;
+  }
+  requestParentSpace();
+}
+window.addEventListener('message', handleSidebarState);
+
+/* iframe 每次重新挂载即查询父页当前侧栏状态，避免父页按 localStorage 已收起而我方仍按展开判断 */
+function pingParentSidebarState() {
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ source: 'iterationFrame', type: 'getSidebarState' }, '*');
+    }
+  } catch (e) { /* 跨源或已卸载，忽略 */ }
+}
+pingParentSidebarState();
 
 function cycleLabelText() {
   const c = activeCycle(state);
@@ -1203,6 +1266,22 @@ RENDERERS.iteration = function () {
 };
 
 /* ---------- ⑥ 偏差分析 ---------- */
+/* 按团队聚合一类明细（_totalsCloud / _totalsMiddle），只统计「已选迭代」，
+   与 totalsByTeam 同口径，用于数据源确认表的三行核验 */
+function srcAggregate(state, raw) {
+  const picked = {};
+  (state.iterations || []).forEach(i => { if (i.selected) picked[normLine(i.name)] = true; });
+  const out = {};
+  TEAMS.forEach(t => { out[t.key] = 0; });
+  (raw || []).forEach(row => {
+    if (!picked[normLine(row.iteration)]) return;
+    const team = TEAM_INDEX[normTeam(row.team)];
+    if (!team) return;
+    out[team.key] += pickValue(row, team, state);
+  });
+  return out;
+}
+
 function matrixTable(title, hint, rows, sumRow, sumLabel) {
   const th = TEAMS.map(t => `<th>${esc(t.key)}</th>`).join('');
   const body = rows.map(r => `
@@ -1234,18 +1313,22 @@ RENDERERS.analysis = function () {
 
   const c = res.cycle;
   let warn = '';
-  // 数据源确认：一行摘要（用到了哪几份数据 + 已选迭代），明细收进折叠，避免占满屏幕
-  warn += '<div class="card tb-src-confirm" style="border-left:3px solid var(--accent)">' +
-    '<details><summary>📊 数据源确认 — 工时表 ' + ((state.totals || []).length + (state._totalsCloud || []).length + (state._totalsMiddle || []).length) +
-    ' 行 · 已选 ' + res.iterations.length + ' 个迭代</summary>' +
-    '<p class="hint" style="margin-top:8px">当前口径：总计表（totals）<b>' + ((state.totals || []).length) + '</b> 行，' +
-    '阳光云明细（_totalsCloud）<b>' + ((state._totalsCloud || []).length) + '</b> 行，' +
-    '中后台明细（_totalsMiddle）<b>' + ((state._totalsMiddle || []).length) + '</b> 行，' +
-    '人力看板（board）<b>' + ((state.board || []).length) + '</b> 行。</p>' +
-    '<p class="hint">已选迭代: <b>' + (res.iterations.length ? res.iterations.join('、') : '无（请到第⑤页勾选）') + '</b></p>' +
-    '<div class="scroll"><table><thead><tr><th>团队</th><th>工时表值（人天）</th></tr></thead><tbody>' +
-    TEAMS.map(function(t) { return '<tr><td class="txt">' + esc(t.key) + '</td><td>' + fmt(res.authoritative[t.key]) + '</td></tr>'; }).join('') +
-    '</tbody></table></div></details></div>';
+  // 数据源确认：与下方「产品线版本工作量汇总 / 版本规划工作量汇总」同款卡片宽表，
+  // 按团队列出权威口径 + 阳光云明细 + 中后台明细，行数/迭代信息放进 hint。
+  const cloudRow = srcAggregate(state, state._totalsCloud || []);
+  const middleRow = srcAggregate(state, state._totalsMiddle || []);
+  const srcRows = [
+    { key: '权威口径（工作总表）', values: res.authoritative },
+    { key: '阳光云明细（_totalsCloud）', values: cloudRow },
+    { key: '中后台明细（_totalsMiddle）', values: middleRow }
+  ];
+  warn += matrixTable('数据源确认', '当前口径：总计表（totals）' + ((state.totals || []).length) +
+    ' 行 · 阳光云明细（_totalsCloud）' + ((state._totalsCloud || []).length) +
+    ' 行 · 中后台明细（_totalsMiddle）' + ((state._totalsMiddle || []).length) +
+    ' 行 · 人力看板（board）' + ((state.board || []).length) + ' 行。已选迭代: ' +
+    (res.iterations.length ? res.iterations.join('、') : '无（请到第⑤页勾选）') +
+    '。「权威口径」用于下列偏差计算，应等于下面两行明细之和，若不等说明部分任务未挂对应团队标签。',
+    srcRows);
   if (!res.iterations.length)
     warn += '<div class="card"><p class="tag warn">未选择本期迭代，所有工时为 0。请到第⑤页勾选。</p></div>';
   if (res.days === 0)

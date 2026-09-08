@@ -181,6 +181,11 @@ function validateState(next) {
           if (ov.startDate && ov.endDate && ov.startDate > ov.endDate) return `总览阶段 "${ov.id}" 开始日期不能晚于结束日期`;
         }
       }
+
+      // 二阶段占位板块（上市计划/遗留问题/项目风险）：一阶段仅弱校验为数组，字段结构待二阶段定稿
+      if (p.marketPlan != null && !Array.isArray(p.marketPlan)) return `计划 "${p.id}" marketPlan 必须为数组`;
+      if (p.issues != null && !Array.isArray(p.issues)) return `计划 "${p.id}" issues 必须为数组`;
+      if (p.risks != null && !Array.isArray(p.risks)) return `计划 "${p.id}" risks 必须为数组`;
     }
   }
   return null;

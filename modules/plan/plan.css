@@ -1193,3 +1193,87 @@ body.dark-theme .gantt-planned,
   padding-top: 14px;
   border-top: 1px solid var(--line);
 }
+
+
+/* ==========================================================
+   表单 Tab 化（横向滚动导航 + tab body + 暂存条 + 占位页 + 导入弹窗）
+   ========================================================== */
+/* 表单顶部横向 tab 导航：一行放不下则横向滚动，不撑破页面 */
+.pl-form-topnav {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin-bottom: 16px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  scrollbar-width: thin;
+}
+.pl-form-topnav::-webkit-scrollbar { height: 6px; }
+.pl-form-topnav::-webkit-scrollbar-thumb { background: var(--line-strong, #d0d5dd); border-radius: 3px; }
+.pl-form-tab {
+  flex: 0 0 auto;           /* 不压缩，超出则横向滚动 */
+  white-space: nowrap;
+}
+
+/* 表单 tab 内容体 */
+.pl-form-tab-body { min-width: 0; }
+.pl-form-tab-body .cs-form-section { border-bottom: none; margin-bottom: 0; padding-bottom: 4px; }
+
+/* 底部暂存条 */
+.pl-form-tab-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* 占位 tab（二阶段设计） */
+.pl-placeholder {
+  padding: 60px 24px;
+  text-align: center;
+  color: var(--muted);
+}
+.pl-placeholder-ic { font-size: 44px; margin-bottom: 14px; opacity: .5; }
+.pl-placeholder h4 { margin: 0 0 10px; font-size: 17px; color: var(--text); }
+.pl-placeholder p { max-width: 560px; margin: 0 auto 14px; font-size: 13px; line-height: 1.8; }
+
+/* 项目总览：子流程行淡底，父阶段行加粗底色 */
+.pl-ov-parent > td { background: var(--panel-soft); }
+.pl-ov-child > td:first-child { color: var(--muted); }
+
+/* WBS 导入按钮（次要入口） */
+.pl-import-btn {
+  font-size: 12.5px;
+  padding: 6px 14px;
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.pl-import-btn:hover { background: var(--accent); color: #fff; }
+
+/* 导入弹窗（复用于需求清单导入） */
+.pl-decompose { min-width: 0; }
+.pl-dec-desc { font-size: 12.5px; color: var(--muted); line-height: 1.75; margin: 0 0 12px; }
+.pl-dec-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.pl-dec-upload { cursor: pointer; font-size: 12.5px; padding: 6px 14px; }
+.pl-dec-filehint { font-size: 12px; color: var(--muted); }
+.pl-dec-input {
+  width: 100%; box-sizing: border-box; min-height: 180px;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--panel); color: var(--text); font-size: 13px; line-height: 1.7; resize: vertical;
+}
+.pl-dec-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.pl-dec-preview { margin-top: 10px; }
+.pl-dec-preview-head {
+  font-size: 12.5px; color: var(--text);
+  background: var(--panel-soft); border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm); padding: 8px 12px;
+}

@@ -17,13 +17,12 @@ const PlanModule = (() => {
   let summary = null;
   let currentView = 'list';            // list | detail | new | edit
   let currentPlanId = null;
-  let currentTab = 'overview';         // overview | wbs | gantt | milestone | resource | exec | ai
-  let dirtyForm = null;                // 编辑中的表单草稿（含 tasks/milestones/resources）
+  let currentTab = 'overview';         // 详情页当前 tab: overview | wbs | gantt | milestone | resource | exec | ai
+  let currentFormTab = 'basic';        // 新建/编辑表单当前 tab: basic|overview|milestone|wbs|market|issue|risk|resource|member|reference
+  let dirtyForm = null;                // 编辑中的表单草稿（含 tasks/milestones/resources/overview...）
   let expandedWbs = new Set();         // 已展开的 wbs 节点 id
   let filterText = '';
   let isSaving = false;
-  let overviewEditing = false;         // 项目总览 tab 是否处于编辑态
-  let overviewDraft = null;            // 项目总览编辑草稿（stages[]）
 
   /* ---------- 常量表 ---------- */
   const PLAN_STATUS_LABELS = { draft: '草稿', active: '进行中', completed: '已完成', archived: '已归档' };
@@ -344,68 +343,25 @@ const PlanModule = (() => {
     return `<div class="cs-topnav">${tabs.map(t => `<button class="cs-tab ${currentTab === t.key ? 'active' : ''}" data-tab="${t.key}"><span class="cs-tab-icon">${t.icon}</span>${t.label}</button>`).join('')}</div>`;
   }
 
-  /* ---------- Tab 0：项目总览（固定 8 阶段大纲，独立数据 plan.overview[]） ---------- */
+  /* ---------- 详情页 Tab 0：项目总览（只读展示，编辑在新建/编辑表单里） ---------- */
   function renderOverviewTab(plan) {
     const stages = plan.overview || [];
-    // 空态：引导一键初始化标准 8 阶段
-    if (!overviewEditing && stages.length === 0) {
-      return `
-      <div class="pl-wrap">
-        <div class="pl-empty">
-          <div class="pl-empty-ic">📋</div>
-          <p>还没有项目总览。项目总览是一份清晰的<b>项目级大纲</b>，按标准 8 阶段（需求传递 → 环境准备 → 方案设计 → 技术详设设计 → 研发计划 → 测试计划 → 实证 → 上市交付）组织。</p>
-          <button class="btn primary" id="plOvInit">📋 一键初始化标准 8 阶段</button>
-        </div>
-      </div>`;
+    if (stages.length === 0) {
+      return `<div class="pl-wrap"><div class="pl-empty"><div class="pl-empty-ic">📋</div><p>暂无项目总览。点击右下角「编辑计划」，在「项目总览」标签页维护 8 阶段大纲。</p></div></div>`;
     }
-    // 编辑态：可增删改每个阶段
-    if (overviewEditing) {
-      const rows = (overviewDraft || []).map((s, i) => `
-        <tr data-ov-idx="${i}">
-          <td class="pl-ov-seq">${i + 1}</td>
-          <td><input data-f="name" value="${esc(s.name)}" placeholder="阶段名称"></td>
-          <td><input data-f="owner" value="${esc(s.owner)}" placeholder="负责人"></td>
-          <td><input type="date" data-f="startDate" value="${esc(s.startDate)}"></td>
-          <td><input type="date" data-f="endDate" value="${esc(s.endDate)}"></td>
-          <td><select data-f="status">${Object.keys(TASK_STATUS_LABELS).map(k => `<option value="${k}" ${s.status === k ? 'selected' : ''}>${TASK_STATUS_LABELS[k]}</option>`).join('')}</select></td>
-          <td><input type="number" data-f="progress" value="${esc(s.progress)}" min="0" max="100" placeholder="0-100"></td>
-          <td><input data-f="deliverable" value="${esc(s.deliverable)}" placeholder="交付物"></td>
-          <td><input data-f="note" value="${esc(s.note)}" placeholder="备注"></td>
-          <td><button type="button" class="cs-del-btn pl-del-ov" data-del-ov="${i}" title="删除阶段">✕</button></td>
-        </tr>`).join('');
-      return `
-      <div class="pl-wrap">
-        <div class="pl-sect-head">
-          <h4>项目总览（编辑）<span class="pl-count-pill">${(overviewDraft || []).length} 阶段</span></h4>
-          <div class="pl-form-actions">
-            <button type="button" class="btn pl-add-btn" id="plOvAddStage">＋ 添加阶段</button>
-            <button type="button" class="btn" id="plOvReset">↻ 重置为标准 8 阶段</button>
-          </div>
-        </div>
-        <div class="pl-form-note">项目总览是阶段级大纲，独立于下方「WBS 任务」明细。可增删阶段、调整负责人/起止/状态/进度/交付物。</div>
-        <div class="table-wrapper pl-ov-table-wrap">
-          <table class="data-table pl-ov-table">
-            <thead><tr>
-              <th style="min-width:40px">#</th><th class="txt" style="min-width:150px">阶段名称</th><th class="txt">负责人</th>
-              <th class="txt">开始</th><th class="txt">结束</th><th>状态</th><th style="min-width:70px">进度%</th>
-              <th class="txt" style="min-width:150px">交付物</th><th class="txt" style="min-width:140px">备注</th><th></th>
-            </tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-        <div class="pl-ov-actions">
-          <button class="btn" id="plOvCancel">取消</button>
-          <button class="btn primary" id="plOvSave">💾 保存总览</button>
-        </div>
-      </div>`;
-    }
-    // 只读态：展示阶段大纲
-    const rows = stages.map((s, i) => {
+    const idToSeq = {}; let topSeq = 0;
+    stages.forEach(s => { if (!s.parentId) { topSeq++; idToSeq[s.id] = topSeq; } });
+    const subSeq = {};
+    const rows = stages.map(s => {
+      const isChild = !!s.parentId;
+      let seqLabel;
+      if (!isChild) seqLabel = String(idToSeq[s.id]);
+      else { subSeq[s.parentId] = (subSeq[s.parentId] || 0) + 1; seqLabel = (idToSeq[s.parentId] || '') + '.' + subSeq[s.parentId]; }
       const pct = Number(s.progress || 0);
       return `
-      <tr>
-        <td class="pl-ov-seq">${i + 1}</td>
-        <td class="txt"><b>${esc(s.name)}</b></td>
+      <tr class="${isChild ? 'pl-ov-child' : 'pl-ov-parent'}">
+        <td class="pl-ov-seq">${seqLabel}</td>
+        <td class="txt" style="${isChild ? 'padding-left:26px' : 'font-weight:600'}">${esc(s.name)}</td>
         <td class="txt">${esc(s.owner || '—')}</td>
         <td class="txt">${esc(fmtDate(s.startDate))}</td>
         <td class="txt">${esc(fmtDate(s.endDate))}</td>
@@ -418,16 +374,13 @@ const PlanModule = (() => {
     return `
     <div class="pl-wrap">
       <div class="pl-sect-head">
-        <h4>项目总览 <span class="pl-count-pill">${stages.length} 阶段</span></h4>
-        <div class="pl-form-actions">
-          <button type="button" class="btn primary" id="plOvEdit">✏️ 编辑总览</button>
-        </div>
+        <h4>项目总览 <span class="pl-count-pill">${stages.filter(s => !s.parentId).length} 阶段</span></h4>
+        <span class="pl-hint">项目级大纲；编辑请点右下角「编辑计划」→「项目总览」标签页</span>
       </div>
-      <div class="pl-form-note">项目级大纲：按标准阶段组织的执行主线，独立于下方「WBS 任务」明细。</div>
       <div class="table-wrapper pl-ov-table-wrap">
         <table class="data-table pl-ov-table">
           <thead><tr>
-            <th style="min-width:40px">#</th><th class="txt">阶段名称</th><th class="txt">负责人</th>
+            <th style="min-width:44px">#</th><th class="txt">阶段 / 子流程</th><th class="txt">负责人</th>
             <th class="txt">开始</th><th class="txt">结束</th><th>状态</th><th style="min-width:110px">进度</th>
             <th class="txt">交付物</th><th class="txt">备注</th>
           </tr></thead>
@@ -839,26 +792,36 @@ const PlanModule = (() => {
                  研发计划 / 测试计划 / 实证 / 上市交付
      （与需求清单彻底解耦；需求清单用于将来的「详细计划」）
      ========================================================== */
+  // 测试计划阶段固定的 6 条子流程
+  const TEST_PLAN_SUBS = ['测试方案设计', '测试用例编写', '敏捷测试', '系统测试一轮', '系统测试二轮', '可用性测试(实证测试)'];
   const OVERVIEW_STAGES = [
     { name: '需求传递', deliverable: '需求评审纪要' },
     { name: '环境准备', deliverable: '开发/测试环境就绪' },
     { name: '方案设计', deliverable: '总体方案文档' },
     { name: '技术详设设计', deliverable: '详细设计文档' },
     { name: '研发计划', deliverable: '功能实现' },
-    { name: '测试计划', deliverable: '测试报告' },
+    { name: '测试计划', deliverable: '测试报告', subs: TEST_PLAN_SUBS },
     { name: '实证', deliverable: '现场实证报告' },
     { name: '上市交付', deliverable: '交付/上市材料' }
   ];
-  function blankStage() {
-    return { id: 'ov-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: '', owner: '', startDate: '', endDate: '', status: 'not-started', progress: 0, deliverable: '', note: '' };
+  // 阶段行：parentId 为空=一级阶段；非空=子流程行（如测试计划下的 6 条）
+  function blankStage(parentId) {
+    return { id: 'ov-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), parentId: parentId || '', name: '', owner: '', startDate: '', endDate: '', status: 'not-started', progress: 0, deliverable: '', note: '' };
   }
-  // 用标准 8 阶段初始化一版项目总览大纲
+  // 用标准 8 阶段初始化一版项目总览大纲（测试计划自动挂 6 条固定子流程）
   function seedOverviewStages() {
-    return OVERVIEW_STAGES.map(s => {
-      const st = blankStage();
+    const out = [];
+    OVERVIEW_STAGES.forEach(s => {
+      const st = blankStage('');
       st.name = s.name; st.deliverable = s.deliverable;
-      return st;
+      out.push(st);
+      if (s.subs) s.subs.forEach(sub => {
+        const c = blankStage(st.id);
+        c.name = sub;
+        out.push(c);
+      });
     });
+    return out;
   }
 
   function initFormDraft(plan) {
@@ -875,8 +838,12 @@ const PlanModule = (() => {
       resources: (p && p.resources ? p.resources : []).map(r => ({ ...r })),
       members: (p && p.members ? p.members : []).map(m => ({ ...m })),
       references: (p && p.references ? p.references : []).map(r => ({ ...r })),
-      // 项目总览：新建计划时自动初始化标准 8 阶段；编辑时保留原有大纲
-      overview: (p && p.overview && p.overview.length ? p.overview.map(o => ({ ...o })) : (p ? [] : seedOverviewStages())),
+      // 项目总览：新建计划时自动初始化标准 8 阶段（含测试计划的 6 条固定子流程）；编辑时保留原有大纲，若为空也补一版
+      overview: (p && p.overview && p.overview.length ? p.overview.map(o => ({ ...o })) : seedOverviewStages()),
+      // 二阶段占位板块：上市计划 / 遗留问题 / 项目风险（一阶段仅预留数据字段，页面占位）
+      marketPlan: (p && p.marketPlan ? p.marketPlan : []).map(x => ({ ...x })),
+      issues: (p && p.issues ? p.issues : []).map(x => ({ ...x })),
+      risks: (p && p.risks ? p.risks : []).map(x => ({ ...x })),
       aiConfig: (p && p.aiConfig) || {}
     };
   }
@@ -980,6 +947,301 @@ const PlanModule = (() => {
     return `<div class="table-wrapper"><table class="data-table"><thead><tr><th class="txt" style="min-width:190px">文档名称</th><th>类型</th><th class="txt" style="min-width:220px">链接/路径</th><th class="txt">说明</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
   }
 
+  /* ---------- 表单 Tab 定义 ---------- */
+  const FORM_TABS = [
+    { key: 'basic', label: '基本信息', icon: '📝' },
+    { key: 'overview', label: '项目总览', icon: '📋' },
+    { key: 'milestone', label: '里程碑', icon: '🎯' },
+    { key: 'wbs', label: 'WBS任务', icon: '🌳' },
+    { key: 'market', label: '上市计划', icon: '🚀' },
+    { key: 'issue', label: '遗留问题', icon: '📌' },
+    { key: 'risk', label: '项目风险', icon: '⚠️' },
+    { key: 'resource', label: '资源', icon: '👥' },
+    { key: 'member', label: '团队成员', icon: '🧑‍🤝‍🧑' },
+    { key: 'reference', label: '参考文档', icon: '📎' }
+  ];
+  function buildFormTabs() {
+    return `<div class="pl-form-topnav">${FORM_TABS.map(t =>
+      `<button type="button" class="cs-tab pl-form-tab ${currentFormTab === t.key ? 'active' : ''}" data-form-tab="${t.key}"><span class="cs-tab-icon">${t.icon}</span>${t.label}</button>`
+    ).join('')}</div>`;
+  }
+
+  /* ---------- 各表单 Tab 内容 ---------- */
+  function renderFormBasic(draft) {
+    return `
+    <div class="cs-form-section">
+      <div class="cs-form-grid">
+        <div class="cs-field"><label>计划名称 <span class="req">*</span></label><input type="text" data-f="name" value="${esc(draft.name)}" placeholder="如：2026 阳光云平台迭代计划"></div>
+        <div class="cs-field"><label>年度</label><input type="number" data-f="year" value="${esc(draft.year)}" min="2020" max="2100"></div>
+        <div class="cs-field"><label>状态</label><select data-f="status">${Object.keys(PLAN_STATUS_LABELS).map(k => `<option value="${k}" ${draft.status === k ? 'selected' : ''}>${PLAN_STATUS_LABELS[k]}</option>`).join('')}</select></div>
+        <div class="cs-field"><label>负责人</label><input type="text" data-f="owner" value="${esc(draft.owner)}" placeholder="计划负责人"></div>
+        <div class="cs-field"><label>项目 ID</label><input type="text" data-f="projectId" value="${esc(draft.projectId)}" placeholder="关联项目ID（可选）"></div>
+        <div class="cs-field"><label>项目名称</label><input type="text" data-f="projectName" value="${esc(draft.projectName)}" placeholder="关联项目名称（可选）"></div>
+        <div class="cs-field"><label>计划开始</label><input type="date" data-f="startDate" value="${esc(draft.startDate)}"></div>
+        <div class="cs-field"><label>计划结束</label><input type="date" data-f="endDate" value="${esc(draft.endDate)}"></div>
+        <div class="cs-field cs-field-wide"><label>计划描述 / 目标</label><textarea data-f="description" rows="3" placeholder="描述计划目标、范围、验收标准">${esc(draft.description)}</textarea></div>
+      </div>
+    </div>`;
+  }
+
+  // 项目总览（表单内）：固定 8 阶段大纲，测试计划下挂 6 条固定子流程，可增删改
+  function renderFormOverview(draft) {
+    const stages = draft.overview || [];
+    // 计算每个一级阶段的序号 + 子行缩进
+    const idToSeq = {};
+    let topSeq = 0;
+    stages.forEach(s => { if (!s.parentId) { topSeq++; idToSeq[s.id] = topSeq; } });
+    const subSeq = {};
+    const rows = stages.map((s, i) => {
+      const isChild = !!s.parentId;
+      let seqLabel;
+      if (!isChild) seqLabel = String(idToSeq[s.id]);
+      else { subSeq[s.parentId] = (subSeq[s.parentId] || 0) + 1; seqLabel = (idToSeq[s.parentId] || '') + '.' + subSeq[s.parentId]; }
+      return `
+      <tr data-ov-idx="${i}" class="${isChild ? 'pl-ov-child' : 'pl-ov-parent'}">
+        <td class="pl-ov-seq">${seqLabel}</td>
+        <td><input data-f="name" value="${esc(s.name)}" placeholder="${isChild ? '子流程名称' : '阶段名称'}" style="${isChild ? 'margin-left:22px' : 'font-weight:600'}"></td>
+        <td><input data-f="owner" value="${esc(s.owner)}" placeholder="负责人"></td>
+        <td><input type="date" data-f="startDate" value="${esc(s.startDate)}"></td>
+        <td><input type="date" data-f="endDate" value="${esc(s.endDate)}"></td>
+        <td><select data-f="status">${Object.keys(TASK_STATUS_LABELS).map(k => `<option value="${k}" ${s.status === k ? 'selected' : ''}>${TASK_STATUS_LABELS[k]}</option>`).join('')}</select></td>
+        <td><input type="number" data-f="progress" value="${esc(s.progress)}" min="0" max="100" placeholder="0-100"></td>
+        <td><input data-f="deliverable" value="${esc(s.deliverable)}" placeholder="交付物"></td>
+        <td><input data-f="note" value="${esc(s.note)}" placeholder="备注"></td>
+        <td><button type="button" class="cs-del-btn pl-del-ov" data-del-ov="${i}" title="删除">✕</button></td>
+      </tr>`;
+    }).join('');
+    const body = stages.length ? `
+      <div class="table-wrapper pl-ov-table-wrap">
+        <table class="data-table pl-ov-table">
+          <thead><tr>
+            <th style="min-width:44px">#</th><th class="txt" style="min-width:170px">阶段 / 子流程</th><th class="txt">负责人</th>
+            <th class="txt">开始</th><th class="txt">结束</th><th>状态</th><th style="min-width:70px">进度%</th>
+            <th class="txt" style="min-width:150px">交付物</th><th class="txt" style="min-width:140px">备注</th><th></th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>` : `<div class="pl-empty pl-empty-sm"><div class="pl-empty-ic">📋</div><p>暂无阶段，点击「重置为标准 8 阶段」生成</p></div>`;
+    return `
+    <div class="cs-form-section">
+      <div class="cs-form-section-head">
+        <div class="cs-form-section-title">项目总览 <span class="pl-count-pill">${stages.filter(s => !s.parentId).length} 阶段</span></div>
+        <div class="pl-form-actions">
+          <button type="button" class="btn pl-add-btn" id="plAddStage">＋ 添加阶段</button>
+          <button type="button" class="btn" id="plOvReset">↻ 重置为标准 8 阶段</button>
+        </div>
+      </div>
+      <div class="pl-form-note">项目级大纲：标准 8 阶段（测试计划内置 6 条固定子流程）。新建计划自动带出，可调整负责人/起止/状态/进度，也可增删阶段。</div>
+      ${body}
+    </div>`;
+  }
+
+  // WBS 任务（表单内）：含「从需求清单导入」次要入口
+  function renderFormWbs(draft) {
+    return `
+    <div class="cs-form-section">
+      <div class="cs-form-section-head">
+        <div class="cs-form-section-title">WBS 任务 <span class="pl-count-pill">${draft.tasks.length} 项</span></div>
+        <div class="pl-form-actions">
+          <button type="button" class="btn pl-import-btn" id="plImportReq">📥 从需求清单导入</button>
+          <button type="button" class="btn pl-add-btn" id="plAddTask">＋ 添加任务</button>
+        </div>
+      </div>
+      <div class="pl-form-note">详细任务分解。可手动逐条添加，或「从需求清单导入」批量生成（追加，不覆盖）。父任务、依赖用于生成树与甘特。</div>
+      ${renderFormTasks(draft)}
+    </div>`;
+  }
+
+  function renderFormMilestoneTab(draft) {
+    return `
+    <div class="cs-form-section">
+      <div class="cs-form-section-head">
+        <div class="cs-form-section-title">里程碑 <span class="pl-count-pill">${draft.milestones.length} 项</span></div>
+        <div class="pl-form-actions"><button type="button" class="btn pl-add-btn" id="plAddMilestone">＋ 添加里程碑</button></div>
+      </div>
+      ${renderFormMilestones(draft)}
+    </div>`;
+  }
+  function renderFormResourceTab(draft) {
+    return `
+    <div class="cs-form-section">
+      <div class="cs-form-section-head">
+        <div class="cs-form-section-title">资源 <span class="pl-count-pill">${draft.resources.length} 项</span></div>
+        <div class="pl-form-actions"><button type="button" class="btn pl-add-btn" id="plAddResource">＋ 添加资源</button></div>
+      </div>
+      ${renderFormResources(draft)}
+    </div>`;
+  }
+  function renderFormMemberTab(draft) {
+    return `
+    <div class="cs-form-section">
+      <div class="cs-form-section-head">
+        <div class="cs-form-section-title">团队成员 <span class="pl-count-pill">${draft.members.length} 人</span></div>
+        <div class="pl-form-actions"><button type="button" class="btn pl-add-btn" id="plAddMember">＋ 添加成员</button></div>
+      </div>
+      <div class="pl-form-note">登记项目关键角色与职责分工（产品经理 / 系统经理 / 项目经理 / 研发 / 测试等），便于责任到人。</div>
+      ${renderFormMembers(draft)}
+    </div>`;
+  }
+  function renderFormReferenceTab(draft) {
+    return `
+    <div class="cs-form-section">
+      <div class="cs-form-section-head">
+        <div class="cs-form-section-title">参考文档 <span class="pl-count-pill">${draft.references.length} 项</span></div>
+        <div class="pl-form-actions"><button type="button" class="btn pl-add-btn" id="plAddReference">＋ 添加文档</button></div>
+      </div>
+      <div class="pl-form-note">关联需求清单、设计方案、测试方案、接口文档等，统一沉淀，方便团队查阅。</div>
+      ${renderFormReferences(draft)}
+    </div>`;
+  }
+  // 二阶段占位 Tab
+  function renderFormPlaceholder(title, icon, desc) {
+    return `
+    <div class="cs-form-section">
+      <div class="pl-placeholder">
+        <div class="pl-placeholder-ic">${icon}</div>
+        <h4>${esc(title)}</h4>
+        <p>${esc(desc)}</p>
+        <span class="pl-chip">二阶段设计中</span>
+      </div>
+    </div>`;
+  }
+
+  // 渲染当前 form tab 的内容体
+  function renderFormTabBodyHtml(draft) {
+    switch (currentFormTab) {
+      case 'basic': return renderFormBasic(draft);
+      case 'overview': return renderFormOverview(draft);
+      case 'milestone': return renderFormMilestoneTab(draft);
+      case 'wbs': return renderFormWbs(draft);
+      case 'market': return renderFormPlaceholder('上市计划', '🚀', '上市策略/计划编制/上市对齐/资料准备/产品推广/分批上线等阶段化管理。此板块将在二阶段按参考模板设计具体表格页面。');
+      case 'issue': return renderFormPlaceholder('遗留问题', '📌', '记录项目遗留问题（问题描述/应对方案/责任人/预计闭环时间/当前进展/结论/状态）。此板块将在二阶段设计具体表格页面。');
+      case 'risk': return renderFormPlaceholder('项目风险', '⚠️', '记录项目风险（风险类型/风险描述/应对方案/责任人/计划闭环时间/风险状态）。此板块将在二阶段设计具体表格页面。');
+      case 'resource': return renderFormResourceTab(draft);
+      case 'member': return renderFormMemberTab(draft);
+      case 'reference': return renderFormReferenceTab(draft);
+      default: return renderFormBasic(draft);
+    }
+  }
+
+  /* ---------- 从需求清单导入 WBS（灵活版：粘贴/上传，智能识别一二级，追加不覆盖） ---------- */
+  // 解析需求清单文本 → [{name, parent}]，支持「父<TAB>子」或缩进/编号表示层级
+  function parseRequirementText(text) {
+    const lines = String(text || '').split(/\r?\n/).map(l => l.replace(/\s+$/, '')).filter(l => l.trim());
+    const items = [];
+    let lastTop = null;
+    lines.forEach(raw => {
+      // 识别「父\t子」或「父,子」两列（制表符/多空格/逗号分隔且第一列非空）
+      const tabM = raw.split(/\t|，|,|\s{2,}/).map(s => s.trim()).filter(Boolean);
+      const indented = /^\s+|^[·•\-*]/.test(raw) || /^\s*\d+\.\d+/.test(raw); // 缩进/子项符号/1.1 编号 → 子任务
+      const clean = (s) => s.replace(/^\s*(\d+(\.\d+)*\s*[.、)．]\s*|[·•\-*]\s*)/, '').trim();
+      if (tabM.length >= 2) {
+        const parent = clean(tabM[0]);
+        const child = clean(tabM.slice(1).join(' '));
+        if (parent) { if (!items.find(x => x.name === parent && !x.parent)) items.push({ name: parent, parent: null }); lastTop = parent; }
+        if (child) items.push({ name: child, parent: parent || lastTop });
+      } else {
+        const name = clean(raw);
+        if (!name) return;
+        if (indented && lastTop) items.push({ name, parent: lastTop });
+        else { items.push({ name, parent: null }); lastTop = name; }
+      }
+    });
+    return items;
+  }
+  // 把解析结果追加为 tasks（建立父子 parentId）
+  function appendRequirementTasks(items) {
+    const nameToId = {};
+    // 先建一级，拿到 id 供子级挂靠
+    items.filter(it => !it.parent).forEach(it => {
+      const t = blankTask(); t.name = it.name; t.parentId = ''; dirtyForm.tasks.push(t); nameToId[it.name] = t.id;
+    });
+    items.filter(it => it.parent).forEach(it => {
+      const t = blankTask(); t.name = it.name;
+      t.parentId = nameToId[it.parent] || '';
+      dirtyForm.tasks.push(t);
+    });
+  }
+  function openRequirementImport() {
+    const body = `
+      <div class="pl-decompose">
+        <p class="pl-dec-desc">粘贴需求清单（一行一条），或上传 .txt / .csv / .xlsx。系统智能识别层级：<b>「父&lt;Tab&gt;子」或两列</b>→ 一二级任务；<b>缩进/1.1 编号/项目符号</b>→ 子任务；识别不出则全部作为一级任务。生成后<b>追加</b>到 WBS，不覆盖已有，可继续手动增删改。需求清单非必须。</p>
+        <div class="pl-dec-toolbar">
+          <label class="pl-dec-upload btn">📎 上传文件<input type="file" id="plReqFile" accept=".txt,.csv,.xlsx,.xls" hidden></label>
+          <span class="pl-dec-filehint" id="plReqFileHint"></span>
+        </div>
+        <textarea id="plReqInput" class="pl-dec-input" rows="9" placeholder="示例（一级）：&#10;开放平台与集成&#10;智能体配置平台&#10;&#10;示例（两列，父&lt;Tab&gt;子）：&#10;研发计划&#9;开放平台与集成&#10;研发计划&#9;记忆库管理"></textarea>
+        <div class="pl-dec-preview" id="plReqPreview"></div>
+      </div>`;
+    SharedUI.confirm('从需求清单导入 WBS', body, () => {
+      const input = document.getElementById('plReqInput');
+      const items = parseRequirementText(input ? input.value : '');
+      if (!items.length) { SharedUI.toast('未解析到需求条目', 'warning'); return; }
+      appendRequirementTasks(items);
+      renderFormTabBody();
+      const tops = items.filter(i => !i.parent).length, subs = items.length - tops;
+      SharedUI.toast(`已追加 ${items.length} 个任务（${tops} 个一级${subs ? `、${subs} 个子任务` : ''}）`, 'success');
+    }, { confirmText: '解析并追加', cancelText: '取消' });
+
+    setTimeout(() => {
+      const fileEl = document.getElementById('plReqFile');
+      const hint = document.getElementById('plReqFileHint');
+      const input = document.getElementById('plReqInput');
+      const preview = document.getElementById('plReqPreview');
+      const refresh = () => {
+        if (!preview) return;
+        const items = parseRequirementText(input ? input.value : '');
+        const tops = items.filter(i => !i.parent).length, subs = items.length - tops;
+        preview.innerHTML = `<div class="pl-dec-preview-head">预览：将追加 <b>${items.length}</b> 个任务（${tops} 一级 / ${subs} 子任务）</div>`;
+      };
+      if (input) input.addEventListener('input', refresh);
+      if (fileEl) fileEl.addEventListener('change', () => {
+        const f = fileEl.files && fileEl.files[0];
+        if (!f) return;
+        if (hint) hint.textContent = '解析中…';
+        parseRequirementFileToText(f, (text) => { if (input) { input.value = text; refresh(); } if (hint) hint.textContent = `✓ 已解析 ${f.name}，请核对后追加`; },
+          (err) => { if (hint) hint.textContent = '✗ ' + err.message; });
+      });
+      refresh();
+    }, 0);
+  }
+  // 文件 → 文本（.txt/.csv 直读；.xlsx 用 SheetJS：优先取前两列拼成「父\t子」，否则第一列）
+  function parseRequirementFileToText(file, onDone, onError) {
+    const name = (file.name || '').toLowerCase();
+    if (/\.(txt|csv)$/.test(name)) {
+      const reader = new FileReader();
+      reader.onerror = () => onError(new Error('文件读取失败'));
+      reader.onload = e => {
+        let text = String(e.target.result || '');
+        if (/\.csv$/.test(name)) text = text.split(/\r?\n/).map(line => line.split(',').map(s => s.replace(/^"|"$/g, '').trim()).filter(Boolean).join('\t')).join('\n');
+        onDone(text);
+      };
+      reader.readAsText(file, 'UTF-8');
+    } else if (/\.(xlsx|xls)$/.test(name)) {
+      if (typeof XLSX === 'undefined') { onError(new Error('Excel 解析库未加载，请改用粘贴文本')); return; }
+      const reader = new FileReader();
+      reader.onerror = () => onError(new Error('文件读取失败'));
+      reader.onload = e => {
+        try {
+          const wb = XLSX.read(e.target.result, { type: 'array' });
+          const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false });
+          // 跳过疑似表头行（含"需求/功能/标题/任务/编号"），其余行取前两个非空列拼 \t
+          const lines = [];
+          aoa.forEach((row, i) => {
+            const cells = (row || []).map(c => String(c == null ? '' : c).trim());
+            if (i === 0 && cells.join('').match(/需求|功能|标题|任务|编号|清单/)) return;
+            const nonEmpty = cells.filter(Boolean);
+            if (nonEmpty.length) lines.push(nonEmpty.slice(0, 2).join('\t'));
+          });
+          onDone(lines.join('\n'));
+        } catch (err) { onError(new Error('Excel 解析失败：' + err.message)); }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      onError(new Error('暂支持 .txt / .csv / .xlsx，其他请粘贴文本'));
+    }
+  }
+
   function renderFormView() {
     const draft = dirtyForm;
     const isEdit = currentView === 'edit';
@@ -995,67 +1257,12 @@ const PlanModule = (() => {
           <button class="btn primary" id="plFormSave">💾 保存计划</button>
         </div>
       </div>
+      ${buildFormTabs()}
       <div class="cs-form-body">
-        <div class="cs-form">
-          <div class="cs-form-section">
-            <div class="cs-form-section-title">基本信息</div>
-            <div class="cs-form-grid">
-              <div class="cs-field"><label>计划名称 <span class="req">*</span></label><input type="text" data-f="name" value="${esc(draft.name)}" placeholder="如：2026 阳光云平台迭代计划"></div>
-              <div class="cs-field"><label>年度</label><input type="number" data-f="year" value="${esc(draft.year)}" min="2020" max="2100"></div>
-              <div class="cs-field"><label>状态</label><select data-f="status">${Object.keys(PLAN_STATUS_LABELS).map(k => `<option value="${k}" ${draft.status === k ? 'selected' : ''}>${PLAN_STATUS_LABELS[k]}</option>`).join('')}</select></div>
-              <div class="cs-field"><label>负责人</label><input type="text" data-f="owner" value="${esc(draft.owner)}" placeholder="计划负责人"></div>
-              <div class="cs-field"><label>项目 ID</label><input type="text" data-f="projectId" value="${esc(draft.projectId)}" placeholder="关联项目ID（可选）"></div>
-              <div class="cs-field"><label>项目名称</label><input type="text" data-f="projectName" value="${esc(draft.projectName)}" placeholder="关联项目名称（可选）"></div>
-              <div class="cs-field"><label>计划开始</label><input type="date" data-f="startDate" value="${esc(draft.startDate)}"></div>
-              <div class="cs-field"><label>计划结束</label><input type="date" data-f="endDate" value="${esc(draft.endDate)}"></div>
-              <div class="cs-field cs-field-wide"><label>计划描述 / 目标</label><textarea data-f="description" rows="3" placeholder="描述计划目标、范围、验收标准">${esc(draft.description)}</textarea></div>
-            </div>
-          </div>
-
-          <div class="cs-form-section">
-            <div class="cs-form-section-head">
-              <div class="cs-form-section-title">任务 WBS <span class="pl-count-pill">${draft.tasks.length} 项</span></div>
-              <div class="pl-form-actions">
-                <button type="button" class="btn pl-add-btn" id="plAddTask">＋ 添加任务</button>
-              </div>
-            </div>
-            <div class="pl-form-note">提示：任务平铺展示、人天可输入 5~6 位数字不截断；WBS 编码、父任务、依赖用于生成树与甘特。「项目总览」已独立成详情页的一个标签页，进详情后维护。</div>
-            ${renderFormTasks(draft)}
-          </div>
-
-          <div class="cs-form-section">
-            <div class="cs-form-section-head">
-              <div class="cs-form-section-title">里程碑 <span class="pl-count-pill">${draft.milestones.length} 项</span></div>
-              <div class="pl-form-actions"><button type="button" class="btn pl-add-btn" id="plAddMilestone">＋ 添加里程碑</button></div>
-            </div>
-            ${renderFormMilestones(draft)}
-          </div>
-
-          <div class="cs-form-section">
-            <div class="cs-form-section-head">
-              <div class="cs-form-section-title">资源 <span class="pl-count-pill">${draft.resources.length} 项</span></div>
-              <div class="pl-form-actions"><button type="button" class="btn pl-add-btn" id="plAddResource">＋ 添加资源</button></div>
-            </div>
-            ${renderFormResources(draft)}
-          </div>
-
-          <div class="cs-form-section">
-            <div class="cs-form-section-head">
-              <div class="cs-form-section-title">团队成员 <span class="pl-count-pill">${draft.members.length} 人</span></div>
-              <div class="pl-form-actions"><button type="button" class="btn pl-add-btn" id="plAddMember">＋ 添加成员</button></div>
-            </div>
-            <div class="pl-form-note">登记项目关键角色与职责分工（产品经理 / 系统经理 / 项目经理 / 研发 / 测试等），便于责任到人。</div>
-            ${renderFormMembers(draft)}
-          </div>
-
-          <div class="cs-form-section">
-            <div class="cs-form-section-head">
-              <div class="cs-form-section-title">参考文档 <span class="pl-count-pill">${draft.references.length} 项</span></div>
-              <div class="pl-form-actions"><button type="button" class="btn pl-add-btn" id="plAddReference">＋ 添加文档</button></div>
-            </div>
-            <div class="pl-form-note">关联需求清单、设计方案、测试方案、接口文档等，统一沉淀，方便团队查阅。</div>
-            ${renderFormReferences(draft)}
-          </div>
+        <div class="cs-form pl-form-tab-body">${renderFormTabBodyHtml(draft)}</div>
+        <div class="pl-form-tab-foot">
+          <button type="button" class="btn" id="plStashTab">暂存本页</button>
+          <button type="button" class="btn primary" id="plFormSave2">💾 保存计划</button>
         </div>
       </div>
     </div>`;
@@ -1122,6 +1329,18 @@ const PlanModule = (() => {
       if (!r) return;
       row.querySelectorAll('[data-f]').forEach(inp => { r[inp.getAttribute('data-f')] = inp.value; });
     });
+    // 项目总览阶段表
+    const ovRows = el.querySelectorAll('tr[data-ov-idx]');
+    ovRows.forEach(row => {
+      const idx = Number(row.getAttribute('data-ov-idx'));
+      const s = dirtyForm.overview[idx];
+      if (!s) return;
+      row.querySelectorAll('[data-f]').forEach(inp => {
+        const f = inp.getAttribute('data-f');
+        if (f === 'progress') { s.progress = inp.value === '' ? 0 : Math.max(0, Math.min(100, Number(inp.value))); return; }
+        s[f] = inp.value;
+      });
+    });
   }
 
   function validateDraft() {
@@ -1180,7 +1399,13 @@ const PlanModule = (() => {
       status: dirtyForm.status || 'draft', owner: dirtyForm.owner || '', projectId: dirtyForm.projectId || '',
       projectName: dirtyForm.projectName || '', startDate: dirtyForm.startDate || '', endDate: dirtyForm.endDate || '',
       description: dirtyForm.description || '',
-      overview: Array.isArray(dirtyForm.overview) ? dirtyForm.overview : [],
+      overview: (dirtyForm.overview || []).filter(s => s.name && String(s.name).trim()).map(s => ({
+        ...s, name: String(s.name).trim(), progress: Math.max(0, Math.min(100, Math.round(num(s.progress)))), status: s.status || 'not-started', parentId: s.parentId || ''
+      })),
+      // 二阶段占位板块：原样透传（一阶段暂无编辑 UI）
+      marketPlan: Array.isArray(dirtyForm.marketPlan) ? dirtyForm.marketPlan : [],
+      issues: Array.isArray(dirtyForm.issues) ? dirtyForm.issues : [],
+      risks: Array.isArray(dirtyForm.risks) ? dirtyForm.risks : [],
       tasks, milestones, resources, members, references, aiConfig: dirtyForm.aiConfig || {}
     };
     // 合并到 state.plans
@@ -1231,10 +1456,19 @@ const PlanModule = (() => {
     bindTabEvents(); // 只重绑 tab body 内的 toggle / 事件，避免整视图重复绑定
   }
 
+  // 仅刷新表单当前 tab 的内容体（不整页重绘，保留其他 tab 已填内容于 dirtyForm）
+  function renderFormTabBody() {
+    if (currentView !== 'new' && currentView !== 'edit') return;
+    el.querySelectorAll('.pl-form-tab').forEach(t => t.classList.toggle('active', t.getAttribute('data-form-tab') === currentFormTab));
+    const body = el.querySelector('.pl-form-tab-body');
+    if (body) body.innerHTML = renderFormTabBodyHtml(dirtyForm);
+    bindFormTabEvents();
+  }
+
   function bindEvents() {
     if (!el) return;
     if (currentView === 'list') {
-      el.querySelector('#plNewPlan')?.addEventListener('click', () => { dirtyForm = initFormDraft(null); currentView = 'new'; render(); });
+      el.querySelector('#plNewPlan')?.addEventListener('click', () => { dirtyForm = initFormDraft(null); currentFormTab = 'basic'; currentView = 'new'; render(); });
       el.querySelector('#plFilter')?.addEventListener('input', (e) => {
         filterText = e.target.value.trim();
         const grid = el.querySelector('.pl-card-grid');
@@ -1248,7 +1482,6 @@ const PlanModule = (() => {
           grid.querySelectorAll('.pl-card').forEach(card => card.addEventListener('click', () => {
             currentPlanId = card.getAttribute('data-plan-id');
             currentTab = 'overview'; currentView = 'detail';
-            overviewEditing = false; overviewDraft = null;
             expandAuto(); render();
           }));
         }
@@ -1256,12 +1489,11 @@ const PlanModule = (() => {
       el.querySelectorAll('.pl-card').forEach(card => card.addEventListener('click', () => {
         currentPlanId = card.getAttribute('data-plan-id');
         currentTab = 'overview'; currentView = 'detail';
-        overviewEditing = false; overviewDraft = null;
         expandAuto(); render();
       }));
     } else if (currentView === 'detail') {
       el.querySelector('#plBack')?.addEventListener('click', () => { currentView = 'list'; render(); });
-      el.querySelector('#plEditPlan')?.addEventListener('click', () => { dirtyForm = initFormDraft(getPlan(currentPlanId)); currentView = 'edit'; render(); });
+      el.querySelector('#plEditPlan')?.addEventListener('click', () => { dirtyForm = initFormDraft(getPlan(currentPlanId)); currentFormTab = 'basic'; currentView = 'edit'; render(); });
       el.querySelector('#plDeletePlan')?.addEventListener('click', () => {
         const plan = getPlan(currentPlanId);
         if (!plan) return;
@@ -1274,27 +1506,60 @@ const PlanModule = (() => {
       el.querySelectorAll('.cs-tab').forEach(tab => tab.addEventListener('click', () => {
         const k = tab.getAttribute('data-tab');
         if (k === currentTab) return;
-        // 离开项目总览编辑态时丢弃未保存草稿，避免跨 tab 状态残留
-        overviewEditing = false; overviewDraft = null;
         currentTab = k;
         renderTabBody(); // renderTabBody 内部会刷新 active 态与 tab body
       }));
       bindTabEvents();
     } else if (currentView === 'new' || currentView === 'edit') {
+      // 顶部/底部通用按钮
       el.querySelector('#plFormCancel')?.addEventListener('click', () => { dirtyForm = null; currentView = currentPlanId ? 'detail' : 'list'; render(); });
       el.querySelector('#plFormCancel2')?.addEventListener('click', () => { dirtyForm = null; currentView = currentPlanId ? 'detail' : 'list'; render(); });
       el.querySelector('#plFormSave')?.addEventListener('click', submitPlan);
-      el.querySelector('#plAddTask')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.tasks.push(blankTask()); renderFormBody(); });
-      el.querySelector('#plAddMilestone')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.milestones.push(blankMilestone()); renderFormBody(); });
-      el.querySelector('#plAddResource')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.resources.push(blankResource()); renderFormBody(); });
-      el.querySelector('#plAddMember')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.members.push(blankMember()); renderFormBody(); });
-      el.querySelector('#plAddReference')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.references.push(blankReference()); renderFormBody(); });
-      el.querySelectorAll('.pl-del-task').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); const i = Number(btn.getAttribute('data-del-task')); dirtyForm.tasks.splice(i, 1); renderFormBody(); }));
-      el.querySelectorAll('.pl-del-ms').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); const i = Number(btn.getAttribute('data-del-ms')); dirtyForm.milestones.splice(i, 1); renderFormBody(); }));
-      el.querySelectorAll('.pl-del-res').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); const i = Number(btn.getAttribute('data-del-res')); dirtyForm.resources.splice(i, 1); renderFormBody(); }));
-      el.querySelectorAll('.pl-del-member').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); const i = Number(btn.getAttribute('data-del-member')); dirtyForm.members.splice(i, 1); renderFormBody(); }));
-      el.querySelectorAll('.pl-del-ref').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); const i = Number(btn.getAttribute('data-del-ref')); dirtyForm.references.splice(i, 1); renderFormBody(); }));
+      el.querySelector('#plFormSave2')?.addEventListener('click', submitPlan);
+      // 暂存本页：把当前 tab 的 DOM 值收回 dirtyForm（不落库），给出反馈
+      el.querySelector('#plStashTab')?.addEventListener('click', () => {
+        syncFormFromDom();
+        SharedUI.toast('本页已暂存（切换标签不丢失，最终点「保存计划」才落库）', 'success');
+      });
+      // 表单 Tab 切换：切换前先把当前 tab 的 DOM 值收回 dirtyForm，避免丢失
+      el.querySelectorAll('.pl-form-tab').forEach(tab => tab.addEventListener('click', () => {
+        const k = tab.getAttribute('data-form-tab');
+        if (k === currentFormTab) return;
+        syncFormFromDom();
+        currentFormTab = k;
+        renderFormTabBody();
+      }));
+      // 首次渲染也绑定当前 tab body 内的事件
+      bindFormTabEvents();
     }
+  }
+
+  // 绑定表单当前 tab body 内的增删/导入/重置等事件（在整页渲染与 tab 切换刷新时都调用）
+  function bindFormTabEvents() {
+    if (!el) return;
+    // 添加行
+    el.querySelector('#plAddTask')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.tasks.push(blankTask()); renderFormTabBody(); });
+    el.querySelector('#plAddMilestone')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.milestones.push(blankMilestone()); renderFormTabBody(); });
+    el.querySelector('#plAddResource')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.resources.push(blankResource()); renderFormTabBody(); });
+    el.querySelector('#plAddMember')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.members.push(blankMember()); renderFormTabBody(); });
+    el.querySelector('#plAddReference')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.references.push(blankReference()); renderFormTabBody(); });
+    el.querySelector('#plAddStage')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.overview.push(blankStage('')); renderFormTabBody(); });
+    // 项目总览重置为标准 8 阶段
+    el.querySelector('#plOvReset')?.addEventListener('click', () => {
+      SharedUI.confirm('重置项目总览', '<p>确认重置为标准 8 阶段（含测试计划 6 条子流程）？当前阶段将被覆盖。</p>', () => {
+        dirtyForm.overview = seedOverviewStages();
+        renderFormTabBody();
+      }, { confirmText: '重置', confirmClass: 'danger' });
+    });
+    // WBS 从需求清单导入
+    el.querySelector('#plImportReq')?.addEventListener('click', () => { syncFormFromDom(); openRequirementImport(); });
+    // 删除行
+    el.querySelectorAll('.pl-del-task').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.tasks.splice(Number(btn.getAttribute('data-del-task')), 1); renderFormTabBody(); }));
+    el.querySelectorAll('.pl-del-ms').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.milestones.splice(Number(btn.getAttribute('data-del-ms')), 1); renderFormTabBody(); }));
+    el.querySelectorAll('.pl-del-res').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.resources.splice(Number(btn.getAttribute('data-del-res')), 1); renderFormTabBody(); }));
+    el.querySelectorAll('.pl-del-member').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.members.splice(Number(btn.getAttribute('data-del-member')), 1); renderFormTabBody(); }));
+    el.querySelectorAll('.pl-del-ref').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.references.splice(Number(btn.getAttribute('data-del-ref')), 1); renderFormTabBody(); }));
+    el.querySelectorAll('.pl-del-ov').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.overview.splice(Number(btn.getAttribute('data-del-ov')), 1); renderFormTabBody(); }));
   }
   function bindTabEvents() {
     if (!el) return;
@@ -1305,77 +1570,6 @@ const PlanModule = (() => {
       renderTabBody();
     }));
 
-    /* ---------- 项目总览 tab 事件 ---------- */
-    // 一键初始化标准 8 阶段 → 进入编辑态
-    el.querySelector('#plOvInit')?.addEventListener('click', () => {
-      overviewDraft = seedOverviewStages();
-      overviewEditing = true;
-      renderTabBody();
-    });
-    // 进入编辑（从只读态拷贝现有阶段到草稿）
-    el.querySelector('#plOvEdit')?.addEventListener('click', () => {
-      const plan = getPlan(currentPlanId);
-      overviewDraft = (plan && plan.overview ? plan.overview : []).map(o => ({ ...o }));
-      if (!overviewDraft.length) overviewDraft = seedOverviewStages();
-      overviewEditing = true;
-      renderTabBody();
-    });
-    // 添加阶段
-    el.querySelector('#plOvAddStage')?.addEventListener('click', () => { syncOverviewFromDom(); overviewDraft.push(blankStage()); renderTabBody(); });
-    // 重置为标准 8 阶段
-    el.querySelector('#plOvReset')?.addEventListener('click', () => {
-      SharedUI.confirm('重置项目总览', '<p>确认重置为标准 8 阶段？当前编辑中的阶段将被覆盖。</p>', () => {
-        overviewDraft = seedOverviewStages();
-        renderTabBody();
-      }, { confirmText: '重置', confirmClass: 'danger' });
-    });
-    // 删除阶段
-    el.querySelectorAll('.pl-del-ov').forEach(btn => btn.addEventListener('click', () => {
-      syncOverviewFromDom();
-      const i = Number(btn.getAttribute('data-del-ov'));
-      overviewDraft.splice(i, 1);
-      renderTabBody();
-    }));
-    // 取消编辑
-    el.querySelector('#plOvCancel')?.addEventListener('click', () => { overviewEditing = false; overviewDraft = null; renderTabBody(); });
-    // 保存总览
-    el.querySelector('#plOvSave')?.addEventListener('click', async () => {
-      syncOverviewFromDom();
-      const plan = getPlan(currentPlanId);
-      if (!plan) return;
-      const cleaned = (overviewDraft || []).filter(s => s.name && String(s.name).trim()).map(s => ({
-        ...s,
-        name: String(s.name).trim(),
-        progress: Math.max(0, Math.min(100, Math.round(Number(s.progress) || 0))),
-        status: s.status || 'not-started'
-      }));
-      const plans = (state.plans || []).map(p => p.id === plan.id ? { ...p, overview: cleaned } : p);
-      const ok = await saveState({ rev: state.rev, plans });
-      if (ok) {
-        overviewEditing = false; overviewDraft = null;
-        await Promise.all([fetchState(), fetchSummary()]);
-        renderTabBody();
-      }
-    });
-  }
-
-  // 从 DOM 收集项目总览编辑草稿
-  function syncOverviewFromDom() {
-    if (!overviewDraft || !el) return;
-    el.querySelectorAll('tr[data-ov-idx]').forEach(row => {
-      const idx = Number(row.getAttribute('data-ov-idx'));
-      const s = overviewDraft[idx];
-      if (!s) return;
-      row.querySelectorAll('[data-f]').forEach(inp => {
-        const f = inp.getAttribute('data-f');
-        if (f === 'progress') { s.progress = inp.value === '' ? 0 : Math.max(0, Math.min(100, Number(inp.value))); return; }
-        s[f] = inp.value;
-      });
-    });
-  }
-  function renderFormBody() {
-    // 表单区结构随 tasks/milestones/resources 增删而变，直接整视图重绘（dirtyForm 为唯一数据源）
-    render();
   }
 
   /* ==========================================================
@@ -1393,6 +1587,7 @@ const PlanModule = (() => {
     } else if (parts[0] === 'new') {
       currentView = 'new';
       currentPlanId = null;
+      currentFormTab = 'basic';
       dirtyForm = initFormDraft(null);
     } else if (parts[0] === 'detail' && parts[1]) {
       currentView = 'detail';
@@ -1402,6 +1597,7 @@ const PlanModule = (() => {
     } else if (parts[0] === 'edit' && parts[1]) {
       currentView = 'edit';
       currentPlanId = parts[1];
+      currentFormTab = 'basic';
       dirtyForm = initFormDraft(getPlan(currentPlanId));
     } else {
       currentView = 'list';

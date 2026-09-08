@@ -25,6 +25,10 @@ const VALID_TASK_STATUS = ['not-started', 'in-progress', 'completed', 'blocked']
 const VALID_TASK_PRIORITY = ['high', 'medium', 'low'];
 const VALID_MILESTONE_STATUS = ['pending', 'in-progress', 'done'];
 const VALID_RES_KIND = ['team', 'person'];
+/* 二阶段板块枚举 */
+const VALID_ISSUE_STATUS = ['pending', 'processing', 'resolved', 'closed'];
+const VALID_RISK_TYPE = ['tech', 'market', 'quality', 'schedule', 'resource', 'other'];
+const VALID_RISK_STATUS = ['occurring', 'watching', 'mitigated', 'closed'];
 
 /* 空状态模板 */
 const EMPTY_STATE = {
@@ -182,10 +186,41 @@ function validateState(next) {
         }
       }
 
-      // 二阶段占位板块（上市计划/遗留问题/项目风险）：一阶段仅弱校验为数组，字段结构待二阶段定稿
-      if (p.marketPlan != null && !Array.isArray(p.marketPlan)) return `计划 "${p.id}" marketPlan 必须为数组`;
-      if (p.issues != null && !Array.isArray(p.issues)) return `计划 "${p.id}" issues 必须为数组`;
-      if (p.risks != null && !Array.isArray(p.risks)) return `计划 "${p.id}" risks 必须为数组`;
+      // 上市计划（树形：parentId 为空=阶段）
+      if (p.marketPlan != null) {
+        if (!Array.isArray(p.marketPlan)) return `计划 "${p.id}" marketPlan 必须为数组`;
+        const mkIds = new Set();
+        for (const mk of p.marketPlan) {
+          if (!mk.id || typeof mk.id !== 'string') return `计划 "${p.id}" 上市计划任务必须有 id`;
+          if (mkIds.has(mk.id)) return `计划 "${p.id}" 上市计划任务 ID 重复: ${mk.id}`;
+          mkIds.add(mk.id);
+          if (mk.status && !VALID_TASK_STATUS.includes(mk.status)) return `上市计划任务 "${mk.id}" 状态无效: "${mk.status}"`;
+          if (mk.startDate && !isValidDate(mk.startDate)) return `上市计划任务 "${mk.id}" startDate 必须为 YYYY-MM-DD`;
+          if (mk.endDate && !isValidDate(mk.endDate)) return `上市计划任务 "${mk.id}" endDate 必须为 YYYY-MM-DD`;
+          if (mk.startDate && mk.endDate && mk.startDate > mk.endDate) return `上市计划任务 "${mk.id}" 开始日期不能晚于结束日期`;
+        }
+      }
+
+      // 遗留问题
+      if (p.issues != null) {
+        if (!Array.isArray(p.issues)) return `计划 "${p.id}" issues 必须为数组`;
+        for (const it of p.issues) {
+          if (!it.id || typeof it.id !== 'string') return `计划 "${p.id}" 遗留问题必须有 id`;
+          if (it.status && !VALID_ISSUE_STATUS.includes(it.status)) return `遗留问题 "${it.id}" 状态无效: "${it.status}"`;
+          if (it.dueDate && !isValidDate(it.dueDate)) return `遗留问题 "${it.id}" dueDate 必须为 YYYY-MM-DD`;
+        }
+      }
+
+      // 项目风险
+      if (p.risks != null) {
+        if (!Array.isArray(p.risks)) return `计划 "${p.id}" risks 必须为数组`;
+        for (const rk of p.risks) {
+          if (!rk.id || typeof rk.id !== 'string') return `计划 "${p.id}" 项目风险必须有 id`;
+          if (rk.type && !VALID_RISK_TYPE.includes(rk.type)) return `项目风险 "${rk.id}" 类型无效: "${rk.type}"`;
+          if (rk.status && !VALID_RISK_STATUS.includes(rk.status)) return `项目风险 "${rk.id}" 状态无效: "${rk.status}"`;
+          if (rk.dueDate && !isValidDate(rk.dueDate)) return `项目风险 "${rk.id}" dueDate 必须为 YYYY-MM-DD`;
+        }
+      }
     }
   }
   return null;

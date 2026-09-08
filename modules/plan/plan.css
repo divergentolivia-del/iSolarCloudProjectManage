@@ -1198,8 +1198,12 @@ body.dark-theme .gantt-planned,
 /* ==========================================================
    表单 Tab 化（横向滚动导航 + tab body + 暂存条 + 占位页 + 导入弹窗）
    ========================================================== */
-/* 表单顶部横向 tab 导航：一行放不下则横向滚动，不撑破页面 */
+/* 表单顶部横向 tab 导航：一行放不下则横向滚动，不撑破页面；
+   并吸顶固定（沿用平台 .project-anchor-nav 的 sticky 方案），滚动时始终能看到当前所处 tab */
 .pl-form-topnav {
+  position: sticky;
+  top: calc(var(--navbar-height) + 8px);
+  z-index: 20;
   display: flex;
   flex-wrap: nowrap;
   gap: 6px;
@@ -1207,12 +1211,15 @@ body.dark-theme .gantt-planned,
   overflow-y: hidden;
   margin-bottom: 16px;
   padding: 6px;
-  background: var(--panel);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   scrollbar-width: thin;
 }
+body.dark-theme .pl-form-topnav,
+[data-theme="dark"] .pl-form-topnav { background: rgba(26, 29, 40, 0.92); }
 .pl-form-topnav::-webkit-scrollbar { height: 6px; }
 .pl-form-topnav::-webkit-scrollbar-thumb { background: var(--line-strong, #d0d5dd); border-radius: 3px; }
 .pl-form-tab {
@@ -1277,3 +1284,47 @@ body.dark-theme .gantt-planned,
   background: var(--panel-soft); border-left: 3px solid var(--accent);
   border-radius: var(--radius-sm); padding: 8px 12px;
 }
+
+
+/* ==========================================================
+   二阶段板块：遗留问题 / 项目风险 / 上市计划 表格
+   ========================================================== */
+.pl-issue-table-wrap,
+.pl-risk-table-wrap,
+.pl-market-table-wrap { overflow-x: auto; min-width: 0; }
+.pl-issue-table { min-width: 1420px; }
+.pl-risk-table { min-width: 1260px; }
+.pl-market-table { min-width: 1180px; }
+
+/* 表格内多行文本域：可纵向拉伸、内容完整显示不截断 */
+.cs-form .table-wrapper textarea {
+  width: 100%;
+  min-width: 150px;
+  min-height: 46px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12.5px;
+  font-family: inherit;
+  line-height: 1.6;
+  box-sizing: border-box;
+  resize: vertical;
+}
+.cs-form .table-wrapper textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.pl-issue-table td,
+.pl-risk-table td,
+.pl-market-table td { padding: 6px 8px; vertical-align: top; }
+.pl-issue-table th,
+.pl-risk-table th,
+.pl-market-table th { white-space: nowrap; }
+
+/* 上市计划：阶段行加底色、子任务行序号淡化（与项目总览一致的层级观感） */
+.pl-mk-parent > td { background: var(--panel-soft); }
+.pl-mk-child > td:first-child { color: var(--muted); }

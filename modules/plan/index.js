@@ -36,6 +36,12 @@ const PlanModule = (() => {
   const RES_KIND_LABELS = { team: '团队', person: '个人' };
   const MEMBER_ROLE_LABELS = { pm: '项目经理', product: '产品经理', system: '系统经理', dev: '研发', test: '测试', design: '设计', other: '其他' };
   const REF_TYPE_LABELS = { requirement: '需求文档', design: '设计文档', test: '测试文档', api: '接口文档', other: '其他' };
+  /* 遗留问题 / 项目风险（二阶段） */
+  const ISSUE_STATUS_LABELS = { pending: '待处理', processing: '处理中', resolved: '已解决', closed: '已关闭' };
+  const ISSUE_STATUS_CLASS = { pending: 'status-hold', processing: 'status-active', resolved: 'status-done', closed: 'status-planned' };
+  const RISK_TYPE_LABELS = { tech: '技术风险', market: '市场风险', quality: '质量风险', schedule: '进度风险', resource: '资源风险', other: '其他风险' };
+  const RISK_STATUS_LABELS = { occurring: '发生中', watching: '观察中', mitigated: '已缓解', closed: '已关闭' };
+  const RISK_STATUS_CLASS = { occurring: 'status-hold', watching: 'status-active', mitigated: 'status-done', closed: 'status-planned' };
 
   const esc = (t) => (typeof SharedUI !== 'undefined' ? SharedUI.esc(t) : String(t == null ? '' : t));
   const whoami = () => (typeof Platform !== 'undefined' && Platform.whoami ? Platform.whoami() : '未署名');
@@ -824,6 +830,42 @@ const PlanModule = (() => {
     return out;
   }
 
+  /* ==========================================================
+     二阶段板块：遗留问题 / 项目风险 / 上市计划
+     ========================================================== */
+  function blankIssue() {
+    return { id: 'is-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), code: '', desc: '', solution: '', owner: '', dueDate: '', progress: '', conclusion: '', status: 'pending' };
+  }
+  function blankRisk() {
+    return { id: 'rk-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), type: 'other', desc: '', solution: '', owner: '', dueDate: '', status: 'occurring', progress: '' };
+  }
+  // 上市计划任务行：parentId 为空=阶段；非空=阶段下的子任务
+  function blankMarketTask(parentId) {
+    return { id: 'mk-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), parentId: parentId || '', name: '', startDate: '', endDate: '', owner: '', status: 'not-started', note: '' };
+  }
+  // 标准上市计划模板（5 阶段 + 子任务，参考钉钉模板）
+  const MARKET_STAGES = [
+    { name: '上市策略阶段', subs: ['上市策略明确（同业竞品分析）'] },
+    { name: '上市计划阶段', subs: ['上市计划编制', '上市计划对齐'] },
+    { name: '上市准备阶段', subs: ['上市资料信息准备', '产品推广', '培训', '内容体验', '可用性测试'] },
+    { name: '产品试销阶段', subs: ['分批上线', '灰度'] },
+    { name: '产品上线阶段', subs: ['上线跟踪跟测', '满意度调研'] }
+  ];
+  function seedMarketPlan() {
+    const out = [];
+    MARKET_STAGES.forEach(s => {
+      const st = blankMarketTask('');
+      st.name = s.name;
+      out.push(st);
+      (s.subs || []).forEach(sub => {
+        const c = blankMarketTask(st.id);
+        c.name = sub;
+        out.push(c);
+      });
+    });
+    return out;
+  }
+
   function initFormDraft(plan) {
     const p = plan || null;
     return {
@@ -1094,6 +1136,146 @@ const PlanModule = (() => {
       ${renderFormReferences(draft)}
     </div>`;
   }
+  /* ---------- 遗留问题 Tab ---------- */
+  function renderFormIssues(draft) {
+    const list = draft.issues || [];
+    const body = list.length ? `
+      <div class="table-wrapper pl-issue-table-wrap">
+        <table class="data-table pl-issue-table">
+          <thead><tr>
+            <th style="min-width:72px">问题编号</th>
+            <th class="txt" style="min-width:220px">遗留问题描述</th>
+            <th class="txt" style="min-width:200px">应对方案</th>
+            <th class="txt" style="min-width:100px">责任人</th>
+            <th class="txt" style="min-width:150px">预计闭环时间</th>
+            <th class="txt" style="min-width:180px">当前进展</th>
+            <th class="txt" style="min-width:180px">结论</th>
+            <th style="min-width:110px">当前状态</th>
+            <th></th>
+          </tr></thead>
+          <tbody>${list.map((x, i) => `
+            <tr data-issue-idx="${i}">
+              <td><input data-f="code" value="${esc(x.code)}" placeholder="${i + 1}"></td>
+              <td><textarea data-f="desc" rows="2" placeholder="问题描述">${esc(x.desc)}</textarea></td>
+              <td><textarea data-f="solution" rows="2" placeholder="应对方案">${esc(x.solution)}</textarea></td>
+              <td><input data-f="owner" value="${esc(x.owner)}" placeholder="责任人"></td>
+              <td><input type="date" data-f="dueDate" value="${esc(x.dueDate)}"></td>
+              <td><textarea data-f="progress" rows="2" placeholder="当前进展">${esc(x.progress)}</textarea></td>
+              <td><textarea data-f="conclusion" rows="2" placeholder="结论">${esc(x.conclusion)}</textarea></td>
+              <td><select data-f="status">${Object.keys(ISSUE_STATUS_LABELS).map(k => `<option value="${k}" ${x.status === k ? 'selected' : ''}>${ISSUE_STATUS_LABELS[k]}</option>`).join('')}</select></td>
+              <td><button type="button" class="cs-del-btn pl-del-issue" data-del-issue="${i}" title="删除">✕</button></td>
+            </tr>`).join('')}</tbody>
+        </table>
+      </div>` : `<div class="pl-empty pl-empty-sm"><div class="pl-empty-ic">📌</div><p>暂无遗留问题，点击「添加问题」</p></div>`;
+    return `
+    <div class="cs-form-section">
+      <div class="cs-form-section-head">
+        <div class="cs-form-section-title">遗留问题 <span class="pl-count-pill">${list.length} 项</span></div>
+        <div class="pl-form-actions"><button type="button" class="btn pl-add-btn" id="plAddIssue">＋ 添加问题</button></div>
+      </div>
+      <div class="pl-form-note">记录项目推进中的遗留问题与闭环情况：问题描述、应对方案、责任人、预计闭环时间、当前进展、结论与状态。</div>
+      ${body}
+    </div>`;
+  }
+
+  /* ---------- 项目风险 Tab ---------- */
+  function renderFormRisks(draft) {
+    const list = draft.risks || [];
+    const body = list.length ? `
+      <div class="table-wrapper pl-risk-table-wrap">
+        <table class="data-table pl-risk-table">
+          <thead><tr>
+            <th style="min-width:110px">风险类型</th>
+            <th class="txt" style="min-width:230px">风险描述</th>
+            <th class="txt" style="min-width:210px">应对方案</th>
+            <th class="txt" style="min-width:100px">责任人</th>
+            <th class="txt" style="min-width:150px">计划闭环时间</th>
+            <th style="min-width:110px">风险状态</th>
+            <th class="txt" style="min-width:180px">进展状态</th>
+            <th></th>
+          </tr></thead>
+          <tbody>${list.map((x, i) => `
+            <tr data-risk-idx="${i}">
+              <td><select data-f="type">${Object.keys(RISK_TYPE_LABELS).map(k => `<option value="${k}" ${x.type === k ? 'selected' : ''}>${RISK_TYPE_LABELS[k]}</option>`).join('')}</select></td>
+              <td><textarea data-f="desc" rows="2" placeholder="风险描述">${esc(x.desc)}</textarea></td>
+              <td><textarea data-f="solution" rows="2" placeholder="应对方案">${esc(x.solution)}</textarea></td>
+              <td><input data-f="owner" value="${esc(x.owner)}" placeholder="责任人"></td>
+              <td><input type="date" data-f="dueDate" value="${esc(x.dueDate)}"></td>
+              <td><select data-f="status">${Object.keys(RISK_STATUS_LABELS).map(k => `<option value="${k}" ${x.status === k ? 'selected' : ''}>${RISK_STATUS_LABELS[k]}</option>`).join('')}</select></td>
+              <td><textarea data-f="progress" rows="2" placeholder="进展状态">${esc(x.progress)}</textarea></td>
+              <td><button type="button" class="cs-del-btn pl-del-risk" data-del-risk="${i}" title="删除">✕</button></td>
+            </tr>`).join('')}</tbody>
+        </table>
+      </div>` : `<div class="pl-empty pl-empty-sm"><div class="pl-empty-ic">⚠️</div><p>暂无项目风险，点击「添加风险」</p></div>`;
+    return `
+    <div class="cs-form-section">
+      <div class="cs-form-section-head">
+        <div class="cs-form-section-title">项目风险 <span class="pl-count-pill">${list.length} 项</span></div>
+        <div class="pl-form-actions"><button type="button" class="btn pl-add-btn" id="plAddRisk">＋ 添加风险</button></div>
+      </div>
+      <div class="pl-form-note">识别与跟踪项目风险：按类型（技术/市场/质量/进度/资源/其他）登记描述、应对方案、责任人、计划闭环时间与状态。</div>
+      ${body}
+    </div>`;
+  }
+
+  /* ---------- 上市计划 Tab（树形：阶段 + 子任务） ---------- */
+  function renderFormMarket(draft) {
+    const list = draft.marketPlan || [];
+    // 阶段序号与子任务编号
+    const idToSeq = {}; let topSeq = 0;
+    list.forEach(x => { if (!x.parentId) { topSeq++; idToSeq[x.id] = topSeq; } });
+    const subSeq = {};
+    // 父任务下拉（仅一级阶段可作为父）
+    const stageOptions = (selected, selfId) => list.filter(x => !x.parentId && x.id !== selfId)
+      .map(x => `<option value="${esc(x.id)}" ${x.id === selected ? 'selected' : ''}>${esc(x.name || '(未命名阶段)')}</option>`).join('');
+    const body = list.length ? `
+      <div class="table-wrapper pl-market-table-wrap">
+        <table class="data-table pl-market-table">
+          <thead><tr>
+            <th style="min-width:52px">#</th>
+            <th class="txt" style="min-width:210px">任务</th>
+            <th class="txt" style="min-width:150px">计划开始时间</th>
+            <th class="txt" style="min-width:150px">计划结束时间</th>
+            <th class="txt" style="min-width:110px">任务执行人</th>
+            <th style="min-width:110px">状态</th>
+            <th class="txt" style="min-width:170px">备注</th>
+            <th class="txt" style="min-width:150px">所属阶段</th>
+            <th></th>
+          </tr></thead>
+          <tbody>${list.map((x, i) => {
+            const isChild = !!x.parentId;
+            let seqLabel;
+            if (!isChild) seqLabel = String(idToSeq[x.id]);
+            else { subSeq[x.parentId] = (subSeq[x.parentId] || 0) + 1; seqLabel = (idToSeq[x.parentId] || '') + '.' + subSeq[x.parentId]; }
+            return `
+            <tr data-market-idx="${i}" class="${isChild ? 'pl-mk-child' : 'pl-mk-parent'}">
+              <td class="pl-ov-seq">${seqLabel}</td>
+              <td><input data-f="name" value="${esc(x.name)}" placeholder="${isChild ? '子任务名称' : '阶段名称'}" style="${isChild ? 'margin-left:22px' : 'font-weight:600'}"></td>
+              <td><input type="date" data-f="startDate" value="${esc(x.startDate)}"></td>
+              <td><input type="date" data-f="endDate" value="${esc(x.endDate)}"></td>
+              <td><input data-f="owner" value="${esc(x.owner)}" placeholder="执行人"></td>
+              <td><select data-f="status">${Object.keys(TASK_STATUS_LABELS).map(k => `<option value="${k}" ${x.status === k ? 'selected' : ''}>${TASK_STATUS_LABELS[k]}</option>`).join('')}</select></td>
+              <td><input data-f="note" value="${esc(x.note)}" placeholder="备注"></td>
+              <td><select data-f="parentId"><option value="">— 阶段(顶层) —</option>${stageOptions(x.parentId, x.id)}</select></td>
+              <td><button type="button" class="cs-del-btn pl-del-market" data-del-market="${i}" title="删除">✕</button></td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>` : `<div class="pl-empty pl-empty-sm"><div class="pl-empty-ic">🚀</div><p>暂无上市计划，点击「一键初始化标准上市计划」或「添加任务」</p></div>`;
+    return `
+    <div class="cs-form-section">
+      <div class="cs-form-section-head">
+        <div class="cs-form-section-title">上市计划 <span class="pl-count-pill">${list.filter(x => !x.parentId).length} 阶段 / ${list.length} 行</span></div>
+        <div class="pl-form-actions">
+          <button type="button" class="btn pl-add-btn" id="plAddMarket">＋ 添加任务</button>
+          <button type="button" class="btn" id="plMarketSeed">↻ 一键初始化标准上市计划</button>
+        </div>
+      </div>
+      <div class="pl-form-note">上市全流程阶段化管理：上市策略 → 上市计划 → 上市准备 → 产品试销 → 产品上线。可用「所属阶段」把任务挂到某个阶段下形成两级结构。</div>
+      ${body}
+    </div>`;
+  }
+
   // 二阶段占位 Tab
   function renderFormPlaceholder(title, icon, desc) {
     return `
@@ -1114,9 +1296,9 @@ const PlanModule = (() => {
       case 'overview': return renderFormOverview(draft);
       case 'milestone': return renderFormMilestoneTab(draft);
       case 'wbs': return renderFormWbs(draft);
-      case 'market': return renderFormPlaceholder('上市计划', '🚀', '上市策略/计划编制/上市对齐/资料准备/产品推广/分批上线等阶段化管理。此板块将在二阶段按参考模板设计具体表格页面。');
-      case 'issue': return renderFormPlaceholder('遗留问题', '📌', '记录项目遗留问题（问题描述/应对方案/责任人/预计闭环时间/当前进展/结论/状态）。此板块将在二阶段设计具体表格页面。');
-      case 'risk': return renderFormPlaceholder('项目风险', '⚠️', '记录项目风险（风险类型/风险描述/应对方案/责任人/计划闭环时间/风险状态）。此板块将在二阶段设计具体表格页面。');
+      case 'market': return renderFormMarket(draft);
+      case 'issue': return renderFormIssues(draft);
+      case 'risk': return renderFormRisks(draft);
       case 'resource': return renderFormResourceTab(draft);
       case 'member': return renderFormMemberTab(draft);
       case 'reference': return renderFormReferenceTab(draft);
@@ -1341,6 +1523,24 @@ const PlanModule = (() => {
         s[f] = inp.value;
       });
     });
+    // 遗留问题表
+    el.querySelectorAll('tr[data-issue-idx]').forEach(row => {
+      const x = dirtyForm.issues[Number(row.getAttribute('data-issue-idx'))];
+      if (!x) return;
+      row.querySelectorAll('[data-f]').forEach(inp => { x[inp.getAttribute('data-f')] = inp.value; });
+    });
+    // 项目风险表
+    el.querySelectorAll('tr[data-risk-idx]').forEach(row => {
+      const x = dirtyForm.risks[Number(row.getAttribute('data-risk-idx'))];
+      if (!x) return;
+      row.querySelectorAll('[data-f]').forEach(inp => { x[inp.getAttribute('data-f')] = inp.value; });
+    });
+    // 上市计划表
+    el.querySelectorAll('tr[data-market-idx]').forEach(row => {
+      const x = dirtyForm.marketPlan[Number(row.getAttribute('data-market-idx'))];
+      if (!x) return;
+      row.querySelectorAll('[data-f]').forEach(inp => { x[inp.getAttribute('data-f')] = inp.value; });
+    });
   }
 
   function validateDraft() {
@@ -1402,10 +1602,16 @@ const PlanModule = (() => {
       overview: (dirtyForm.overview || []).filter(s => s.name && String(s.name).trim()).map(s => ({
         ...s, name: String(s.name).trim(), progress: Math.max(0, Math.min(100, Math.round(num(s.progress)))), status: s.status || 'not-started', parentId: s.parentId || ''
       })),
-      // 二阶段占位板块：原样透传（一阶段暂无编辑 UI）
-      marketPlan: Array.isArray(dirtyForm.marketPlan) ? dirtyForm.marketPlan : [],
-      issues: Array.isArray(dirtyForm.issues) ? dirtyForm.issues : [],
-      risks: Array.isArray(dirtyForm.risks) ? dirtyForm.risks : [],
+      // 上市计划 / 遗留问题 / 项目风险：过滤空行并归一枚举
+      marketPlan: (dirtyForm.marketPlan || []).filter(x => x.name && String(x.name).trim()).map(x => ({
+        ...x, name: String(x.name).trim(), status: x.status || 'not-started', parentId: x.parentId || ''
+      })),
+      issues: (dirtyForm.issues || []).filter(x => (x.desc && String(x.desc).trim()) || (x.code && String(x.code).trim())).map(x => ({
+        ...x, desc: String(x.desc || '').trim(), status: x.status || 'pending'
+      })),
+      risks: (dirtyForm.risks || []).filter(x => x.desc && String(x.desc).trim()).map(x => ({
+        ...x, desc: String(x.desc).trim(), type: x.type || 'other', status: x.status || 'occurring'
+      })),
       tasks, milestones, resources, members, references, aiConfig: dirtyForm.aiConfig || {}
     };
     // 合并到 state.plans
@@ -1544,6 +1750,16 @@ const PlanModule = (() => {
     el.querySelector('#plAddMember')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.members.push(blankMember()); renderFormTabBody(); });
     el.querySelector('#plAddReference')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.references.push(blankReference()); renderFormTabBody(); });
     el.querySelector('#plAddStage')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.overview.push(blankStage('')); renderFormTabBody(); });
+    el.querySelector('#plAddIssue')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.issues.push(blankIssue()); renderFormTabBody(); });
+    el.querySelector('#plAddRisk')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.risks.push(blankRisk()); renderFormTabBody(); });
+    el.querySelector('#plAddMarket')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.marketPlan.push(blankMarketTask('')); renderFormTabBody(); });
+    // 一键初始化标准上市计划
+    el.querySelector('#plMarketSeed')?.addEventListener('click', () => {
+      const doSeed = () => { dirtyForm.marketPlan = seedMarketPlan(); renderFormTabBody(); };
+      if ((dirtyForm.marketPlan || []).length) {
+        SharedUI.confirm('初始化上市计划', '<p>确认用标准模板（5 阶段及子任务）覆盖当前上市计划内容？</p>', doSeed, { confirmText: '覆盖', confirmClass: 'danger' });
+      } else { doSeed(); }
+    });
     // 项目总览重置为标准 8 阶段
     el.querySelector('#plOvReset')?.addEventListener('click', () => {
       SharedUI.confirm('重置项目总览', '<p>确认重置为标准 8 阶段（含测试计划 6 条子流程）？当前阶段将被覆盖。</p>', () => {
@@ -1560,6 +1776,9 @@ const PlanModule = (() => {
     el.querySelectorAll('.pl-del-member').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.members.splice(Number(btn.getAttribute('data-del-member')), 1); renderFormTabBody(); }));
     el.querySelectorAll('.pl-del-ref').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.references.splice(Number(btn.getAttribute('data-del-ref')), 1); renderFormTabBody(); }));
     el.querySelectorAll('.pl-del-ov').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.overview.splice(Number(btn.getAttribute('data-del-ov')), 1); renderFormTabBody(); }));
+    el.querySelectorAll('.pl-del-issue').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.issues.splice(Number(btn.getAttribute('data-del-issue')), 1); renderFormTabBody(); }));
+    el.querySelectorAll('.pl-del-risk').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.risks.splice(Number(btn.getAttribute('data-del-risk')), 1); renderFormTabBody(); }));
+    el.querySelectorAll('.pl-del-market').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.marketPlan.splice(Number(btn.getAttribute('data-del-market')), 1); renderFormTabBody(); }));
   }
   function bindTabEvents() {
     if (!el) return;

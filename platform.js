@@ -21,6 +21,19 @@ const Platform = (() => {
      Sidebar Rendering
      ============================================================ */
 
+  /** 各功能模块专属图标配色：渐变色瓦片 + 唯一 emoji，避免同类图标混淆 */
+  const NAV_ICON_COLORS = {
+    dashboard: { icon: '🏠', bg: 'linear-gradient(135deg, #4c7dff, #6a9bff)', shadow: 'rgba(76,125,255,.35)' },
+    iteration: { icon: '📚', bg: 'linear-gradient(135deg, #1fa38a, #38c9ac)', shadow: 'rgba(31,163,138,.35)' },
+    csenergy:  { icon: '📊', bg: 'linear-gradient(135deg, #8b6cff, #a68bff)', shadow: 'rgba(139,108,255,.35)' },
+    plan:      { icon: '🗓️', bg: 'linear-gradient(135deg, #f59a24, #ffb857)', shadow: 'rgba(245,154,36,.35)' },
+    settings:  { icon: '⚙',  bg: 'linear-gradient(135deg, #8a94a6, #a6b0c2)', shadow: 'rgba(138,148,166,.35)' },
+    help:      { icon: '📖', bg: 'linear-gradient(135deg, #8a94a6, #a6b0c2)', shadow: 'rgba(138,148,166,.35)' }
+  };
+  function navLook(id) {
+    return NAV_ICON_COLORS[id] || { icon: '', bg: 'linear-gradient(135deg, #8a94a6, #a6b0c2)', shadow: 'rgba(138,148,166,.35)' };
+  }
+
   /**
    * Render sidebar navigation items into #sidebarNav.
    * Only renders modules with sidebar !== false, sorted by order.
@@ -35,12 +48,21 @@ const Platform = (() => {
 
     nav.innerHTML = sidebarModules.map(m => {
       const href = '#/' + (m.id === 'dashboard' ? 'dashboard' : m.id);
-      return `<a class="sidebar-nav-item" href="${SharedUI.esc(href)}" data-module="${SharedUI.esc(m.id)}" data-tooltip="${SharedUI.esc(m.name)}">
-        <span class="nav-icon">${SharedUI.esc(m.icon || '')}</span>
+      const look = navLook(m.id);
+      return `<a class="sidebar-nav-item" href="${SharedUI.esc(href)}" data-module="${SharedUI.esc(m.id)}" data-tooltip="${SharedUI.esc(m.name)}" data-navcolor="${SharedUI.esc(m.id)}">
+        <span class="nav-icon" style="--nav-bg:${look.bg};--nav-shadow:${look.shadow}">${SharedUI.esc(m.icon || look.icon)}</span>
         <span class="nav-label">${SharedUI.esc(m.name)}</span>
         <span class="nav-badge hidden" id="badge-${SharedUI.esc(m.id)}"></span>
       </a>`;
     }).join('');
+
+    // 静态 footer 项（系统设置 / 使用帮助）也应用同款图标瓦片
+    nav.querySelectorAll('.nav-icon[data-fixed]').forEach(ic => {
+      const id = ic.getAttribute('data-fixed');
+      const look = navLook(id);
+      ic.style.setProperty('--nav-bg', look.bg);
+      ic.style.setProperty('--nav-shadow', look.shadow);
+    });
 
     // Bind click handlers for mobile close
     nav.querySelectorAll('.sidebar-nav-item').forEach(item => {

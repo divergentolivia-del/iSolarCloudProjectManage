@@ -339,11 +339,16 @@ body.dark-theme .sidebar-nav-item.active:hover {
 /* ══════════ Main Content ══════════ */
 .main-content {
   flex: 1;
+  /* flex 子项默认 min-width:auto 会被内容(宽表/甘特)撑开，导致整页横向滚动。
+     置 0 后，超宽内容改由各模块内部的 .table-wrapper / *-scroll 容器自行横向滚动。 */
+  min-width: 0;
   margin-left: var(--sidebar-width);
   padding: 28px 32px 48px;
   min-height: calc(100vh - var(--navbar-height));
   transition: margin-left 0.25s cubic-bezier(0.4,0,0.2,1);
 }
+/* 模块视图容器同样不允许被超宽内容撑破 */
+.module-view { min-width: 0; }
 .sidebar.collapsed ~ .main-content,
 .platform-layout:has(.sidebar.collapsed) .main-content {
   margin-left: var(--sidebar-collapsed-width);

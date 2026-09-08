@@ -33,6 +33,8 @@ const PlanModule = (() => {
   const MILESTONE_STATUS_LABELS = { pending: '待完成', 'in-progress': '进行中', done: '已完成' };
   const MILESTONE_STATUS_CLASS = { pending: 'status-planned', 'in-progress': 'status-active', done: 'status-done' };
   const RES_KIND_LABELS = { team: '团队', person: '个人' };
+  const MEMBER_ROLE_LABELS = { pm: '项目经理', product: '产品经理', system: '系统经理', dev: '研发', test: '测试', design: '设计', other: '其他' };
+  const REF_TYPE_LABELS = { requirement: '需求文档', design: '设计文档', test: '测试文档', api: '接口文档', other: '其他' };
 
   const esc = (t) => (typeof SharedUI !== 'undefined' ? SharedUI.esc(t) : String(t == null ? '' : t));
   const whoami = () => (typeof Platform !== 'undefined' && Platform.whoami ? Platform.whoami() : '未署名');
@@ -278,6 +280,22 @@ const PlanModule = (() => {
   /* ==========================================================
      计划详情 —— 顶部概览 + Tab 切换
      ========================================================== */
+  function renderDetailMembers(plan) {
+    const members = plan.members || [];
+    if (!members.length) return '';
+    const chips = members.map(m => `<span class="pl-member-chip"><b>${esc(m.name)}</b><i>${esc(MEMBER_ROLE_LABELS[m.role] || m.role || '')}</i>${m.duty ? `<span class="pl-member-duty">${esc(m.duty)}</span>` : ''}</span>`).join('');
+    return `<div class="pl-detail-block"><span class="pl-block-label">🧑‍🤝‍🧑 团队成员</span><div class="pl-member-chips">${chips}</div></div>`;
+  }
+  function renderDetailReferences(plan) {
+    const refs = plan.references || [];
+    if (!refs.length) return '';
+    const items = refs.map(r => {
+      const label = `${REF_TYPE_LABELS[r.type] || r.type || ''}`;
+      const link = r.link ? `<a class="pl-ref-link" href="${esc(r.link)}" target="_blank" rel="noopener">${esc(r.title)}</a>` : `<span>${esc(r.title)}</span>`;
+      return `<span class="pl-ref-item"><span class="pl-chip">${esc(label)}</span>${link}${r.note ? `<i class="pl-ref-note">${esc(r.note)}</i>` : ''}</span>`;
+    }).join('');
+    return `<div class="pl-detail-block"><span class="pl-block-label">📎 参考文档</span><div class="pl-ref-list">${items}</div></div>`;
+  }
   function renderDetailHeader(plan, ms) {
     const wbs = ms.wbs || {};
     const riskCount = (ms.risks || []).length;
@@ -297,6 +315,8 @@ const PlanModule = (() => {
         ${plan.projectName ? `<span class="pl-tag">🏢 ${esc(plan.projectName)}</span>` : ''}
       </div>
       ${plan.description ? `<p class="pl-desc">${esc(plan.description)}</p>` : ''}
+      ${renderDetailMembers(plan)}
+      ${renderDetailReferences(plan)}
     </div>
     <div class="pl-detail-stats">
       <div class="pl-detail-stat"><span>任务</span><b>${fmtNum(wbs.total)}</b></div>
@@ -363,7 +383,7 @@ const PlanModule = (() => {
         <table class="data-table pl-wbs-table">
           <thead>
             <tr>
-              <th class="txt">WBS</th><th class="txt" style="min-width:230px">能力名称</th><th>类型</th><th>状态</th><th>优先级</th>
+              <th class="txt">WBS</th><th class="txt" style="min-width:230px">任务名称</th><th>类型</th><th>状态</th><th>优先级</th>
               <th class="txt">负责人</th><th class="txt">主责部门</th><th>人天</th><th style="min-width:110px">进度</th>
               <th class="txt">开始</th><th class="txt">结束</th><th class="txt" style="min-width:120px">依赖</th>
             </tr>
@@ -709,6 +729,12 @@ const PlanModule = (() => {
   function blankResource() {
     return { id: 'r-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: '', kind: 'team', dept: '', total: '', used: null, note: '' };
   }
+  function blankMember() {
+    return { id: 'mb-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: '', role: 'dev', dept: '', duty: '', contact: '' };
+  }
+  function blankReference() {
+    return { id: 'rf-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), title: '', type: 'requirement', link: '', note: '' };
+  }
   function initFormDraft(plan) {
     const p = plan || null;
     return {
@@ -721,6 +747,8 @@ const PlanModule = (() => {
       tasks: (p && p.tasks ? p.tasks : []).map(t => ({ ...t })),
       milestones: (p && p.milestones ? p.milestones : []).map(m => ({ ...m })),
       resources: (p && p.resources ? p.resources : []).map(r => ({ ...r })),
+      members: (p && p.members ? p.members : []).map(m => ({ ...m })),
+      references: (p && p.references ? p.references : []).map(r => ({ ...r })),
       aiConfig: (p && p.aiConfig) || {}
     };
   }
@@ -738,11 +766,10 @@ const PlanModule = (() => {
     if (!draft.tasks.length) {
       return `<div class="pl-empty pl-empty-sm"><div class="pl-empty-ic">🌳</div><p>暂无任务，点击「添加任务」</p></div>`;
     }
-    // 计算当前最大 wbs 编号
+    // WBS 编码在保存时由 buildWbsCodes 依据「父任务」层级自动生成，无需手填，故不展示 WBS 列
     const rows = draft.tasks.map((t, i) => `
       <tr data-task-idx="${i}">
-        <td><input class="pl-f-wbs" data-f="wbsCode" value="${esc(t.wbsCode)}" placeholder="1.1"></td>
-        <td><input class="pl-f-name" data-f="name" value="${esc(t.name)}" placeholder="能力名称"></td>
+        <td><input class="pl-f-name" data-f="name" value="${esc(t.name)}" placeholder="任务名称"></td>
         <td><select data-f="type">${Object.keys(TASK_TYPE_LABELS).map(k => `<option value="${k}" ${t.type === k ? 'selected' : ''}>${TASK_TYPE_LABELS[k]}</option>`).join('')}</select></td>
         <td><select data-f="status">${Object.keys(TASK_STATUS_LABELS).map(k => `<option value="${k}" ${t.status === k ? 'selected' : ''}>${TASK_STATUS_LABELS[k]}</option>`).join('')}</select></td>
         <td><select data-f="priority">${Object.keys(PRIORITY_LABELS).map(k => `<option value="${k}" ${t.priority === k ? 'selected' : ''}>${PRIORITY_LABELS[k]}</option>`).join('')}</select></td>
@@ -757,7 +784,7 @@ const PlanModule = (() => {
         <td><button type="button" class="cs-del-btn pl-del-task" data-del-task="${i}" title="删除">✕</button></td>
       </tr>`);
     return `<div class="table-wrapper pl-form-table-wrap"><table class="data-table pl-form-table"><thead><tr>
-        <th class="txt">WBS</th><th class="txt" style="min-width:190px">能力名称</th><th>类型</th><th>状态</th><th>优先级</th>
+        <th class="txt" style="min-width:200px">任务名称</th><th>类型</th><th>状态</th><th>优先级</th>
         <th class="txt">负责人</th><th class="txt">主责部门</th><th style="min-width:70px">人天</th><th style="min-width:60px">进度%</th>
         <th class="txt">开始</th><th class="txt">结束</th><th class="txt">父任务</th><th class="txt">依赖</th><th></th>
       </tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
@@ -792,6 +819,37 @@ const PlanModule = (() => {
         <td><button type="button" class="cs-del-btn pl-del-ms" data-del-ms="${i}" title="删除">✕</button></td>
       </tr>`);
     return `<div class="table-wrapper"><table class="data-table"><thead><tr><th class="txt" style="min-width:190px">里程碑</th><th class="txt">日期</th><th>状态</th><th class="txt">负责人</th><th class="txt">说明</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+  }
+
+  function renderFormMembers(draft) {
+    if (!draft.members.length) {
+      return `<div class="pl-empty pl-empty-sm"><div class="pl-empty-ic">🧑‍🤝‍🧑</div><p>暂无团队成员，点击「添加成员」</p></div>`;
+    }
+    const rows = draft.members.map((m, i) => `
+      <tr data-member-idx="${i}">
+        <td><input data-f="name" value="${esc(m.name)}" placeholder="姓名"></td>
+        <td><select data-f="role">${Object.keys(MEMBER_ROLE_LABELS).map(k => `<option value="${k}" ${m.role === k ? 'selected' : ''}>${MEMBER_ROLE_LABELS[k]}</option>`).join('')}</select></td>
+        <td><input data-f="dept" value="${esc(m.dept)}" placeholder="部门/团队"></td>
+        <td><input data-f="duty" value="${esc(m.duty)}" placeholder="职责分工"></td>
+        <td><input data-f="contact" value="${esc(m.contact)}" placeholder="联系方式(可选)"></td>
+        <td><button type="button" class="cs-del-btn pl-del-member" data-del-member="${i}" title="删除">✕</button></td>
+      </tr>`);
+    return `<div class="table-wrapper"><table class="data-table"><thead><tr><th class="txt">姓名</th><th>角色</th><th class="txt">部门/团队</th><th class="txt" style="min-width:180px">职责分工</th><th class="txt" style="min-width:150px">联系方式</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+  }
+
+  function renderFormReferences(draft) {
+    if (!draft.references.length) {
+      return `<div class="pl-empty pl-empty-sm"><div class="pl-empty-ic">📎</div><p>暂无参考文档，点击「添加文档」</p></div>`;
+    }
+    const rows = draft.references.map((r, i) => `
+      <tr data-ref-idx="${i}">
+        <td><input data-f="title" value="${esc(r.title)}" placeholder="文档名称"></td>
+        <td><select data-f="type">${Object.keys(REF_TYPE_LABELS).map(k => `<option value="${k}" ${r.type === k ? 'selected' : ''}>${REF_TYPE_LABELS[k]}</option>`).join('')}</select></td>
+        <td><input data-f="link" value="${esc(r.link)}" placeholder="链接 / 路径"></td>
+        <td><input data-f="note" value="${esc(r.note)}" placeholder="说明"></td>
+        <td><button type="button" class="cs-del-btn pl-del-ref" data-del-ref="${i}" title="删除">✕</button></td>
+      </tr>`);
+    return `<div class="table-wrapper"><table class="data-table"><thead><tr><th class="txt" style="min-width:190px">文档名称</th><th>类型</th><th class="txt" style="min-width:220px">链接/路径</th><th class="txt">说明</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
   }
 
   function renderFormView() {
@@ -852,6 +910,24 @@ const PlanModule = (() => {
             </div>
             ${renderFormResources(draft)}
           </div>
+
+          <div class="cs-form-section">
+            <div class="cs-form-section-head">
+              <div class="cs-form-section-title">团队成员 <span class="pl-count-pill">${draft.members.length} 人</span></div>
+              <div class="pl-form-actions"><button type="button" class="btn pl-add-btn" id="plAddMember">＋ 添加成员</button></div>
+            </div>
+            <div class="pl-form-note">登记项目关键角色与职责分工（产品经理 / 系统经理 / 项目经理 / 研发 / 测试等），便于责任到人。</div>
+            ${renderFormMembers(draft)}
+          </div>
+
+          <div class="cs-form-section">
+            <div class="cs-form-section-head">
+              <div class="cs-form-section-title">参考文档 <span class="pl-count-pill">${draft.references.length} 项</span></div>
+              <div class="pl-form-actions"><button type="button" class="btn pl-add-btn" id="plAddReference">＋ 添加文档</button></div>
+            </div>
+            <div class="pl-form-note">关联需求清单、设计方案、测试方案、接口文档等，统一沉淀，方便团队查阅。</div>
+            ${renderFormReferences(draft)}
+          </div>
         </div>
       </div>
     </div>`;
@@ -902,6 +978,22 @@ const PlanModule = (() => {
         r[f] = inp.value;
       });
     });
+    // 团队成员表
+    const memberRows = el.querySelectorAll('tr[data-member-idx]');
+    memberRows.forEach(row => {
+      const idx = Number(row.getAttribute('data-member-idx'));
+      const m = dirtyForm.members[idx];
+      if (!m) return;
+      row.querySelectorAll('[data-f]').forEach(inp => { m[inp.getAttribute('data-f')] = inp.value; });
+    });
+    // 参考文档表
+    const refRows = el.querySelectorAll('tr[data-ref-idx]');
+    refRows.forEach(row => {
+      const idx = Number(row.getAttribute('data-ref-idx'));
+      const r = dirtyForm.references[idx];
+      if (!r) return;
+      row.querySelectorAll('[data-f]').forEach(inp => { r[inp.getAttribute('data-f')] = inp.value; });
+    });
   }
 
   function validateDraft() {
@@ -949,12 +1041,18 @@ const PlanModule = (() => {
     const resources = dirtyForm.resources.filter(r => r.name && String(r.name).trim()).map(r => ({
       ...r, name: String(r.name).trim(), kind: r.kind || 'team', total: num(r.total)
     }));
+    const members = (dirtyForm.members || []).filter(m => m.name && String(m.name).trim()).map(m => ({
+      ...m, name: String(m.name).trim(), role: m.role || 'other'
+    }));
+    const references = (dirtyForm.references || []).filter(r => r.title && String(r.title).trim()).map(r => ({
+      ...r, title: String(r.title).trim(), type: r.type || 'other'
+    }));
     const plan = {
       id: dirtyForm.id, name: String(dirtyForm.name).trim(), year: Number(dirtyForm.year) || new Date().getFullYear(),
       status: dirtyForm.status || 'draft', owner: dirtyForm.owner || '', projectId: dirtyForm.projectId || '',
       projectName: dirtyForm.projectName || '', startDate: dirtyForm.startDate || '', endDate: dirtyForm.endDate || '',
       description: dirtyForm.description || '',
-      tasks, milestones, resources, aiConfig: dirtyForm.aiConfig || {}
+      tasks, milestones, resources, members, references, aiConfig: dirtyForm.aiConfig || {}
     };
     // 合并到 state.plans
     const plans = Array.isArray(state.plans) ? state.plans.slice() : [];
@@ -1055,9 +1153,13 @@ const PlanModule = (() => {
       el.querySelector('#plAddTask')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.tasks.push(blankTask()); renderFormBody(); });
       el.querySelector('#plAddMilestone')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.milestones.push(blankMilestone()); renderFormBody(); });
       el.querySelector('#plAddResource')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.resources.push(blankResource()); renderFormBody(); });
+      el.querySelector('#plAddMember')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.members.push(blankMember()); renderFormBody(); });
+      el.querySelector('#plAddReference')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.references.push(blankReference()); renderFormBody(); });
       el.querySelectorAll('.pl-del-task').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); const i = Number(btn.getAttribute('data-del-task')); dirtyForm.tasks.splice(i, 1); renderFormBody(); }));
       el.querySelectorAll('.pl-del-ms').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); const i = Number(btn.getAttribute('data-del-ms')); dirtyForm.milestones.splice(i, 1); renderFormBody(); }));
       el.querySelectorAll('.pl-del-res').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); const i = Number(btn.getAttribute('data-del-res')); dirtyForm.resources.splice(i, 1); renderFormBody(); }));
+      el.querySelectorAll('.pl-del-member').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); const i = Number(btn.getAttribute('data-del-member')); dirtyForm.members.splice(i, 1); renderFormBody(); }));
+      el.querySelectorAll('.pl-del-ref').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); const i = Number(btn.getAttribute('data-del-ref')); dirtyForm.references.splice(i, 1); renderFormBody(); }));
     }
   }
   function bindTabEvents() {

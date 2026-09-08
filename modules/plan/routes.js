@@ -152,6 +152,22 @@ function validateState(next) {
           if (r.total != null && (typeof r.total !== 'number' || r.total < 0)) return `资源 "${r.id}" total 必须为非负数`;
         }
       }
+
+      // 团队成员校验（新增板块，弱约束：数组 + 每项有 id）
+      if (p.members != null) {
+        if (!Array.isArray(p.members)) return `计划 "${p.id}" members 必须为数组`;
+        for (const mb of p.members) {
+          if (!mb.id || typeof mb.id !== 'string') return `计划 "${p.id}" 团队成员必须有 id`;
+        }
+      }
+
+      // 参考文档校验（新增板块，弱约束：数组 + 每项有 id）
+      if (p.references != null) {
+        if (!Array.isArray(p.references)) return `计划 "${p.id}" references 必须为数组`;
+        for (const rf of p.references) {
+          if (!rf.id || typeof rf.id !== 'string') return `计划 "${p.id}" 参考文档必须有 id`;
+        }
+      }
     }
   }
   return null;

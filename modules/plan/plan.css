@@ -100,16 +100,23 @@
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
   font-size: 13px;
   opacity: .55;
   pointer-events: none;
 }
-/* ① 输入框不截断：足够 min-width + 内边距，文字完整显示 */
-.pl-search-input {
+/* ① 输入框不截断：足够 min-width + 内边距，文字完整显示。
+   左内边距须大于「图标 left(12px)+图标宽(16px)+间隙」，否则占位符会压到图标上。
+   ⚠ 用 .pl-search 前缀提高特异性(0,2,0)，压过 platform.css 里 input[type=text]{padding:8px 12px}(0,1,1)，
+      否则通用 input 规则会把左内边距覆盖回 12px，图标又会与占位符重叠。 */
+.pl-search .pl-search-input {
   width: 100%;
   min-width: 240px;
   min-height: 38px;
-  padding: 8px 14px 8px 34px;
+  padding: 8px 14px 8px 38px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--panel);
@@ -928,7 +935,13 @@
 /* ==========================================================
    表单页  ① 输入框不截断（重点）
    ========================================================== */
-.pl-form-page { max-width: 1400px; }
+.pl-form-page { max-width: 1400px; min-width: 0; }
+/* 表单页整条约束链都置 min-width:0，确保超宽 WBS 表只在 .pl-form-table-wrap 内横向滚动，
+   而不会把整个表单页(乃至整页)撑出横向滚动条。 */
+.pl-form-page .cs-form,
+.pl-form-page .cs-form-body,
+.pl-form-page .cs-form-section,
+.pl-form-page .cs-form-grid { min-width: 0; }
 
 .cs-form-section-head {
   display: flex;
@@ -1073,3 +1086,61 @@ body.dark-theme .pl-warn-badge,
 [data-theme="dark"] .pl-warn-badge { background: rgba(245, 165, 36, .16); color: #ffc46b; }
 body.dark-theme .gantt-planned,
 [data-theme="dark"] .gantt-planned { background: #4a5361; }
+
+
+/* ==========================================================
+   详情页：团队成员 / 参考文档 展示块
+   ========================================================== */
+.pl-detail-block {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+}
+.pl-block-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.pl-member-chips,
+.pl-ref-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.pl-member-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12.5px;
+}
+.pl-member-chip b { font-weight: 600; color: var(--text); }
+.pl-member-chip i {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+.pl-member-chip .pl-member-duty { font-size: 11.5px; color: var(--muted); }
+.pl-ref-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--panel-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+}
+.pl-ref-link { color: var(--accent); text-decoration: none; }
+.pl-ref-link:hover { text-decoration: underline; }
+.pl-ref-note { font-style: normal; font-size: 11.5px; color: var(--muted); }

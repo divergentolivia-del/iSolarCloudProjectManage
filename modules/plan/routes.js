@@ -168,6 +168,19 @@ function validateState(next) {
           if (!rf.id || typeof rf.id !== 'string') return `计划 "${p.id}" 参考文档必须有 id`;
         }
       }
+
+      // 项目总览校验（固定阶段大纲，独立于 tasks；弱约束：数组 + 每项有 id + 进度/状态合法）
+      if (p.overview != null) {
+        if (!Array.isArray(p.overview)) return `计划 "${p.id}" overview 必须为数组`;
+        for (const ov of p.overview) {
+          if (!ov.id || typeof ov.id !== 'string') return `计划 "${p.id}" 项目总览阶段必须有 id`;
+          if (ov.status && !VALID_TASK_STATUS.includes(ov.status)) return `总览阶段 "${ov.id}" 状态无效: "${ov.status}"`;
+          if (ov.progress != null && (typeof ov.progress !== 'number' || ov.progress < 0 || ov.progress > 100)) return `总览阶段 "${ov.id}" 进度必须为 0-100`;
+          if (ov.startDate && !isValidDate(ov.startDate)) return `总览阶段 "${ov.id}" startDate 必须为 YYYY-MM-DD`;
+          if (ov.endDate && !isValidDate(ov.endDate)) return `总览阶段 "${ov.id}" endDate 必须为 YYYY-MM-DD`;
+          if (ov.startDate && ov.endDate && ov.startDate > ov.endDate) return `总览阶段 "${ov.id}" 开始日期不能晚于结束日期`;
+        }
+      }
     }
   }
   return null;

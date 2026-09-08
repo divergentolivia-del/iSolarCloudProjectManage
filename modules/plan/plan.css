@@ -1147,62 +1147,49 @@ body.dark-theme .gantt-planned,
 
 
 /* ==========================================================
-   需求清单拆解 → 项目总览（弹窗 + 入口按钮）
+   项目总览 tab（固定 8 阶段大纲，独立数据）
    ========================================================== */
-.pl-decompose-btn {
-  font-size: 12.5px;
-  padding: 6px 14px;
-  background: var(--accent-soft);
-  border-color: var(--accent);
-  color: var(--accent);
+.pl-ov-table-wrap { overflow-x: auto; min-width: 0; }
+.pl-ov-table { min-width: 900px; }
+.pl-ov-table .pl-ov-seq {
+  text-align: center;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
-.pl-decompose-btn:hover { background: var(--accent); color: #fff; }
-
-.pl-decompose { min-width: 0; }
-.pl-dec-desc {
-  font-size: 12.5px;
-  color: var(--muted);
-  line-height: 1.7;
-  margin: 0 0 12px;
-}
-.pl-dec-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
-}
-.pl-dec-upload { cursor: pointer; font-size: 12.5px; padding: 6px 14px; }
-.pl-dec-filehint { font-size: 12px; color: var(--muted); }
-.pl-dec-input {
+/* 编辑态输入控件（沿用表单表格样式，不截断） */
+.pl-ov-table input,
+.pl-ov-table select {
   width: 100%;
-  box-sizing: border-box;
-  min-height: 180px;
-  padding: 10px 12px;
+  min-width: 90px;
+  min-height: 34px;
+  padding: 6px 9px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--panel);
   color: var(--text);
-  font-size: 13px;
-  line-height: 1.7;
-  resize: vertical;
+  font-size: 12.5px;
+  box-sizing: border-box;
 }
-.pl-dec-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.pl-dec-replace {
+.pl-ov-table input:focus,
+.pl-ov-table select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.pl-ov-table input[type="number"] {
+  min-width: 70px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.pl-ov-table input[type="date"] { min-width: 148px; }
+.pl-ov-table td { padding: 6px 8px; }
+.pl-ov-table th { white-space: nowrap; }
+.pl-ov-actions {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-.pl-dec-preview { margin-top: 10px; }
-.pl-dec-preview-head {
-  font-size: 12.5px;
-  color: var(--text);
-  background: var(--panel-soft);
-  border-left: 3px solid var(--accent);
-  border-radius: var(--radius-sm);
-  padding: 8px 12px;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
 }

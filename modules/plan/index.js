@@ -735,6 +735,159 @@ const PlanModule = (() => {
   function blankReference() {
     return { id: 'rf-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), title: '', type: 'requirement', link: '', note: '' };
   }
+
+  /* ==========================================================
+     需求清单 → 项目总览 WBS 拆解（本地规则，零依赖 / 离线）
+     ------------------------------------------------------------
+     标准 8 阶段：需求传递 / 环境准备 / 方案设计 / 技术详设设计 /
+                 研发计划(按需求逐条展开) / 测试计划(固定6条子流程) /
+                 实证 / 上市交付
+     ========================================================== */
+  const OVERVIEW_STAGES = [
+    { name: '需求传递', type: 'doc', deliverable: '需求评审纪要', mode: 'placeholder' },
+    { name: '环境准备', type: 'ops', deliverable: '开发/测试环境就绪', mode: 'placeholder' },
+    { name: '方案设计', type: 'design', deliverable: '总体方案文档', mode: 'placeholder' },
+    { name: '技术详设设计', type: 'design', deliverable: '详细设计文档', mode: 'placeholder' },
+    { name: '研发计划', type: 'dev', deliverable: '功能实现', mode: 'perRequirement' },
+    { name: '测试计划', type: 'test', deliverable: '测试报告', mode: 'fixedChildren',
+      children: ['测试方案设计', '测试用例编写', '敏捷测试', '系统测试一轮', '系统测试二轮', '可用性测试(实证测试)'] },
+    { name: '实证', type: 'ops', deliverable: '现场实证报告', mode: 'placeholder' },
+    { name: '上市交付', type: 'other', deliverable: '交付/上市材料', mode: 'placeholder' }
+  ];
+
+  // 解析需求清单文本：一行一条，去空行，去行首编号/项目符号前缀
+  function parseRequirementLines(text) {
+    if (!text) return [];
+    return String(text)
+      .split(/\r?\n/)
+      .map(s => s.replace(/^\s*(\d+(\.\d+)*\s*[.、)．]\s*|[-*·•]\s*)/, '').trim())
+      .filter(Boolean);
+  }
+
+  // 依据 8 阶段 + 需求列表构建任务树（parentId 建好；wbsCode 留空，保存时 buildWbsCodes 自动编号）
+  function decomposeOverview(reqs) {
+    const tasks = [];
+    const mk = (name, type, parentId, deliverable) => {
+      const t = blankTask();
+      t.name = name; t.type = type || 'other'; t.parentId = parentId || '';
+      t.phase = name && !parentId ? name : undefined;
+      if (deliverable) t.deliverable = deliverable;
+      return t;
+    };
+    OVERVIEW_STAGES.forEach(stage => {
+      const parent = mk(stage.name, stage.type, '', stage.deliverable);
+      parent.phase = stage.name;
+      tasks.push(parent);
+      if (stage.mode === 'perRequirement') {
+        if (reqs.length) {
+          reqs.forEach(r => { const c = mk(r, stage.type, parent.id); c.phase = stage.name; tasks.push(c); });
+        } else {
+          const c = mk('（待补充需求）', stage.type, parent.id); c.phase = stage.name; tasks.push(c);
+        }
+      } else if (stage.mode === 'fixedChildren') {
+        stage.children.forEach(cn => { const c = mk(cn, stage.type, parent.id); c.phase = stage.name; tasks.push(c); });
+      }
+      // placeholder 模式：只保留一级阶段任务，不建子任务
+    });
+    return tasks;
+  }
+
+  // 解析上传文件为需求文本（.txt/.csv 走文本；.xlsx 走内置 SheetJS，取首个非空列）
+  function parseRequirementFile(file, onDone, onError) {
+    const name = (file.name || '').toLowerCase();
+    if (/\.(txt|csv)$/.test(name)) {
+      const reader = new FileReader();
+      reader.onerror = () => onError(new Error('文件读取失败'));
+      reader.onload = e => {
+        let text = String(e.target.result || '');
+        if (/\.csv$/.test(name)) {
+          // CSV：取每行第一个字段（简单按逗号切，够用；复杂 CSV 用户可粘贴文本）
+          text = text.split(/\r?\n/).map(line => (line.split(',')[0] || '').replace(/^"|"$/g, '').trim()).join('\n');
+        }
+        onDone(text);
+      };
+      reader.readAsText(file, 'UTF-8');
+    } else if (/\.(xlsx|xls)$/.test(name)) {
+      if (typeof XLSX === 'undefined') { onError(new Error('Excel 解析库未加载，请改用粘贴文本')); return; }
+      const reader = new FileReader();
+      reader.onerror = () => onError(new Error('文件读取失败'));
+      reader.onload = e => {
+        try {
+          const wb = XLSX.read(e.target.result, { type: 'array' });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
+          // 找出"需求/功能/标题/任务"列，找不到则用第一列；跳过疑似表头行
+          let col = 0;
+          const header = (aoa[0] || []).map(c => String(c == null ? '' : c));
+          const hit = header.findIndex(h => /需求|功能|标题|任务|条目|清单/.test(h));
+          let startRow = 0;
+          if (hit >= 0) { col = hit; startRow = 1; }
+          const lines = [];
+          for (let i = startRow; i < aoa.length; i++) {
+            const v = (aoa[i] || [])[col];
+            const s = String(v == null ? '' : v).trim();
+            if (s) lines.push(s);
+          }
+          onDone(lines.join('\n'));
+        } catch (err) { onError(new Error('Excel 解析失败：' + err.message)); }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      onError(new Error('暂支持 .txt / .csv / .xlsx，其他格式请粘贴文本'));
+    }
+  }
+
+  // 拆解面板（弹窗）：粘贴需求 / 上传文件 / 生成预览 / 采用
+  function openDecomposePanel() {
+    const existingCount = (dirtyForm.tasks || []).length;
+    const body = `
+      <div class="pl-decompose">
+        <p class="pl-dec-desc">粘贴产品需求清单（一行一条），或上传 .txt / .csv / .xlsx 文件。系统将按标准 <b>8 阶段</b> 生成一版「项目总览」计划，其中「研发计划」按需求逐条展开、「测试计划」内置 6 条固定子流程。</p>
+        <div class="pl-dec-toolbar">
+          <label class="pl-dec-upload btn">📎 上传文件<input type="file" id="plDecFile" accept=".txt,.csv,.xlsx,.xls" hidden></label>
+          <span class="pl-dec-filehint" id="plDecFileHint"></span>
+        </div>
+        <textarea id="plDecInput" class="pl-dec-input" rows="9" placeholder="示例：&#10;1. 支持多语言切换&#10;2. 新增设备离线告警推送&#10;3. 报表导出 PDF"></textarea>
+        ${existingCount ? `<label class="pl-dec-replace"><input type="checkbox" id="plDecReplace" checked> 替换当前已有的 ${existingCount} 个任务（取消勾选则追加）</label>` : ''}
+        <div class="pl-dec-preview" id="plDecPreview"></div>
+      </div>`;
+    SharedUI.confirm('需求清单拆解 → 项目总览', body, () => {
+      // "生成/采用"按钮回调：读输入 → 生成 → 写入 dirtyForm
+      const input = document.getElementById('plDecInput');
+      const reqs = parseRequirementLines(input ? input.value : '');
+      const generated = decomposeOverview(reqs);
+      const replaceEl = document.getElementById('plDecReplace');
+      const doReplace = !existingCount || (replaceEl && replaceEl.checked);
+      syncFormFromDom();
+      dirtyForm.tasks = doReplace ? generated : (dirtyForm.tasks || []).concat(generated);
+      renderFormBody();
+      SharedUI.toast(`已生成项目总览：${generated.length} 个任务（研发 ${reqs.length} 条需求）`, 'success');
+    }, { confirmText: '生成并填入', cancelText: '取消' });
+
+    // 绑定文件上传（在弹窗渲染后）
+    setTimeout(() => {
+      const fileEl = document.getElementById('plDecFile');
+      const hint = document.getElementById('plDecFileHint');
+      const input = document.getElementById('plDecInput');
+      const preview = document.getElementById('plDecPreview');
+      const refreshPreview = () => {
+        if (!preview) return;
+        const reqs = parseRequirementLines(input ? input.value : '');
+        preview.innerHTML = `<div class="pl-dec-preview-head">预览：将生成 <b>8</b> 个阶段，研发计划展开 <b>${reqs.length}</b> 条需求，测试计划 6 条子流程</div>`;
+      };
+      if (input) input.addEventListener('input', refreshPreview);
+      if (fileEl) fileEl.addEventListener('change', () => {
+        const f = fileEl.files && fileEl.files[0];
+        if (!f) return;
+        if (hint) hint.textContent = '解析中…';
+        parseRequirementFile(f, (text) => {
+          if (input) { input.value = text; refreshPreview(); }
+          if (hint) hint.textContent = `✓ 已解析 ${f.name}，请核对下方内容后生成`;
+        }, (err) => { if (hint) hint.textContent = '✗ ' + err.message; });
+      });
+      refreshPreview();
+    }, 0);
+  }
   function initFormDraft(plan) {
     const p = plan || null;
     return {
@@ -888,10 +1041,11 @@ const PlanModule = (() => {
             <div class="cs-form-section-head">
               <div class="cs-form-section-title">任务 WBS <span class="pl-count-pill">${draft.tasks.length} 项</span></div>
               <div class="pl-form-actions">
+                <button type="button" class="btn pl-decompose-btn" id="plDecompose">⚡ 需求清单拆解总览</button>
                 <button type="button" class="btn pl-add-btn" id="plAddTask">＋ 添加任务</button>
               </div>
             </div>
-            <div class="pl-form-note">提示：任务平铺展示、人天可输入 5~6 位数字不截断；WBS 编码、父任务、依赖用于生成树与甘特。</div>
+            <div class="pl-form-note">提示：任务平铺展示、人天可输入 5~6 位数字不截断；WBS 编码、父任务、依赖用于生成树与甘特。可点「需求清单拆解总览」按标准 8 阶段自动生成一版项目总览计划。</div>
             ${renderFormTasks(draft)}
           </div>
 
@@ -1150,6 +1304,7 @@ const PlanModule = (() => {
       el.querySelector('#plFormCancel')?.addEventListener('click', () => { dirtyForm = null; currentView = currentPlanId ? 'detail' : 'list'; render(); });
       el.querySelector('#plFormCancel2')?.addEventListener('click', () => { dirtyForm = null; currentView = currentPlanId ? 'detail' : 'list'; render(); });
       el.querySelector('#plFormSave')?.addEventListener('click', submitPlan);
+      el.querySelector('#plDecompose')?.addEventListener('click', () => { syncFormFromDom(); openDecomposePanel(); });
       el.querySelector('#plAddTask')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.tasks.push(blankTask()); renderFormBody(); });
       el.querySelector('#plAddMilestone')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.milestones.push(blankMilestone()); renderFormBody(); });
       el.querySelector('#plAddResource')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.resources.push(blankResource()); renderFormBody(); });

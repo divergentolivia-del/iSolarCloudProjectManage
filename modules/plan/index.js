@@ -842,7 +842,7 @@ const PlanModule = (() => {
     const existingCount = (dirtyForm.tasks || []).length;
     const body = `
       <div class="pl-decompose">
-        <p class="pl-dec-desc">粘贴产品需求清单（一行一条），或上传 .txt / .csv / .xlsx 文件。系统将按标准 <b>8 阶段</b> 生成一版「项目总览」计划，其中「研发计划」按需求逐条展开、「测试计划」内置 6 条固定子流程。</p>
+        <p class="pl-dec-desc">粘贴产品需求清单（一行一条），或上传 .txt / .csv / .xlsx 文件。系统将按标准 <b>8 阶段</b> 生成一版清晰的<b>项目级大纲</b>，其中「研发计划」按需求逐条展开、「测试计划」内置 6 条固定子流程。</p>
         <div class="pl-dec-toolbar">
           <label class="pl-dec-upload btn">📎 上传文件<input type="file" id="plDecFile" accept=".txt,.csv,.xlsx,.xls" hidden></label>
           <span class="pl-dec-filehint" id="plDecFileHint"></span>
@@ -851,7 +851,7 @@ const PlanModule = (() => {
         ${existingCount ? `<label class="pl-dec-replace"><input type="checkbox" id="plDecReplace" checked> 替换当前已有的 ${existingCount} 个任务（取消勾选则追加）</label>` : ''}
         <div class="pl-dec-preview" id="plDecPreview"></div>
       </div>`;
-    SharedUI.confirm('需求清单拆解 → 项目总览', body, () => {
+    SharedUI.confirm('项目总览 · 生成项目级大纲', body, () => {
       // "生成/采用"按钮回调：读输入 → 生成 → 写入 dirtyForm
       const input = document.getElementById('plDecInput');
       const reqs = parseRequirementLines(input ? input.value : '');
@@ -1041,11 +1041,11 @@ const PlanModule = (() => {
             <div class="cs-form-section-head">
               <div class="cs-form-section-title">任务 WBS <span class="pl-count-pill">${draft.tasks.length} 项</span></div>
               <div class="pl-form-actions">
-                <button type="button" class="btn pl-decompose-btn" id="plDecompose">⚡ 需求清单拆解总览</button>
+                <button type="button" class="btn pl-decompose-btn" id="plDecompose">🗂 项目总览</button>
                 <button type="button" class="btn pl-add-btn" id="plAddTask">＋ 添加任务</button>
               </div>
             </div>
-            <div class="pl-form-note">提示：任务平铺展示、人天可输入 5~6 位数字不截断；WBS 编码、父任务、依赖用于生成树与甘特。可点「需求清单拆解总览」按标准 8 阶段自动生成一版项目总览计划。</div>
+            <div class="pl-form-note">提示：任务平铺展示、人天可输入 5~6 位数字不截断；WBS 编码、父任务、依赖用于生成树与甘特。可点「项目总览」按标准 8 阶段一键生成清晰的项目级大纲。</div>
             ${renderFormTasks(draft)}
           </div>
 

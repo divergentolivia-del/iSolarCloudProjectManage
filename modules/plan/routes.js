@@ -18,6 +18,13 @@ const DATA_DIR = process.env.DATA_DIR
 const PLAN_DIR = path.join(DATA_DIR, 'plan');
 const STATE_FILE = path.join(PLAN_DIR, 'state.json');
 const HISTORY_DIR = path.join(PLAN_DIR, 'history');
+/* 本地配置（已 .gitignore）：存部门级 RPD 文档模板库链接等本机设置，
+   放在这里而不是源码里，改动不会与 git 拉取冲突。 */
+const CONFIG_FILE = path.join(PLAN_DIR, 'config.json');
+const EMPTY_CONFIG = {
+  _comment: '本文件已 .gitignore，仅存在于本机，不会提交到仓库。把部门 RPD 规范文档模板库链接填到 rpdTemplateUrl 即可全局生效。',
+  rpdTemplateUrl: ''
+};
 
 /* 枚举 */
 const VALID_PLAN_STATUS = ['draft', 'active', 'completed', 'archived'];
@@ -92,6 +99,16 @@ function latestSnapshot() {
     }
   } catch (e) { }
   return null;
+}
+
+/* 读取本机配置（缺失/损坏都不报错，返回空配置） */
+function readConfig() {
+  try {
+    const cfg = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+    return (cfg && typeof cfg === 'object') ? cfg : JSON.parse(JSON.stringify(EMPTY_CONFIG));
+  } catch (e) {
+    return JSON.parse(JSON.stringify(EMPTY_CONFIG));
+  }
 }
 
 function writeState(s) {
@@ -403,6 +420,14 @@ module.exports = {
     if (!fs.existsSync(STATE_FILE)) {
       writeState(JSON.parse(JSON.stringify(EMPTY_STATE)));
     }
+    // 首次启动生成本地配置模板（已 gitignore），用户把 RPD 链接填进去即可
+    if (!fs.existsSync(CONFIG_FILE)) {
+      try {
+        const tmp = CONFIG_FILE + '.tmp';
+        fs.writeFileSync(tmp, JSON.stringify(EMPTY_CONFIG, null, 2), 'utf8');
+        fs.renameSync(tmp, CONFIG_FILE);
+      } catch (e) { /* 生成失败不影响主流程 */ }
+    }
   },
 
   handle(req, res, u) {
@@ -415,6 +440,12 @@ module.exports = {
 
     if (sub === '/summary' && req.method === 'GET') {
       return sendJson(res, 200, computeSummary(readState()));
+    }
+
+    // 本地配置（只读，仅返回前端需要的字段，不回显 _comment）
+    if (sub === '/config' && req.method === 'GET') {
+      const cfg = readConfig();
+      return sendJson(res, 200, { rpdTemplateUrl: cfg.rpdTemplateUrl || '' });
     }
 
     if (sub === '/state' && req.method === 'POST') {

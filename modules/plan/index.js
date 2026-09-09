@@ -23,6 +23,7 @@ const PlanModule = (() => {
   let expandedWbs = new Set();         // 已展开的 wbs 节点 id
   let filterText = '';
   let isSaving = false;
+  let planConfig = { rpdTemplateUrl: '' };   // 本机配置（GET /api/plan/config）
 
   /* ---------- 常量表 ---------- */
   const PLAN_STATUS_LABELS = { draft: '草稿', active: '进行中', completed: '已完成', archived: '已归档' };
@@ -37,11 +38,10 @@ const PlanModule = (() => {
   const MEMBER_ROLE_LABELS = { pm: '项目经理', product: '产品经理', system: '系统经理', dev: '研发', test: '测试', design: '设计', other: '其他' };
   const REF_TYPE_LABELS = { requirement: '需求文档', design: '设计文档', test: '测试文档', api: '接口文档', other: '其他' };
   /* ★ RPD 规范文档模板库（部门级知识库链接）
-     —— 这是部门统一的文档模板库，不需要每个项目单独填写。
-        换库只改这一行即可全局生效；留空则「打开模板库」按钮置灰并提示未配置。 */
-  const RPD_TEMPLATE_URL = '';
-  // 取生效链接：优先用计划自带（兼容历史数据/特殊项目覆盖），否则用部门统一常量
-  function rpdUrlOf(obj) { return String((obj && obj.rpdTemplateUrl) || RPD_TEMPLATE_URL || '').trim(); }
+     —— 链接不写在源码里，而是存本机 data/plan/config.json（已 .gitignore），
+        由 GET /api/plan/config 提供。这样你维护链接不会与 git 拉取冲突。 */
+  // 取生效链接：优先用计划自带（历史数据/特殊项目覆盖），否则用本机配置
+  function rpdUrlOf(obj) { return String((obj && obj.rpdTemplateUrl) || (planConfig && planConfig.rpdTemplateUrl) || '').trim(); }
 
   /* 参考文档 / 交付件（评审阶段 + 提交状态） */
   const REF_STAGE_LABELS = { TR2: 'TR2', TR3: 'TR3', TR4: 'TR4', TR5: 'TR5', other: '其他' };
@@ -124,6 +124,17 @@ const PlanModule = (() => {
       console.error('[plan] 获取数据失败:', e.message);
       state = { rev: 0, plans: [] };
       return null;
+    }
+  }
+  // 读取本机配置（RPD 模板库链接等）。失败不影响主流程，只是按钮置灰。
+  async function fetchConfig() {
+    try {
+      const resp = await fetch('/api/plan/config');
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const cfg = await resp.json();
+      planConfig = { rpdTemplateUrl: (cfg && cfg.rpdTemplateUrl) || '' };
+    } catch (e) {
+      planConfig = { rpdTemplateUrl: '' };
     }
   }
   async function fetchSummary() {
@@ -1282,7 +1293,7 @@ const PlanModule = (() => {
           <h4>RPD 规范文档模板库</h4>
           <p>${url
             ? '部门内部项目文档模板与规范知识库，团队可直接查阅各交付件的标准模板样式。'
-            : '尚未配置知识库链接。请在 <code>modules/plan/index.js</code> 的 <code>RPD_TEMPLATE_URL</code> 填入部门知识库地址，即可全局生效。'}</p>
+            : '尚未配置知识库链接。打开本机 <code>data/plan/config.json</code>，把链接填到 <code>rpdTemplateUrl</code> 后刷新页面即可（该文件已 gitignore，不会提交、也不会与拉取代码冲突）。'}</p>
         </div>
       </div>
       <div class="pl-rpd-actions">
@@ -2043,7 +2054,7 @@ const PlanModule = (() => {
     // 打开 RPD 模板库（链接来自部门级常量 RPD_TEMPLATE_URL）
     el.querySelector('#plRpdOpen')?.addEventListener('click', () => {
       const url = rpdUrlOf(dirtyForm);
-      if (!url) { SharedUI.toast('尚未配置 RPD 模板库链接（modules/plan/index.js → RPD_TEMPLATE_URL）', 'warning'); return; }
+      if (!url) { SharedUI.toast('尚未配置 RPD 模板库链接：请在本机 data/plan/config.json 填写 rpdTemplateUrl 后刷新', 'warning'); return; }
       if (!/^https?:\/\//i.test(url)) { SharedUI.toast('链接需以 http:// 或 https:// 开头', 'warning'); return; }
       window.open(url, '_blank', 'noopener');
     });
@@ -2141,7 +2152,7 @@ const PlanModule = (() => {
     container = el_;
     el = el_;
     el.innerHTML = `<div class="cs-loading">加载项目计划…</div>`;
-    await Promise.all([fetchState(), fetchSummary()]);
+    await Promise.all([fetchState(), fetchSummary(), fetchConfig()]);
     render();
   }
 

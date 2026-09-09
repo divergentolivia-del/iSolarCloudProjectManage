@@ -1730,8 +1730,22 @@ body.dark-theme .pl-dp,
    行拖拽排序（表单内 9 张表格通用）
    ========================================================== */
 /* 树形表：序号列兼作把手，不额外占宽度 */
-.pl-drag { cursor: grab; user-select: none; -webkit-user-select: none; }
+/* touch-action:none 只加在把手上：触屏拖行时不让页面跟着滚，
+   但表格其他区域仍可正常触摸滚动 */
+.pl-drag {
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
 .pl-drag:active { cursor: grabbing; }
+/* 键盘换序：把手可聚焦，给明确的焦点环 */
+.pl-drag:focus { outline: none; }
+.pl-drag:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: var(--accent-soft, rgba(82,196,26,.12));
+}
 .pl-ov-seq.pl-drag { position: relative; transition: background .12s ease; }
 .pl-ov-seq.pl-drag:hover { background: var(--accent-soft, rgba(82,196,26,.12)); color: var(--accent); }
 

@@ -34,9 +34,10 @@ const PlanModule = (() => {
   const TASK_TYPE_LABELS = { dev: '开发', test: '测试', design: '设计', doc: '文档', ops: '运维', other: '其他' };
   /* 行拖拽把手：树形表直接复用「序号」列当把手（不额外占宽度），
      平铺表没有序号列，插一列 28px 窄把手。语义见 applyRowDrop 上方注释。 */
-  const DRAG_TIP = '按住拖动：上/下沿=同级换序，中间=成为子项';
+  const DRAG_TIP = '按住拖动：上/下沿=同级换序，中间=成为子项&#10;键盘：Alt+↑/↓ 换序，Alt+→ 缩进，Alt+← 升级';
+  const DRAG_TIP_FLAT = '按住拖动调整顺序&#10;键盘：Alt+↑/↓';
   const DRAG_TH = '<th class="pl-drag-th"></th>';
-  const DRAG_TD = '<td class="pl-drag pl-drag-cell" title="按住拖动调整顺序"><span class="pl-grip">⠿</span></td>';
+  const DRAG_TD = `<td class="pl-drag pl-drag-cell" tabindex="0" role="button" aria-label="拖动调整顺序，或按 Alt 加上下方向键" title="${DRAG_TIP_FLAT}"><span class="pl-grip">⠿</span></td>`;
   const MILESTONE_STATUS_LABELS = { pending: '待完成', 'in-progress': '进行中', done: '已完成' };
   const MILESTONE_STATUS_CLASS = { pending: 'status-planned', 'in-progress': 'status-active', done: 'status-done' };
   const RES_KIND_LABELS = { team: '团队', person: '个人' };
@@ -1174,7 +1175,7 @@ const PlanModule = (() => {
       const t = o.item, i = o.index, d = o.depth;
       return `
       <tr data-task-idx="${i}" data-depth="${d}">
-        <td class="pl-ov-seq pl-drag" title="${DRAG_TIP}">${o.code}</td>
+        <td class="pl-ov-seq pl-drag" tabindex="0" role="button" aria-label="拖动调整顺序与层级，或按 Alt 加方向键" title="${DRAG_TIP}">${o.code}</td>
         <td>${indWrap(d, `<input class="pl-f-name" data-f="name" value="${esc(t.name)}" placeholder="任务名称"${d ? '' : ' style="font-weight:600"'}>`)}</td>
         <td><select data-f="type">${Object.keys(TASK_TYPE_LABELS).map(k => `<option value="${k}" ${t.type === k ? 'selected' : ''}>${TASK_TYPE_LABELS[k]}</option>`).join('')}</select></td>
         <td><select data-f="status">${Object.keys(TASK_STATUS_LABELS).map(k => `<option value="${k}" ${t.status === k ? 'selected' : ''}>${TASK_STATUS_LABELS[k]}</option>`).join('')}</select></td>
@@ -1253,7 +1254,7 @@ const PlanModule = (() => {
       const r = o.item, i = o.index, d = o.depth;
       return `
       <tr data-ref-idx="${i}" data-depth="${d}">
-        <td class="pl-ov-seq pl-drag" title="${DRAG_TIP}">${o.code}</td>
+        <td class="pl-ov-seq pl-drag" tabindex="0" role="button" aria-label="拖动调整顺序与层级，或按 Alt 加方向键" title="${DRAG_TIP}">${o.code}</td>
         <td>${indWrap(d, `<input data-f="title" value="${esc(r.title)}" placeholder="${d ? '子项名称' : '交付产物'}"${d ? '' : ' style="font-weight:600"'}>`)}</td>
         <td><select data-f="stage">${Object.keys(REF_STAGE_LABELS).map(k => `<option value="${k}" ${r.stage === k ? 'selected' : ''}>${REF_STAGE_LABELS[k]}</option>`).join('')}</select></td>
         <td><input data-f="dept" value="${esc(r.dept)}" placeholder="责任部门/人"></td>
@@ -1364,7 +1365,7 @@ const PlanModule = (() => {
       const s = o.item, i = o.index, d = o.depth;
       return `
       <tr data-ov-idx="${i}" data-depth="${d}">
-        <td class="pl-ov-seq pl-drag" title="${DRAG_TIP}">${o.code}</td>
+        <td class="pl-ov-seq pl-drag" tabindex="0" role="button" aria-label="拖动调整顺序与层级，或按 Alt 加方向键" title="${DRAG_TIP}">${o.code}</td>
         <td>${indWrap(d, `<input data-f="name" value="${esc(s.name)}" placeholder="${d ? '子项名称' : '阶段名称'}"${d ? '' : ' style="font-weight:600"'}>`)}</td>
         <td><input data-f="owner" value="${esc(s.owner)}" placeholder="负责人"></td>
         <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="startDate" value="${esc(s.startDate)}"></td>
@@ -1558,7 +1559,7 @@ const PlanModule = (() => {
             const x = o.item, i = o.index, d = o.depth;
             return `
             <tr data-market-idx="${i}" data-depth="${d}">
-              <td class="pl-ov-seq pl-drag" title="${DRAG_TIP}">${o.code}</td>
+              <td class="pl-ov-seq pl-drag" tabindex="0" role="button" aria-label="拖动调整顺序与层级，或按 Alt 加方向键" title="${DRAG_TIP}">${o.code}</td>
               <td>${indWrap(d, `<input data-f="name" value="${esc(x.name)}" placeholder="${d ? '子任务名称' : '阶段名称'}"${d ? '' : ' style="font-weight:600"'}>`)}</td>
               <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="startDate" value="${esc(x.startDate)}"></td>
               <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="endDate" value="${esc(x.endDate)}"></td>
@@ -2232,8 +2233,9 @@ const PlanModule = (() => {
       if (dragCtx.ghost && dragCtx.ghost.parentNode) dragCtx.ghost.remove();
     }
     clearDropMarks();
-    document.removeEventListener('mousemove', onRowDragMove, true);
-    document.removeEventListener('mouseup', onRowDragUp, true);
+    document.removeEventListener('pointermove', onRowDragMove, true);
+    document.removeEventListener('pointerup', onRowDragUp, true);
+    document.removeEventListener('pointercancel', endRowDrag, true);
     document.removeEventListener('keydown', onRowDragKey, true);
     document.body.classList.remove('pl-dragging-active');
     dragCtx = null;
@@ -2260,8 +2262,9 @@ const PlanModule = (() => {
       active: false, drop: null,
       scroller: scrollParentOf(tr)
     };
-    document.addEventListener('mousemove', onRowDragMove, true);
-    document.addEventListener('mouseup', onRowDragUp, true);
+    document.addEventListener('pointermove', onRowDragMove, true);
+    document.addEventListener('pointerup', onRowDragUp, true);
+    document.addEventListener('pointercancel', endRowDrag, true);
     document.addEventListener('keydown', onRowDragKey, true);
   }
 
@@ -2302,6 +2305,58 @@ const PlanModule = (() => {
 
   function onRowDragKey(e) {
     if (e.key === 'Escape' && dragCtx) { e.preventDefault(); endRowDrag(); }
+  }
+
+  /* ---------- 键盘换序（把手聚焦后 Alt + 方向键） ----------
+     长表格用鼠标精确拖拽很费劲，键盘更快；也让不便使用鼠标的人可用。
+     Alt+↑/↓ 同级上下移；Alt+→ 缩进为上一个同级的子项；Alt+← 升级为父级的下一个同级。 */
+  // parentId 归一化：与 treeOrder 的判定保持一致（指向不存在的 id 或自己都视为顶层）
+  function normPid(list, x) {
+    const pid = x && x.parentId;
+    if (!pid || pid === x.id) return '';
+    return list.some(y => y.id === pid) ? pid : '';
+  }
+  function siblingsOf(list, item, tree) {
+    if (!tree) return list.slice();
+    const pid = normPid(list, item);
+    return list.filter(y => normPid(list, y) === pid);
+  }
+  function moveRowByKey(cfg, id, action) {
+    const list = (dirtyForm && dirtyForm[cfg.key]) || [];
+    const item = list.find(x => x.id === id);
+    if (!item) return false;
+    const sibs = siblingsOf(list, item, cfg.tree);
+    const at = sibs.findIndex(x => x.id === id);
+    if (action === 'up') {
+      if (at <= 0) return false;                                   // 已是第一个，静默不动
+      return applyRowDrop(cfg, id, sibs[at - 1].id, 'before');
+    }
+    if (action === 'down') {
+      if (at < 0 || at >= sibs.length - 1) return false;            // 已是最后一个
+      return applyRowDrop(cfg, id, sibs[at + 1].id, 'after');
+    }
+    if (!cfg.tree) return false;                                    // 平铺表没有层级
+    if (action === 'indent') {
+      if (at <= 0) return false;                                    // 没有上一个同级可挂
+      return applyRowDrop(cfg, id, sibs[at - 1].id, 'child');
+    }
+    if (action === 'outdent') {
+      const pid = normPid(list, item);
+      if (!pid) return false;                                       // 已是顶层
+      return applyRowDrop(cfg, id, pid, 'after');
+    }
+    return false;
+  }
+  // 重渲染后把焦点还给刚移动的那一行（DOM 已被替换，需按 id 重新定位）
+  function refocusHandle(cfg, id) {
+    const list = (dirtyForm && dirtyForm[cfg.key]) || [];
+    const i = list.findIndex(x => x.id === id);
+    if (i < 0) return;
+    const tr = el.querySelector(`tr[${cfg.attr}="${i}"]`);
+    const h = tr && tr.querySelector('.pl-drag');
+    if (!h) return;
+    h.focus();
+    if (h.scrollIntoView) h.scrollIntoView({ block: 'nearest' });
   }
 
   function onRowDragUp() {
@@ -2534,7 +2589,7 @@ const PlanModule = (() => {
        整个 innerHTML 替换掉，监听器会连根消失。只有 el 自身永不被替换。 */
     if (!el._plDragDelegated) {
       el._plDragDelegated = true;
-      el.addEventListener('mousedown', (e) => {
+      el.addEventListener('pointerdown', (e) => {
         if (e.button !== 0 || !dirtyForm) return;
         if (currentView !== 'new' && currentView !== 'edit') return;
         const handle = e.target.closest('.pl-drag');
@@ -2544,6 +2599,27 @@ const PlanModule = (() => {
         if (!cfg) return;
         e.preventDefault();               // 防止拖动时选中页面文字
         startRowDrag(e, tr, cfg);
+      });
+      // 键盘换序：把手聚焦后 Alt + 方向键
+      el.addEventListener('keydown', (e) => {
+        if (!dirtyForm || !e.altKey) return;
+        if (currentView !== 'new' && currentView !== 'edit') return;
+        const action = { ArrowUp: 'up', ArrowDown: 'down', ArrowRight: 'indent', ArrowLeft: 'outdent' }[e.key];
+        if (!action) return;
+        const handle = e.target.closest && e.target.closest('.pl-drag');
+        if (!handle) return;
+        const tr = handle.closest(DRAG_ROW_SEL);
+        const cfg = dragCfgOf(tr);
+        if (!cfg) return;
+        e.preventDefault();
+        const list = dirtyForm[cfg.key] || [];
+        const item = list[Number(tr.getAttribute(cfg.attr))];
+        if (!item) return;
+        const id = item.id;
+        syncFormFromDom();                       // 同拖拽：先回写再动数组
+        if (!moveRowByKey(cfg, id, action)) return;
+        renderFormTabBody();
+        refocusHandle(cfg, id);
       });
       /* 「上级」下拉原来没有任何监听：改完不重排、不缩进，要等切 tab 或增删行才生效。
          补一个 change，让层级变更立刻可见（与拖拽改父节点行为一致）。 */

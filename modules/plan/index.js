@@ -32,6 +32,11 @@ const PlanModule = (() => {
   const TASK_STATUS_CLASS = { 'not-started': 'status-planned', 'in-progress': 'status-active', completed: 'status-done', blocked: 'status-hold' };
   const PRIORITY_LABELS = { high: '高', medium: '中', low: '低' };
   const TASK_TYPE_LABELS = { dev: '开发', test: '测试', design: '设计', doc: '文档', ops: '运维', other: '其他' };
+  /* 行拖拽把手：树形表直接复用「序号」列当把手（不额外占宽度），
+     平铺表没有序号列，插一列 28px 窄把手。语义见 applyRowDrop 上方注释。 */
+  const DRAG_TIP = '按住拖动：上/下沿=同级换序，中间=成为子项';
+  const DRAG_TH = '<th class="pl-drag-th"></th>';
+  const DRAG_TD = '<td class="pl-drag pl-drag-cell" title="按住拖动调整顺序"><span class="pl-grip">⠿</span></td>';
   const MILESTONE_STATUS_LABELS = { pending: '待完成', 'in-progress': '进行中', done: '已完成' };
   const MILESTONE_STATUS_CLASS = { pending: 'status-planned', 'in-progress': 'status-active', done: 'status-done' };
   const RES_KIND_LABELS = { team: '团队', person: '个人' };
@@ -1169,7 +1174,7 @@ const PlanModule = (() => {
       const t = o.item, i = o.index, d = o.depth;
       return `
       <tr data-task-idx="${i}" data-depth="${d}">
-        <td class="pl-ov-seq">${o.code}</td>
+        <td class="pl-ov-seq pl-drag" title="${DRAG_TIP}">${o.code}</td>
         <td>${indWrap(d, `<input class="pl-f-name" data-f="name" value="${esc(t.name)}" placeholder="任务名称"${d ? '' : ' style="font-weight:600"'}>`)}</td>
         <td><select data-f="type">${Object.keys(TASK_TYPE_LABELS).map(k => `<option value="${k}" ${t.type === k ? 'selected' : ''}>${TASK_TYPE_LABELS[k]}</option>`).join('')}</select></td>
         <td><select data-f="status">${Object.keys(TASK_STATUS_LABELS).map(k => `<option value="${k}" ${t.status === k ? 'selected' : ''}>${TASK_STATUS_LABELS[k]}</option>`).join('')}</select></td>
@@ -1198,13 +1203,14 @@ const PlanModule = (() => {
     }
     const rows = draft.resources.map((r, i) => `
       <tr data-res-idx="${i}">
+        ${DRAG_TD}
         <td><input data-f="name" value="${esc(r.name)}" placeholder="资源名"></td>
         <td><select data-f="kind">${Object.keys(RES_KIND_LABELS).map(k => `<option value="${k}" ${r.kind === k ? 'selected' : ''}>${RES_KIND_LABELS[k]}</option>`).join('')}</select></td>
         <td><input data-f="dept" value="${esc(r.dept)}" placeholder="部门"></td>
         <td><input type="number" data-f="total" value="${esc(r.total)}" placeholder="总容量(人天)" min="0" step="0.1"></td>
         <td><button type="button" class="pl-row-del pl-del-res" data-del-res="${i}" title="删除"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M6.5 1.5h3a.5.5 0 0 1 .5.5v1H6V2a.5.5 0 0 1 .5-.5Zm-1.5 2V2A1.5 1.5 0 0 1 6.5.5h3A1.5 1.5 0 0 1 11 2v1.5h2.5a.5.5 0 0 1 0 1h-.53l-.6 8.4A2 2 0 0 1 10.38 15H5.62a2 2 0 0 1-1.99-1.85l-.6-8.4H2.5a.5.5 0 0 1 0-1H5Zm-.96 1 .59 8.33a1 1 0 0 0 1 .92h4.74a1 1 0 0 0 1-.92l.59-8.33H4.04ZM6.75 6a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Z"/></svg></button></td>
       </tr>`);
-    return `<div class="table-wrapper"><table class="data-table"><thead><tr><th class="txt">资源</th><th>类型</th><th class="txt">部门</th><th style="min-width:120px">总容量(人天)</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+    return `<div class="table-wrapper"><table class="data-table"><thead><tr>${DRAG_TH}<th class="txt">资源</th><th>类型</th><th class="txt">部门</th><th style="min-width:120px">总容量(人天)</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
   }
 
   function renderFormMilestones(draft) {
@@ -1213,6 +1219,7 @@ const PlanModule = (() => {
     }
     const rows = draft.milestones.map((m, i) => `
       <tr data-ms-idx="${i}">
+        ${DRAG_TD}
         <td><input data-f="name" value="${esc(m.name)}" placeholder="里程碑名称"></td>
         <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="date" value="${esc(m.date)}"></td>
         <td><select data-f="status">${Object.keys(MILESTONE_STATUS_LABELS).map(k => `<option value="${k}" ${m.status === k ? 'selected' : ''}>${MILESTONE_STATUS_LABELS[k]}</option>`).join('')}</select></td>
@@ -1220,7 +1227,7 @@ const PlanModule = (() => {
         <td><input data-f="desc" value="${esc(m.desc)}" placeholder="说明"></td>
         <td><button type="button" class="pl-row-del pl-del-ms" data-del-ms="${i}" title="删除"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M6.5 1.5h3a.5.5 0 0 1 .5.5v1H6V2a.5.5 0 0 1 .5-.5Zm-1.5 2V2A1.5 1.5 0 0 1 6.5.5h3A1.5 1.5 0 0 1 11 2v1.5h2.5a.5.5 0 0 1 0 1h-.53l-.6 8.4A2 2 0 0 1 10.38 15H5.62a2 2 0 0 1-1.99-1.85l-.6-8.4H2.5a.5.5 0 0 1 0-1H5Zm-.96 1 .59 8.33a1 1 0 0 0 1 .92h4.74a1 1 0 0 0 1-.92l.59-8.33H4.04ZM6.75 6a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Z"/></svg></button></td>
       </tr>`);
-    return `<div class="table-wrapper"><table class="data-table"><thead><tr><th class="txt" style="min-width:190px">里程碑</th><th class="txt">日期</th><th>状态</th><th class="txt">负责人</th><th class="txt">说明</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+    return `<div class="table-wrapper"><table class="data-table"><thead><tr>${DRAG_TH}<th class="txt" style="min-width:190px">里程碑</th><th class="txt">日期</th><th>状态</th><th class="txt">负责人</th><th class="txt">说明</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
   }
 
   function renderFormMembers(draft) {
@@ -1229,6 +1236,7 @@ const PlanModule = (() => {
     }
     const rows = draft.members.map((m, i) => `
       <tr data-member-idx="${i}">
+        ${DRAG_TD}
         <td><input data-f="name" value="${esc(m.name)}" placeholder="姓名"></td>
         <td><select data-f="role">${Object.keys(MEMBER_ROLE_LABELS).map(k => `<option value="${k}" ${m.role === k ? 'selected' : ''}>${MEMBER_ROLE_LABELS[k]}</option>`).join('')}</select></td>
         <td><input data-f="dept" value="${esc(m.dept)}" placeholder="部门/团队"></td>
@@ -1236,7 +1244,7 @@ const PlanModule = (() => {
         <td><input data-f="contact" value="${esc(m.contact)}" placeholder="联系方式(可选)"></td>
         <td><button type="button" class="pl-row-del pl-del-member" data-del-member="${i}" title="删除"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M6.5 1.5h3a.5.5 0 0 1 .5.5v1H6V2a.5.5 0 0 1 .5-.5Zm-1.5 2V2A1.5 1.5 0 0 1 6.5.5h3A1.5 1.5 0 0 1 11 2v1.5h2.5a.5.5 0 0 1 0 1h-.53l-.6 8.4A2 2 0 0 1 10.38 15H5.62a2 2 0 0 1-1.99-1.85l-.6-8.4H2.5a.5.5 0 0 1 0-1H5Zm-.96 1 .59 8.33a1 1 0 0 0 1 .92h4.74a1 1 0 0 0 1-.92l.59-8.33H4.04ZM6.75 6a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Z"/></svg></button></td>
       </tr>`);
-    return `<div class="table-wrapper"><table class="data-table"><thead><tr><th class="txt">姓名</th><th>角色</th><th class="txt">部门/团队</th><th class="txt" style="min-width:180px">职责分工</th><th class="txt" style="min-width:150px">联系方式</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+    return `<div class="table-wrapper"><table class="data-table"><thead><tr>${DRAG_TH}<th class="txt">姓名</th><th>角色</th><th class="txt">部门/团队</th><th class="txt" style="min-width:180px">职责分工</th><th class="txt" style="min-width:150px">联系方式</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
   }
 
   function renderFormReferences(draft) {
@@ -1245,7 +1253,7 @@ const PlanModule = (() => {
       const r = o.item, i = o.index, d = o.depth;
       return `
       <tr data-ref-idx="${i}" data-depth="${d}">
-        <td class="pl-ov-seq">${o.code}</td>
+        <td class="pl-ov-seq pl-drag" title="${DRAG_TIP}">${o.code}</td>
         <td>${indWrap(d, `<input data-f="title" value="${esc(r.title)}" placeholder="${d ? '子项名称' : '交付产物'}"${d ? '' : ' style="font-weight:600"'}>`)}</td>
         <td><select data-f="stage">${Object.keys(REF_STAGE_LABELS).map(k => `<option value="${k}" ${r.stage === k ? 'selected' : ''}>${REF_STAGE_LABELS[k]}</option>`).join('')}</select></td>
         <td><input data-f="dept" value="${esc(r.dept)}" placeholder="责任部门/人"></td>
@@ -1356,7 +1364,7 @@ const PlanModule = (() => {
       const s = o.item, i = o.index, d = o.depth;
       return `
       <tr data-ov-idx="${i}" data-depth="${d}">
-        <td class="pl-ov-seq">${o.code}</td>
+        <td class="pl-ov-seq pl-drag" title="${DRAG_TIP}">${o.code}</td>
         <td>${indWrap(d, `<input data-f="name" value="${esc(s.name)}" placeholder="${d ? '子项名称' : '阶段名称'}"${d ? '' : ' style="font-weight:600"'}>`)}</td>
         <td><input data-f="owner" value="${esc(s.owner)}" placeholder="负责人"></td>
         <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="startDate" value="${esc(s.startDate)}"></td>
@@ -1450,6 +1458,7 @@ const PlanModule = (() => {
       <div class="table-wrapper pl-issue-table-wrap">
         <table class="data-table pl-issue-table">
           <thead><tr>
+            ${DRAG_TH}
             <th style="min-width:72px">问题编号</th>
             <th class="txt" style="min-width:220px">遗留问题描述</th>
             <th class="txt" style="min-width:200px">应对方案</th>
@@ -1462,6 +1471,7 @@ const PlanModule = (() => {
           </tr></thead>
           <tbody>${list.map((x, i) => `
             <tr data-issue-idx="${i}">
+              ${DRAG_TD}
               <td><input data-f="code" value="${esc(x.code)}" placeholder="${i + 1}"></td>
               <td><textarea data-f="desc" rows="2" placeholder="问题描述">${esc(x.desc)}</textarea></td>
               <td><textarea data-f="solution" rows="2" placeholder="应对方案">${esc(x.solution)}</textarea></td>
@@ -1492,6 +1502,7 @@ const PlanModule = (() => {
       <div class="table-wrapper pl-risk-table-wrap">
         <table class="data-table pl-risk-table">
           <thead><tr>
+            ${DRAG_TH}
             <th style="min-width:110px">风险类型</th>
             <th class="txt" style="min-width:230px">风险描述</th>
             <th class="txt" style="min-width:210px">应对方案</th>
@@ -1503,6 +1514,7 @@ const PlanModule = (() => {
           </tr></thead>
           <tbody>${list.map((x, i) => `
             <tr data-risk-idx="${i}">
+              ${DRAG_TD}
               <td><select data-f="type">${Object.keys(RISK_TYPE_LABELS).map(k => `<option value="${k}" ${x.type === k ? 'selected' : ''}>${RISK_TYPE_LABELS[k]}</option>`).join('')}</select></td>
               <td><textarea data-f="desc" rows="2" placeholder="风险描述">${esc(x.desc)}</textarea></td>
               <td><textarea data-f="solution" rows="2" placeholder="应对方案">${esc(x.solution)}</textarea></td>
@@ -1546,7 +1558,7 @@ const PlanModule = (() => {
             const x = o.item, i = o.index, d = o.depth;
             return `
             <tr data-market-idx="${i}" data-depth="${d}">
-              <td class="pl-ov-seq">${o.code}</td>
+              <td class="pl-ov-seq pl-drag" title="${DRAG_TIP}">${o.code}</td>
               <td>${indWrap(d, `<input data-f="name" value="${esc(x.name)}" placeholder="${d ? '子任务名称' : '阶段名称'}"${d ? '' : ' style="font-weight:600"'}>`)}</td>
               <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="startDate" value="${esc(x.startDate)}"></td>
               <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="endDate" value="${esc(x.endDate)}"></td>
@@ -2112,6 +2124,199 @@ const PlanModule = (() => {
     });
   }
 
+  /* ==========================================================
+     行拖拽排序（表单内 9 张表格通用）
+     语义：树形表 = 上/下沿放开→与目标同级换序，中间放开→成为目标的子项；
+           平铺表 = 只有上/下沿（无层级概念）。
+     两个必须遵守的约束：
+     1) 落点生效前必须先 syncFormFromDom()，把用户尚未回写的输入救回 dirtyForm。
+        因为 data-*-idx 是「数组下标」，数组一动下标就错位，而 syncFormFromDom 里
+        取不到元素时是**静默 return**，顺序反了会悄悄把值写到别的行上、且不报错。
+     2) 环引用必须自己校验：parentOptions 的防环只作用在下拉选项上，拖拽绕过了它。
+     ========================================================== */
+  const DRAG_TABLES = [
+    { attr: 'data-ov-idx', key: 'overview', tree: true },
+    { attr: 'data-task-idx', key: 'tasks', tree: true },
+    { attr: 'data-market-idx', key: 'marketPlan', tree: true },
+    { attr: 'data-ref-idx', key: 'references', tree: true },
+    { attr: 'data-ms-idx', key: 'milestones', tree: false },
+    { attr: 'data-issue-idx', key: 'issues', tree: false },
+    { attr: 'data-risk-idx', key: 'risks', tree: false },
+    { attr: 'data-res-idx', key: 'resources', tree: false },
+    { attr: 'data-member-idx', key: 'members', tree: false }
+  ];
+  const DRAG_ROW_SEL = DRAG_TABLES.map(t => `tr[${t.attr}]`).join(',');
+  function dragCfgOf(tr) { return tr ? (DRAG_TABLES.find(t => tr.hasAttribute(t.attr)) || null) : null; }
+  function dragLabelOf(x) { return (x && (x.name || x.title || x.desc)) || '(未命名)'; }
+
+  let dragCtx = null;
+
+  /* 被拖动的整块：树形表 = 自身 + 全部后代（按树序取，保证子树在数组里连续）
+     平铺表 = 仅自身。treeOrder 里子树是「深度 > 自身」的连续段。 */
+  function subtreeBlock(list, id, tree) {
+    const self = (list || []).find(x => x.id === id);
+    if (!self) return [];
+    if (!tree) return [self];
+    const ord = treeOrder(list);
+    const at = ord.findIndex(o => o.item.id === id);
+    if (at < 0) return [self];
+    const base = ord[at].depth;
+    const block = [ord[at].item];
+    for (let k = at + 1; k < ord.length && ord[k].depth > base; k++) block.push(ord[k].item);
+    return block;
+  }
+
+  /* 落点应用。mode: before | after | child
+     before -> 插到 target 之前，与 target 同级
+     after  -> 插到 target 整棵子树之后，与 target 同级
+     child  -> 成为 target 的最后一个子项
+     返回 false = 非法落点（拖到自己身上，或拖进自己的子孙里） */
+  function applyRowDrop(cfg, dragId, targetId, mode) {
+    const list = dirtyForm && dirtyForm[cfg.key];
+    if (!Array.isArray(list)) return false;
+    const drag = list.find(x => x.id === dragId);
+    const target = list.find(x => x.id === targetId);
+    if (!drag || !target || dragId === targetId) return false;
+    if (cfg.tree && descendantIds(list, dragId).has(targetId)) return false;
+
+    const block = subtreeBlock(list, dragId, cfg.tree);
+    const blockIds = new Set(block.map(x => x.id));
+    if (cfg.tree) drag.parentId = (mode === 'child') ? target.id : (target.parentId || '');
+
+    const rest = list.filter(x => !blockIds.has(x.id));
+    let at;
+    if (mode === 'before') {
+      at = rest.findIndex(x => x.id === targetId);
+    } else {
+      const tb = subtreeBlock(rest, targetId, cfg.tree);
+      const lastId = tb.length ? tb[tb.length - 1].id : targetId;
+      at = rest.findIndex(x => x.id === lastId) + 1;
+    }
+    if (at < 0) at = rest.length;
+    rest.splice(at, 0, ...block);
+    dirtyForm[cfg.key] = rest;
+    return true;
+  }
+
+  function clearDropMarks() {
+    if (!el) return;
+    el.querySelectorAll('.pl-drop-before,.pl-drop-after,.pl-drop-child,.pl-drop-deny')
+      .forEach(r => r.classList.remove('pl-drop-before', 'pl-drop-after', 'pl-drop-child', 'pl-drop-deny'));
+  }
+  // 找最近的可纵向滚动祖先，拖到边缘时自动滚动（表单体在滚动，不一定是 window）
+  function scrollParentOf(node) {
+    let p = node && node.parentElement;
+    while (p && p !== document.body) {
+      const cs = getComputedStyle(p);
+      if (/(auto|scroll)/.test(cs.overflowY) && p.scrollHeight - p.clientHeight > 4) return p;
+      p = p.parentElement;
+    }
+    return null;
+  }
+  function dragAutoScroll(y) {
+    const M = 56, S = 14;
+    const sp = dragCtx && dragCtx.scroller;
+    if (sp) {
+      const r = sp.getBoundingClientRect();
+      if (y < r.top + M) sp.scrollTop -= S;
+      else if (y > r.bottom - M) sp.scrollTop += S;
+      return;
+    }
+    if (y < M) window.scrollBy(0, -S);
+    else if (y > window.innerHeight - M) window.scrollBy(0, S);
+  }
+
+  function endRowDrag() {
+    if (dragCtx) {
+      dragCtx.srcRows.forEach(r => r.classList.remove('pl-dragging'));
+      if (dragCtx.ghost && dragCtx.ghost.parentNode) dragCtx.ghost.remove();
+    }
+    clearDropMarks();
+    document.removeEventListener('mousemove', onRowDragMove, true);
+    document.removeEventListener('mouseup', onRowDragUp, true);
+    document.removeEventListener('keydown', onRowDragKey, true);
+    document.body.classList.remove('pl-dragging-active');
+    dragCtx = null;
+  }
+
+  function startRowDrag(e, tr, cfg) {
+    const list = (dirtyForm && dirtyForm[cfg.key]) || [];
+    const idx = Number(tr.getAttribute(cfg.attr));
+    const item = list[idx];
+    if (!item) return;
+    const block = subtreeBlock(list, item.id, cfg.tree);
+    const srcRows = block
+      .map(b => el.querySelector(`tr[${cfg.attr}="${list.indexOf(b)}"]`))
+      .filter(Boolean);
+
+    const ghost = document.createElement('div');
+    ghost.className = 'pl-drag-ghost';
+    ghost.textContent = dragLabelOf(item).slice(0, 28) + (block.length > 1 ? `（含 ${block.length - 1} 个子项）` : '');
+
+    dragCtx = {
+      cfg, dragId: item.id, srcRows, ghost,
+      descIds: cfg.tree ? descendantIds(list, item.id) : new Set(),
+      startX: e.clientX, startY: e.clientY,
+      active: false, drop: null,
+      scroller: scrollParentOf(tr)
+    };
+    document.addEventListener('mousemove', onRowDragMove, true);
+    document.addEventListener('mouseup', onRowDragUp, true);
+    document.addEventListener('keydown', onRowDragKey, true);
+  }
+
+  function onRowDragMove(e) {
+    if (!dragCtx) return;
+    e.preventDefault();
+    // 超过 4px 才真正开始拖，避免单击把手时界面闪一下
+    if (!dragCtx.active) {
+      if (Math.abs(e.clientY - dragCtx.startY) < 4 && Math.abs(e.clientX - dragCtx.startX) < 4) return;
+      dragCtx.active = true;
+      dragCtx.srcRows.forEach(r => r.classList.add('pl-dragging'));
+      document.body.classList.add('pl-dragging-active');
+      document.body.appendChild(dragCtx.ghost);
+    }
+    dragCtx.ghost.style.left = (e.clientX + 14) + 'px';
+    dragCtx.ghost.style.top = (e.clientY + 12) + 'px';
+
+    clearDropMarks();
+    dragCtx.drop = null;
+    dragAutoScroll(e.clientY);
+
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    const tr = (under && under.closest) ? under.closest(`tr[${dragCtx.cfg.attr}]`) : null;
+    if (!tr) return;
+    const list = (dirtyForm && dirtyForm[dragCtx.cfg.key]) || [];
+    const target = list[Number(tr.getAttribute(dragCtx.cfg.attr))];
+    if (!target || target.id === dragCtx.dragId) return;
+    if (dragCtx.cfg.tree && dragCtx.descIds.has(target.id)) { tr.classList.add('pl-drop-deny'); return; }
+
+    const r = tr.getBoundingClientRect();
+    const p = (e.clientY - r.top) / (r.height || 1);
+    const mode = dragCtx.cfg.tree
+      ? (p < 0.3 ? 'before' : p > 0.7 ? 'after' : 'child')
+      : (p < 0.5 ? 'before' : 'after');
+    tr.classList.add('pl-drop-' + mode);
+    dragCtx.drop = { targetId: target.id, mode };
+  }
+
+  function onRowDragKey(e) {
+    if (e.key === 'Escape' && dragCtx) { e.preventDefault(); endRowDrag(); }
+  }
+
+  function onRowDragUp() {
+    if (!dragCtx) return;
+    const cfg = dragCtx.cfg, dragId = dragCtx.dragId, drop = dragCtx.drop, active = dragCtx.active;
+    endRowDrag();
+    if (!active || !drop) return;          // 只是点了一下把手，没真拖
+    syncFormFromDom();                     // ★ 顺序关键：先回写，再动数组
+    if (!applyRowDrop(cfg, dragId, drop.targetId, drop.mode)) {
+      SharedUI.toast('不能移到这里：目标是它自己的子项', 'warning');
+      return;
+    }
+    renderFormTabBody();
+  }
+
   // 仅刷新表单当前 tab 的内容体（不整页重绘，保留其他 tab 已填内容于 dirtyForm）
   function renderFormTabBody() {
     if (currentView !== 'new' && currentView !== 'edit') return;
@@ -2322,6 +2527,32 @@ const PlanModule = (() => {
       el.addEventListener('click', (e) => {
         const inp = e.target.closest('input.pl-date');
         if (inp) { e.preventDefault(); openDatePicker(inp); }
+      });
+    }
+    /* 行拖拽 + 「上级」下拉，同样用委托绑一次。
+       绝不能绑在 .pl-form-tab-body / table / tr 上：renderFormTabBody() 会把它们
+       整个 innerHTML 替换掉，监听器会连根消失。只有 el 自身永不被替换。 */
+    if (!el._plDragDelegated) {
+      el._plDragDelegated = true;
+      el.addEventListener('mousedown', (e) => {
+        if (e.button !== 0 || !dirtyForm) return;
+        if (currentView !== 'new' && currentView !== 'edit') return;
+        const handle = e.target.closest('.pl-drag');
+        if (!handle) return;
+        const tr = handle.closest(DRAG_ROW_SEL);
+        const cfg = dragCfgOf(tr);
+        if (!cfg) return;
+        e.preventDefault();               // 防止拖动时选中页面文字
+        startRowDrag(e, tr, cfg);
+      });
+      /* 「上级」下拉原来没有任何监听：改完不重排、不缩进，要等切 tab 或增删行才生效。
+         补一个 change，让层级变更立刻可见（与拖拽改父节点行为一致）。 */
+      el.addEventListener('change', (e) => {
+        if (!dirtyForm) return;
+        if (currentView !== 'new' && currentView !== 'edit') return;
+        if (!e.target.closest('select[data-f="parentId"]')) return;
+        syncFormFromDom();
+        renderFormTabBody();
       });
     }
     await Promise.all([fetchState(), fetchSummary(), fetchConfig()]);

@@ -1724,3 +1724,72 @@ body.dark-theme .pl-dp,
 .pl-ind[style*="padding-left"] > input {
   border-left: 2px solid var(--accent-soft, rgba(82,196,26,.25));
 }
+
+
+/* ==========================================================
+   行拖拽排序（表单内 9 张表格通用）
+   ========================================================== */
+/* 树形表：序号列兼作把手，不额外占宽度 */
+.pl-drag { cursor: grab; user-select: none; -webkit-user-select: none; }
+.pl-drag:active { cursor: grabbing; }
+.pl-ov-seq.pl-drag { position: relative; transition: background .12s ease; }
+.pl-ov-seq.pl-drag:hover { background: var(--accent-soft, rgba(82,196,26,.12)); color: var(--accent); }
+
+/* 平铺表：插一列窄把手 */
+.pl-drag-th { width: 28px; min-width: 28px; padding: 0 !important; }
+.pl-drag-cell {
+  width: 28px; min-width: 28px;
+  padding: 0 !important;
+  text-align: center;
+  vertical-align: middle;
+}
+.pl-grip {
+  display: inline-block;
+  color: var(--line);
+  font-size: 13px;
+  line-height: 1;
+  letter-spacing: -1px;
+  transition: color .12s ease;
+}
+.pl-drag-cell:hover .pl-grip { color: var(--accent); }
+
+/* 拖拽中：源行（含子树）淡出 */
+tr.pl-dragging > td { opacity: .38; }
+body.pl-dragging-active { cursor: grabbing !important; }
+body.pl-dragging-active input,
+body.pl-dragging-active select,
+body.pl-dragging-active textarea { pointer-events: none; }
+
+/* 落点指示：上沿/下沿=同级换序，整行高亮=成为子项，红色=非法 */
+tr.pl-drop-before > td { box-shadow: inset 0 2px 0 0 var(--accent); }
+tr.pl-drop-after  > td { box-shadow: inset 0 -2px 0 0 var(--accent); }
+tr.pl-drop-child  > td {
+  background: var(--accent-soft, rgba(82,196,26,.14));
+  box-shadow: inset 0 1px 0 0 var(--accent), inset 0 -1px 0 0 var(--accent);
+}
+tr.pl-drop-child > td:first-child { box-shadow: inset 1px 0 0 0 var(--accent), inset 0 1px 0 0 var(--accent), inset 0 -1px 0 0 var(--accent); }
+tr.pl-drop-deny > td {
+  background: var(--warn-soft, rgba(245,34,45,.08));
+  box-shadow: inset 0 0 0 1px var(--warn, #f5222d);
+  cursor: not-allowed;
+}
+
+/* 跟随光标的拖拽标签 */
+.pl-drag-ghost {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  max-width: 280px;
+  padding: 5px 10px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 6px 18px rgba(0,0,0,.18);
+}
+body.dark-theme .pl-drag-ghost,
+[data-theme="dark"] .pl-drag-ghost { box-shadow: 0 8px 22px rgba(0,0,0,.5); }

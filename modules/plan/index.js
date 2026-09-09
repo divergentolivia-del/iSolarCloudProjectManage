@@ -307,7 +307,7 @@ const PlanModule = (() => {
     ];
     return `
     <div class="cs-panel pl-dash-panel pl-dash-guide">
-      <h4>指挥台预览 <small>新建第一个计划后，下面三块会自动汇总出来</small></h4>
+      <h4>指挥台预览</h4>
       <div class="pl-guide-grid">
         ${blocks.map(b => `
           <div class="pl-guide-item">
@@ -489,7 +489,7 @@ const PlanModule = (() => {
         ${renderMilestoneTimeline(plans)}
         ${renderStageDistribution(plans)}
       </div>
-    ` : renderDashboardEmptyGuide()}
+    ` : ''}
     <div class="pl-allplans-head">
       <h4>全部计划 <span class="pl-count-pill">${fmtNum(plans.length)}</span></h4>
       <div class="pl-list-bar pl-list-bar-inline">
@@ -502,7 +502,7 @@ const PlanModule = (() => {
     </div>
     ${filtered.length === 0 ? `<div class="pl-empty"><div class="pl-empty-ic">🗓️</div><p>${plans.length === 0 ? '还没有计划，点击右上角「新建计划」开始' : '没有匹配的计划'}</p></div>`
       : `<div class="pl-card-grid">${filtered.map(s => renderPlanCard(s)).join('')}</div>`}
-    ${plans.length === 0 ? `<div class="section-note">新建计划后，可在「项目总览 / WBS任务 / 里程碑 / 上市计划 / 遗留问题 / 项目风险 / 交付件」等标签页维护内容，本页会自动汇总为部门指挥台。</div>` : ''}`;
+    ${plans.length === 0 ? renderDashboardEmptyGuide() : ''}`;
   }
 
   /* ==========================================================
@@ -1168,11 +1168,11 @@ const PlanModule = (() => {
         <td><input data-f="dept" value="${esc(t.dept)}" placeholder="主责部门"></td>
         <td><input type="number" data-f="plannedHours" value="${esc(t.plannedHours)}" placeholder="人天" min="0" step="0.1"></td>
         <td><input type="number" data-f="progress" value="${esc(t.progress)}" placeholder="0-100" min="0" max="100"></td>
-        <td><input type="date" data-f="startDate" value="${esc(t.startDate)}"></td>
-        <td><input type="date" data-f="endDate" value="${esc(t.endDate)}"></td>
+        <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="startDate" value="${esc(t.startDate)}"></td>
+        <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="endDate" value="${esc(t.endDate)}"></td>
         <td><select data-f="parentId" class="pl-f-parent">${parentOptions(draft.tasks, t.id, t.parentId, '— 顶层 —')}</select></td>
         <td><input data-f="deps" value="${esc((t.dependencies || []).join(', '))}" placeholder="依赖任务WBS"></td>
-        <td><button type="button" class="cs-del-btn pl-del-task" data-del-task="${i}" title="删除（连带子任务）">✕</button></td>
+        <td><button type="button" class="pl-row-del pl-del-task" data-del-task="${i}" title="删除（连带子任务）"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M6.5 1.5h3a.5.5 0 0 1 .5.5v1H6V2a.5.5 0 0 1 .5-.5Zm-1.5 2V2A1.5 1.5 0 0 1 6.5.5h3A1.5 1.5 0 0 1 11 2v1.5h2.5a.5.5 0 0 1 0 1h-.53l-.6 8.4A2 2 0 0 1 10.38 15H5.62a2 2 0 0 1-1.99-1.85l-.6-8.4H2.5a.5.5 0 0 1 0-1H5Zm-.96 1 .59 8.33a1 1 0 0 0 1 .92h4.74a1 1 0 0 0 1-.92l.59-8.33H4.04ZM6.75 6a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Z"/></svg></button></td>
       </tr>`;
     }).join('');
     return `<div class="table-wrapper pl-form-table-wrap"><table class="data-table pl-form-table"><thead><tr>
@@ -1192,7 +1192,7 @@ const PlanModule = (() => {
         <td><select data-f="kind">${Object.keys(RES_KIND_LABELS).map(k => `<option value="${k}" ${r.kind === k ? 'selected' : ''}>${RES_KIND_LABELS[k]}</option>`).join('')}</select></td>
         <td><input data-f="dept" value="${esc(r.dept)}" placeholder="部门"></td>
         <td><input type="number" data-f="total" value="${esc(r.total)}" placeholder="总容量(人天)" min="0" step="0.1"></td>
-        <td><button type="button" class="cs-del-btn pl-del-res" data-del-res="${i}" title="删除">✕</button></td>
+        <td><button type="button" class="pl-row-del pl-del-res" data-del-res="${i}" title="删除"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M6.5 1.5h3a.5.5 0 0 1 .5.5v1H6V2a.5.5 0 0 1 .5-.5Zm-1.5 2V2A1.5 1.5 0 0 1 6.5.5h3A1.5 1.5 0 0 1 11 2v1.5h2.5a.5.5 0 0 1 0 1h-.53l-.6 8.4A2 2 0 0 1 10.38 15H5.62a2 2 0 0 1-1.99-1.85l-.6-8.4H2.5a.5.5 0 0 1 0-1H5Zm-.96 1 .59 8.33a1 1 0 0 0 1 .92h4.74a1 1 0 0 0 1-.92l.59-8.33H4.04ZM6.75 6a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Z"/></svg></button></td>
       </tr>`);
     return `<div class="table-wrapper"><table class="data-table"><thead><tr><th class="txt">资源</th><th>类型</th><th class="txt">部门</th><th style="min-width:120px">总容量(人天)</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
   }
@@ -1204,11 +1204,11 @@ const PlanModule = (() => {
     const rows = draft.milestones.map((m, i) => `
       <tr data-ms-idx="${i}">
         <td><input data-f="name" value="${esc(m.name)}" placeholder="里程碑名称"></td>
-        <td><input type="date" data-f="date" value="${esc(m.date)}"></td>
+        <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="date" value="${esc(m.date)}"></td>
         <td><select data-f="status">${Object.keys(MILESTONE_STATUS_LABELS).map(k => `<option value="${k}" ${m.status === k ? 'selected' : ''}>${MILESTONE_STATUS_LABELS[k]}</option>`).join('')}</select></td>
         <td><input data-f="owner" value="${esc(m.owner)}" placeholder="负责人"></td>
         <td><input data-f="desc" value="${esc(m.desc)}" placeholder="说明"></td>
-        <td><button type="button" class="cs-del-btn pl-del-ms" data-del-ms="${i}" title="删除">✕</button></td>
+        <td><button type="button" class="pl-row-del pl-del-ms" data-del-ms="${i}" title="删除"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M6.5 1.5h3a.5.5 0 0 1 .5.5v1H6V2a.5.5 0 0 1 .5-.5Zm-1.5 2V2A1.5 1.5 0 0 1 6.5.5h3A1.5 1.5 0 0 1 11 2v1.5h2.5a.5.5 0 0 1 0 1h-.53l-.6 8.4A2 2 0 0 1 10.38 15H5.62a2 2 0 0 1-1.99-1.85l-.6-8.4H2.5a.5.5 0 0 1 0-1H5Zm-.96 1 .59 8.33a1 1 0 0 0 1 .92h4.74a1 1 0 0 0 1-.92l.59-8.33H4.04ZM6.75 6a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Z"/></svg></button></td>
       </tr>`);
     return `<div class="table-wrapper"><table class="data-table"><thead><tr><th class="txt" style="min-width:190px">里程碑</th><th class="txt">日期</th><th>状态</th><th class="txt">负责人</th><th class="txt">说明</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
   }
@@ -1224,7 +1224,7 @@ const PlanModule = (() => {
         <td><input data-f="dept" value="${esc(m.dept)}" placeholder="部门/团队"></td>
         <td><input data-f="duty" value="${esc(m.duty)}" placeholder="职责分工"></td>
         <td><input data-f="contact" value="${esc(m.contact)}" placeholder="联系方式(可选)"></td>
-        <td><button type="button" class="cs-del-btn pl-del-member" data-del-member="${i}" title="删除">✕</button></td>
+        <td><button type="button" class="pl-row-del pl-del-member" data-del-member="${i}" title="删除"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M6.5 1.5h3a.5.5 0 0 1 .5.5v1H6V2a.5.5 0 0 1 .5-.5Zm-1.5 2V2A1.5 1.5 0 0 1 6.5.5h3A1.5 1.5 0 0 1 11 2v1.5h2.5a.5.5 0 0 1 0 1h-.53l-.6 8.4A2 2 0 0 1 10.38 15H5.62a2 2 0 0 1-1.99-1.85l-.6-8.4H2.5a.5.5 0 0 1 0-1H5Zm-.96 1 .59 8.33a1 1 0 0 0 1 .92h4.74a1 1 0 0 0 1-.92l.59-8.33H4.04ZM6.75 6a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Z"/></svg></button></td>
       </tr>`);
     return `<div class="table-wrapper"><table class="data-table"><thead><tr><th class="txt">姓名</th><th>角色</th><th class="txt">部门/团队</th><th class="txt" style="min-width:180px">职责分工</th><th class="txt" style="min-width:150px">联系方式</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
   }
@@ -1240,12 +1240,12 @@ const PlanModule = (() => {
         <td><select data-f="stage">${Object.keys(REF_STAGE_LABELS).map(k => `<option value="${k}" ${r.stage === k ? 'selected' : ''}>${REF_STAGE_LABELS[k]}</option>`).join('')}</select></td>
         <td><input data-f="dept" value="${esc(r.dept)}" placeholder="责任部门/人"></td>
         <td><input data-f="owner" value="${esc(r.owner)}" placeholder="提交人员"></td>
-        <td><input type="date" data-f="date" value="${esc(r.date)}"></td>
+        <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="date" value="${esc(r.date)}"></td>
         <td><select data-f="status">${Object.keys(REF_DOC_STATUS_LABELS).map(k => `<option value="${k}" ${r.status === k ? 'selected' : ''}>${REF_DOC_STATUS_LABELS[k]}</option>`).join('')}</select></td>
         <td><textarea data-f="requirement" rows="2" placeholder="评审要求（必选/可选及范围）">${esc(r.requirement)}</textarea></td>
         <td><input data-f="link" value="${esc(r.link)}" placeholder="模板/文档链接"></td>
         <td><select data-f="parentId">${parentOptions(list, r.id, r.parentId, '— 顶层 —')}</select></td>
-        <td><button type="button" class="cs-del-btn pl-del-ref" data-del-ref="${i}" title="删除（连带子项）">✕</button></td>
+        <td><button type="button" class="pl-row-del pl-del-ref" data-del-ref="${i}" title="删除（连带子项）"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M6.5 1.5h3a.5.5 0 0 1 .5.5v1H6V2a.5.5 0 0 1 .5-.5Zm-1.5 2V2A1.5 1.5 0 0 1 6.5.5h3A1.5 1.5 0 0 1 11 2v1.5h2.5a.5.5 0 0 1 0 1h-.53l-.6 8.4A2 2 0 0 1 10.38 15H5.62a2 2 0 0 1-1.99-1.85l-.6-8.4H2.5a.5.5 0 0 1 0-1H5Zm-.96 1 .59 8.33a1 1 0 0 0 1 .92h4.74a1 1 0 0 0 1-.92l.59-8.33H4.04ZM6.75 6a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Z"/></svg></button></td>
       </tr>`;
     }).join('');
     const table = list.length ? `
@@ -1332,8 +1332,8 @@ const PlanModule = (() => {
         <div class="cs-field"><label>负责人</label><input type="text" data-f="owner" value="${esc(draft.owner)}" placeholder="计划负责人"></div>
         <div class="cs-field"><label>项目 ID</label><input type="text" data-f="projectId" value="${esc(draft.projectId)}" placeholder="关联项目ID（可选）"></div>
         <div class="cs-field"><label>项目名称</label><input type="text" data-f="projectName" value="${esc(draft.projectName)}" placeholder="关联项目名称（可选）"></div>
-        <div class="cs-field"><label>计划开始</label><input type="date" data-f="startDate" value="${esc(draft.startDate)}"></div>
-        <div class="cs-field"><label>计划结束</label><input type="date" data-f="endDate" value="${esc(draft.endDate)}"></div>
+        <div class="cs-field"><label>计划开始</label><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="startDate" value="${esc(draft.startDate)}"></div>
+        <div class="cs-field"><label>计划结束</label><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="endDate" value="${esc(draft.endDate)}"></div>
         <div class="cs-field cs-field-wide"><label>计划描述 / 目标</label><textarea data-f="description" rows="3" placeholder="描述计划目标、范围、验收标准">${esc(draft.description)}</textarea></div>
       </div>
     </div>`;
@@ -1349,14 +1349,14 @@ const PlanModule = (() => {
         <td class="pl-ov-seq">${o.code}</td>
         <td><input data-f="name" value="${esc(s.name)}" placeholder="${d ? '子项名称' : '阶段名称'}" style="margin-left:${d * 20}px${d ? '' : ';font-weight:600'}"></td>
         <td><input data-f="owner" value="${esc(s.owner)}" placeholder="负责人"></td>
-        <td><input type="date" data-f="startDate" value="${esc(s.startDate)}"></td>
-        <td><input type="date" data-f="endDate" value="${esc(s.endDate)}"></td>
+        <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="startDate" value="${esc(s.startDate)}"></td>
+        <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="endDate" value="${esc(s.endDate)}"></td>
         <td><select data-f="status">${Object.keys(TASK_STATUS_LABELS).map(k => `<option value="${k}" ${s.status === k ? 'selected' : ''}>${TASK_STATUS_LABELS[k]}</option>`).join('')}</select></td>
         <td><input type="number" data-f="progress" value="${esc(s.progress)}" min="0" max="100" placeholder="0-100"></td>
         <td><input data-f="deliverable" value="${esc(s.deliverable)}" placeholder="交付物"></td>
         <td><input data-f="note" value="${esc(s.note)}" placeholder="备注"></td>
         <td><select data-f="parentId" class="pl-f-parent">${parentOptions(stages, s.id, s.parentId, '— 顶层阶段 —')}</select></td>
-        <td><button type="button" class="cs-del-btn pl-del-ov" data-del-ov="${i}" title="删除（连带子项）">✕</button></td>
+        <td><button type="button" class="pl-row-del pl-del-ov" data-del-ov="${i}" title="删除（连带子项）"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M6.5 1.5h3a.5.5 0 0 1 .5.5v1H6V2a.5.5 0 0 1 .5-.5Zm-1.5 2V2A1.5 1.5 0 0 1 6.5.5h3A1.5 1.5 0 0 1 11 2v1.5h2.5a.5.5 0 0 1 0 1h-.53l-.6 8.4A2 2 0 0 1 10.38 15H5.62a2 2 0 0 1-1.99-1.85l-.6-8.4H2.5a.5.5 0 0 1 0-1H5Zm-.96 1 .59 8.33a1 1 0 0 0 1 .92h4.74a1 1 0 0 0 1-.92l.59-8.33H4.04ZM6.75 6a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Z"/></svg></button></td>
       </tr>`;
     }).join('');
     const body = stages.length ? `
@@ -1456,11 +1456,11 @@ const PlanModule = (() => {
               <td><textarea data-f="desc" rows="2" placeholder="问题描述">${esc(x.desc)}</textarea></td>
               <td><textarea data-f="solution" rows="2" placeholder="应对方案">${esc(x.solution)}</textarea></td>
               <td><input data-f="owner" value="${esc(x.owner)}" placeholder="责任人"></td>
-              <td><input type="date" data-f="dueDate" value="${esc(x.dueDate)}"></td>
+              <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="dueDate" value="${esc(x.dueDate)}"></td>
               <td><textarea data-f="progress" rows="2" placeholder="当前进展">${esc(x.progress)}</textarea></td>
               <td><textarea data-f="conclusion" rows="2" placeholder="结论">${esc(x.conclusion)}</textarea></td>
               <td><select data-f="status">${Object.keys(ISSUE_STATUS_LABELS).map(k => `<option value="${k}" ${x.status === k ? 'selected' : ''}>${ISSUE_STATUS_LABELS[k]}</option>`).join('')}</select></td>
-              <td><button type="button" class="cs-del-btn pl-del-issue" data-del-issue="${i}" title="删除">✕</button></td>
+              <td><button type="button" class="pl-row-del pl-del-issue" data-del-issue="${i}" title="删除"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M6.5 1.5h3a.5.5 0 0 1 .5.5v1H6V2a.5.5 0 0 1 .5-.5Zm-1.5 2V2A1.5 1.5 0 0 1 6.5.5h3A1.5 1.5 0 0 1 11 2v1.5h2.5a.5.5 0 0 1 0 1h-.53l-.6 8.4A2 2 0 0 1 10.38 15H5.62a2 2 0 0 1-1.99-1.85l-.6-8.4H2.5a.5.5 0 0 1 0-1H5Zm-.96 1 .59 8.33a1 1 0 0 0 1 .92h4.74a1 1 0 0 0 1-.92l.59-8.33H4.04ZM6.75 6a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Z"/></svg></button></td>
             </tr>`).join('')}</tbody>
         </table>
       </div>` : `<div class="pl-empty pl-empty-sm"><div class="pl-empty-ic">📌</div><p>暂无遗留问题，点击「添加问题」</p></div>`;
@@ -1497,10 +1497,10 @@ const PlanModule = (() => {
               <td><textarea data-f="desc" rows="2" placeholder="风险描述">${esc(x.desc)}</textarea></td>
               <td><textarea data-f="solution" rows="2" placeholder="应对方案">${esc(x.solution)}</textarea></td>
               <td><input data-f="owner" value="${esc(x.owner)}" placeholder="责任人"></td>
-              <td><input type="date" data-f="dueDate" value="${esc(x.dueDate)}"></td>
+              <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="dueDate" value="${esc(x.dueDate)}"></td>
               <td><select data-f="status">${Object.keys(RISK_STATUS_LABELS).map(k => `<option value="${k}" ${x.status === k ? 'selected' : ''}>${RISK_STATUS_LABELS[k]}</option>`).join('')}</select></td>
               <td><textarea data-f="progress" rows="2" placeholder="进展状态">${esc(x.progress)}</textarea></td>
-              <td><button type="button" class="cs-del-btn pl-del-risk" data-del-risk="${i}" title="删除">✕</button></td>
+              <td><button type="button" class="pl-row-del pl-del-risk" data-del-risk="${i}" title="删除"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M6.5 1.5h3a.5.5 0 0 1 .5.5v1H6V2a.5.5 0 0 1 .5-.5Zm-1.5 2V2A1.5 1.5 0 0 1 6.5.5h3A1.5 1.5 0 0 1 11 2v1.5h2.5a.5.5 0 0 1 0 1h-.53l-.6 8.4A2 2 0 0 1 10.38 15H5.62a2 2 0 0 1-1.99-1.85l-.6-8.4H2.5a.5.5 0 0 1 0-1H5Zm-.96 1 .59 8.33a1 1 0 0 0 1 .92h4.74a1 1 0 0 0 1-.92l.59-8.33H4.04ZM6.75 6a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Z"/></svg></button></td>
             </tr>`).join('')}</tbody>
         </table>
       </div>` : `<div class="pl-empty pl-empty-sm"><div class="pl-empty-ic">⚠️</div><p>暂无项目风险，点击「添加风险」</p></div>`;
@@ -1538,13 +1538,13 @@ const PlanModule = (() => {
             <tr data-market-idx="${i}" data-depth="${d}">
               <td class="pl-ov-seq">${o.code}</td>
               <td><input data-f="name" value="${esc(x.name)}" placeholder="${d ? '子任务名称' : '阶段名称'}" style="margin-left:${d * 20}px${d ? '' : ';font-weight:600'}"></td>
-              <td><input type="date" data-f="startDate" value="${esc(x.startDate)}"></td>
-              <td><input type="date" data-f="endDate" value="${esc(x.endDate)}"></td>
+              <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="startDate" value="${esc(x.startDate)}"></td>
+              <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="endDate" value="${esc(x.endDate)}"></td>
               <td><input data-f="owner" value="${esc(x.owner)}" placeholder="执行人"></td>
               <td><select data-f="status">${Object.keys(TASK_STATUS_LABELS).map(k => `<option value="${k}" ${x.status === k ? 'selected' : ''}>${TASK_STATUS_LABELS[k]}</option>`).join('')}</select></td>
               <td><input data-f="note" value="${esc(x.note)}" placeholder="备注"></td>
               <td><select data-f="parentId">${parentOptions(list, x.id, x.parentId, '— 阶段(顶层) —')}</select></td>
-              <td><button type="button" class="cs-del-btn pl-del-market" data-del-market="${i}" title="删除（连带子项）">✕</button></td>
+              <td><button type="button" class="pl-row-del pl-del-market" data-del-market="${i}" title="删除（连带子项）"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M6.5 1.5h3a.5.5 0 0 1 .5.5v1H6V2a.5.5 0 0 1 .5-.5Zm-1.5 2V2A1.5 1.5 0 0 1 6.5.5h3A1.5 1.5 0 0 1 11 2v1.5h2.5a.5.5 0 0 1 0 1h-.53l-.6 8.4A2 2 0 0 1 10.38 15H5.62a2 2 0 0 1-1.99-1.85l-.6-8.4H2.5a.5.5 0 0 1 0-1H5Zm-.96 1 .59 8.33a1 1 0 0 0 1 .92h4.74a1 1 0 0 0 1-.92l.59-8.33H4.04ZM6.75 6a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Z"/></svg></button></td>
             </tr>`;
           }).join('')}</tbody>
         </table>
@@ -1927,6 +1927,7 @@ const PlanModule = (() => {
     else if (currentView === 'new' || currentView === 'edit') html = renderFormView();
     container.innerHTML = html;
     bindEvents();
+    syncSidebarByCrowding();
   }
   function renderTabBody() {
     // 仅刷新 tab body（WBS/甘特/里程碑/资源/高管/AI 各 tab 内容区）
@@ -1949,6 +1950,156 @@ const PlanModule = (() => {
     const tbody = el.querySelector('.pl-tab-body');
     if (tbody) tbody.innerHTML = tabHtml;
     bindTabEvents(); // 只重绑 tab body 内的 toggle / 事件，避免整视图重复绑定
+    syncSidebarByCrowding();
+  }
+
+  /* ==========================================================
+     轻量日期选择器（零依赖，替代原生 input[type=date] 的默认样式）
+     结构：顶部当前值 → 月份导航 → 周一起始的日网格 → 清除/确定
+     用法：任意 <input class="pl-date" readonly> 点击即弹出
+     ========================================================== */
+  const DP_WEEK = ['一', '二', '三', '四', '五', '六', '日'];
+  const DP_MONTH = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
+  let dpPanel = null;      // 面板 DOM（懒创建、全局复用）
+  let dpInput = null;      // 当前关联的输入框
+  let dpViewY = 0, dpViewM = 0;  // 当前浏览的年/月
+  let dpTemp = '';         // 待确认的选中值（YYYY-MM-DD）
+
+  function dpFmt(y, m, d) {
+    return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  }
+  function dpParse(v) {
+    const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(String(v || '').trim());
+    if (!m) return null;
+    return { y: Number(m[1]), m: Number(m[2]) - 1, d: Number(m[3]) };
+  }
+  function ensureDpPanel() {
+    if (dpPanel) return dpPanel;
+    dpPanel = document.createElement('div');
+    dpPanel.className = 'pl-dp';
+    dpPanel.setAttribute('role', 'dialog');
+    document.body.appendChild(dpPanel);
+    // 面板内交互（事件委托，面板整体复用）
+    dpPanel.addEventListener('mousedown', (e) => e.preventDefault()); // 防止输入框失焦导致面板先关
+    dpPanel.addEventListener('click', (e) => {
+      const nav = e.target.closest('[data-dp-nav]');
+      if (nav) {
+        const step = Number(nav.getAttribute('data-dp-nav'));
+        dpViewM += step;
+        if (dpViewM < 0) { dpViewM = 11; dpViewY--; }
+        else if (dpViewM > 11) { dpViewM = 0; dpViewY++; }
+        renderDpPanel();
+        return;
+      }
+      const day = e.target.closest('[data-dp-day]');
+      if (day) {
+        dpTemp = day.getAttribute('data-dp-day');
+        renderDpPanel();
+        return;
+      }
+      if (e.target.closest('[data-dp-clear]')) { dpCommit(''); return; }
+      if (e.target.closest('[data-dp-ok]')) { dpCommit(dpTemp); return; }
+    });
+    return dpPanel;
+  }
+  function renderDpPanel() {
+    const first = new Date(dpViewY, dpViewM, 1);
+    const offset = (first.getDay() + 6) % 7;           // 周一为一周起点
+    const start = new Date(dpViewY, dpViewM, 1 - offset);
+    const todayStr = (() => { const n = new Date(); return dpFmt(n.getFullYear(), n.getMonth(), n.getDate()); })();
+    let cells = '';
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+      const val = dpFmt(d.getFullYear(), d.getMonth(), d.getDate());
+      const outside = d.getMonth() !== dpViewM;
+      const cls = ['pl-dp-day'];
+      if (outside) cls.push('outside');
+      if (val === dpTemp) cls.push('selected');
+      if (val === todayStr) cls.push('today');
+      cells += `<button type="button" class="${cls.join(' ')}" data-dp-day="${val}">${d.getDate()}</button>`;
+      // 满 6 行即止；若第 5 行已覆盖整月则提前结束，避免空行
+      if (i === 34 && new Date(start.getFullYear(), start.getMonth(), start.getDate() + 35).getMonth() !== dpViewM) break;
+    }
+    dpPanel.innerHTML = `
+      <div class="pl-dp-value">${esc(dpTemp || '未选择日期')}</div>
+      <div class="pl-dp-head">
+        <button type="button" class="pl-dp-nav" data-dp-nav="-1" title="上一月">‹</button>
+        <span class="pl-dp-title">${DP_MONTH[dpViewM]} ${dpViewY}</span>
+        <button type="button" class="pl-dp-nav" data-dp-nav="1" title="下一月">›</button>
+      </div>
+      <div class="pl-dp-week">${DP_WEEK.map(w => `<span>${w}</span>`).join('')}</div>
+      <div class="pl-dp-grid">${cells}</div>
+      <div class="pl-dp-foot">
+        <button type="button" class="pl-dp-btn ghost" data-dp-clear>清除</button>
+        <button type="button" class="pl-dp-btn primary" data-dp-ok ${dpTemp ? '' : 'disabled'}>确定</button>
+      </div>`;
+  }
+  function dpCommit(val) {
+    if (dpInput) {
+      dpInput.value = val;
+      dpInput.dispatchEvent(new Event('input', { bubbles: true }));
+      dpInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    closeDatePicker();
+  }
+  function openDatePicker(input) {
+    dpInput = input;
+    const cur = dpParse(input.value);
+    const now = new Date();
+    dpTemp = cur ? input.value.trim() : '';
+    dpViewY = cur ? cur.y : now.getFullYear();
+    dpViewM = cur ? cur.m : now.getMonth();
+    const p = ensureDpPanel();
+    p.classList.add('open');
+    renderDpPanel();
+    // 定位：默认贴输入框下方；空间不足则上翻；右侧溢出则右对齐
+    const r = input.getBoundingClientRect();
+    const pw = p.offsetWidth || 300, ph = p.offsetHeight || 340;
+    let left = r.left + window.scrollX;
+    let top = r.bottom + window.scrollY + 6;
+    if (left + pw > window.scrollX + document.documentElement.clientWidth - 8) {
+      left = window.scrollX + document.documentElement.clientWidth - pw - 8;
+    }
+    if (r.bottom + ph + 8 > document.documentElement.clientHeight && r.top - ph - 6 > 0) {
+      top = r.top + window.scrollY - ph - 6;
+    }
+    p.style.left = Math.max(8, left) + 'px';
+    p.style.top = top + 'px';
+  }
+  function closeDatePicker() {
+    if (dpPanel) dpPanel.classList.remove('open');
+    dpInput = null;
+  }
+  // 全局关闭：点击面板与输入框以外区域、Esc、滚动容器变化
+  if (!window._plDpBound) {
+    window._plDpBound = true;
+    document.addEventListener('mousedown', (e) => {
+      if (!dpPanel || !dpPanel.classList.contains('open')) return;
+      if (e.target.closest('.pl-dp') || e.target.closest('.pl-date')) return;
+      closeDatePicker();
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDatePicker(); });
+  }
+
+  /* ---------- 宽表拥挤时自动收起左侧功能抽屉（与「阳光云迭代项目」一致的体验） ----------
+     判断依据：本模块内任一横向滚动容器出现溢出（内容宽度 > 可视宽度）即视为拥挤。
+     只在「侧栏当前展开」时请求收起；不再拥挤则请求恢复（Platform 内部只会恢复"自动收起"的情况，
+     用户手动收起不会被打扰）。 */
+  let crowdRaf = 0;
+  function syncSidebarByCrowding() {
+    if (!el || typeof Platform === 'undefined') return;
+    if (crowdRaf) cancelAnimationFrame(crowdRaf);
+    // 等布局稳定后再测量，避免刚 innerHTML 完宽度还没算好
+    crowdRaf = requestAnimationFrame(() => {
+      crowdRaf = 0;
+      const wraps = el.querySelectorAll('.table-wrapper, .pl-gantt-scroll');
+      let crowded = false;
+      wraps.forEach(w => { if (w.scrollWidth - w.clientWidth > 4) crowded = true; });
+      try {
+        if (crowded) Platform.collapseSidebar && Platform.collapseSidebar();
+        else Platform.expandSidebar && Platform.expandSidebar();
+      } catch (e) { /* 忽略 */ }
+    });
   }
 
   // 仅刷新表单当前 tab 的内容体（不整页重绘，保留其他 tab 已填内容于 dirtyForm）
@@ -1958,6 +2109,7 @@ const PlanModule = (() => {
     const body = el.querySelector('.pl-form-tab-body');
     if (body) body.innerHTML = renderFormTabBodyHtml(dirtyForm);
     bindFormTabEvents();
+    syncSidebarByCrowding();
   }
 
   function bindEvents() {
@@ -2141,7 +2293,9 @@ const PlanModule = (() => {
     }
   }
   function leave() {
-    // 无副作用
+    // 离开模块：关闭日期面板，并把因本模块宽表而自动收起的侧栏恢复回去
+    closeDatePicker();
+    try { if (typeof Platform !== 'undefined' && Platform.expandSidebar) Platform.expandSidebar(); } catch (e) { }
   }
   function getSummary() {
     return summary && summary.agg || null;
@@ -2152,6 +2306,14 @@ const PlanModule = (() => {
     container = el_;
     el = el_;
     el.innerHTML = `<div class="cs-loading">加载项目计划…</div>`;
+    // 日期输入用事件委托绑定一次即可（后续 innerHTML 重绘不会丢失）
+    if (!el._plDateDelegated) {
+      el._plDateDelegated = true;
+      el.addEventListener('click', (e) => {
+        const inp = e.target.closest('input.pl-date');
+        if (inp) { e.preventDefault(); openDatePicker(inp); }
+      });
+    }
     await Promise.all([fetchState(), fetchSummary(), fetchConfig()]);
     render();
   }

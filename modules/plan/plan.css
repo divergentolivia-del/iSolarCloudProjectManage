@@ -1503,3 +1503,198 @@ tr[data-depth="0"] > .pl-ov-seq { color: var(--text); font-weight: 600; }
 .pl-guide-text { min-width: 0; }
 .pl-guide-text b { display: block; margin-bottom: 4px; font-size: 13.5px; color: var(--text); }
 .pl-guide-text p { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.65; }
+
+
+/* ==========================================================
+   统一表格单元格展示规则（全部 tab 一致，参考「项目总览」）
+   · 首列序号：上下 + 左右居中
+   · 其他单元格：上下居中、左对齐
+   ========================================================== */
+.pl-ov-table td, .pl-ov-table th,
+.pl-form-table td, .pl-form-table th,
+.pl-issue-table td, .pl-issue-table th,
+.pl-risk-table td, .pl-risk-table th,
+.pl-market-table td, .pl-market-table th,
+.pl-ref-table td, .pl-ref-table th,
+.pl-attention-table td, .pl-attention-table th {
+  vertical-align: middle;
+  text-align: left;
+}
+/* 序号列：完全居中 */
+.pl-ov-table td.pl-ov-seq, .pl-ov-table th:first-child,
+.pl-form-table td.pl-ov-seq, .pl-form-table th:first-child,
+.pl-market-table td.pl-ov-seq, .pl-market-table th:first-child,
+.pl-ref-table td.pl-ov-seq, .pl-ref-table th:first-child,
+.pl-issue-table th:first-child,
+.pl-risk-table th:first-child {
+  text-align: center;
+  vertical-align: middle;
+}
+/* 操作列（删除按钮）居中 */
+.pl-ov-table td:last-child, .pl-form-table td:last-child,
+.pl-issue-table td:last-child, .pl-risk-table td:last-child,
+.pl-market-table td:last-child, .pl-ref-table td:last-child { text-align: center; }
+
+/* 行距放宽，避免拥挤 */
+.pl-ov-table td, .pl-form-table td,
+.pl-issue-table td, .pl-risk-table td,
+.pl-market-table td, .pl-ref-table td { padding: 9px 10px; }
+.pl-ov-table th, .pl-form-table th,
+.pl-issue-table th, .pl-risk-table th,
+.pl-market-table th, .pl-ref-table th { padding: 10px; }
+
+/* ==========================================================
+   行内删除按钮（替代原来生硬的 ✕ 文本按钮）
+   ========================================================== */
+.pl-row-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color .15s, background .15s, border-color .15s;
+}
+.pl-row-del svg { fill: currentColor; display: block; }
+.pl-row-del:hover {
+  color: var(--warn);
+  background: var(--warn-soft, rgba(245, 34, 45, .08));
+  border-color: rgba(245, 34, 45, .28);
+}
+.pl-row-del:active { transform: scale(.94); }
+.pl-row-del:focus-visible { outline: 2px solid var(--warn); outline-offset: 1px; }
+
+
+/* ==========================================================
+   自定义日期控件（替代原生 input[type=date]）
+   ========================================================== */
+/* 只读日期输入框：右侧内置日历图标，点击弹出面板 */
+input.pl-date {
+  cursor: pointer;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%238a94a6'><path d='M5 1.5a.5.5 0 0 1 .5.5V3h5V2a.5.5 0 0 1 1 0v1h1A1.5 1.5 0 0 1 14 4.5v8A1.5 1.5 0 0 1 12.5 14h-9A1.5 1.5 0 0 1 2 12.5v-8A1.5 1.5 0 0 1 3.5 3h1V2a.5.5 0 0 1 .5-.5ZM3 6v6.5a.5.5 0 0 0 .5.5h9a.5.5 0 0 0 .5-.5V6H3Zm10-1V4.5a.5.5 0 0 0-.5-.5h-9a.5.5 0 0 0-.5.5V5h10Z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  background-size: 14px 14px;
+  padding-right: 28px !important;
+}
+input.pl-date:hover { border-color: var(--accent); }
+
+/* 弹出面板 */
+.pl-dp {
+  position: absolute;
+  z-index: 300;
+  display: none;
+  width: 292px;
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl, 0 12px 32px rgba(0,0,0,.16));
+}
+.pl-dp.open { display: block; }
+
+.pl-dp-value {
+  margin-bottom: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel-soft);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  text-align: center;
+}
+.pl-dp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.pl-dp-title { font-size: 14.5px; font-weight: 700; color: var(--text); }
+.pl-dp-nav {
+  width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all .15s;
+}
+.pl-dp-nav:hover { background: var(--panel-soft); color: var(--text); border-color: var(--line); }
+
+.pl-dp-week,
+.pl-dp-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.pl-dp-week { margin-bottom: 4px; }
+.pl-dp-week span {
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 4px 0;
+}
+.pl-dp-day {
+  height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.pl-dp-day:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.pl-dp-day.outside { color: var(--muted); opacity: .5; }
+.pl-dp-day.today { font-weight: 700; box-shadow: inset 0 0 0 1px var(--accent); }
+.pl-dp-day.selected {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 3px 10px rgba(82, 196, 26, .32);
+}
+.pl-dp-foot {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.pl-dp-btn {
+  flex: 1 1 0;
+  min-height: 34px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s;
+}
+.pl-dp-btn.ghost {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+}
+.pl-dp-btn.ghost:hover { color: var(--warn); border-color: var(--warn); background: var(--warn-soft, rgba(245,34,45,.06)); }
+.pl-dp-btn.primary {
+  border: 1px solid var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #fff;
+}
+.pl-dp-btn.primary:hover { filter: brightness(1.05); }
+.pl-dp-btn.primary:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+
+body.dark-theme .pl-dp,
+[data-theme="dark"] .pl-dp { box-shadow: 0 12px 32px rgba(0,0,0,.5); }

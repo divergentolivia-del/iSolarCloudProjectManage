@@ -96,6 +96,26 @@ const Router = (() => {
         items.push({ label: mod ? mod.name : '全年度项目管理', href: '#/project' });
         items.push({ label: projectSubLabels[subPath] || subPath });
       }
+    } else if (moduleId === 'plan') {
+      const planName = mod ? mod.name : '项目计划';
+      if (!subPath) {
+        items.push({ label: planName });
+      } else if (subPath.startsWith('detail/')) {
+        items.push({ label: planName, href: '#/plan' });
+        items.push({ label: '计划详情' });
+        const tab = subPath.split('/')[2];
+        const planTabLabels = { wbs: 'WBS 任务', gantt: '甘特图', milestone: '里程碑', resource: '资源负荷', exec: '高管视图', ai: 'AI 规则' };
+        if (tab && planTabLabels[tab]) items.push({ label: planTabLabels[tab] });
+      } else if (subPath === 'new') {
+        items.push({ label: planName, href: '#/plan' });
+        items.push({ label: '新建计划' });
+      } else if (subPath.startsWith('edit/')) {
+        items.push({ label: planName, href: '#/plan' });
+        items.push({ label: '编辑计划' });
+      } else {
+        items.push({ label: planName, href: '#/plan' });
+        items.push({ label: subPath });
+      }
     } else if (moduleId === 'csenergy') {
       const csSubLabels = {
         board: '立项管理看板',

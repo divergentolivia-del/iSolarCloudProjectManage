@@ -21,6 +21,19 @@ const Platform = (() => {
      Sidebar Rendering
      ============================================================ */
 
+  /** 各功能模块专属图标配色：渐变色瓦片 + 唯一 emoji，避免同类图标混淆 */
+  const NAV_ICON_COLORS = {
+    dashboard: { icon: '🏠', bg: 'linear-gradient(135deg, #4c7dff, #6a9bff)', shadow: 'rgba(76,125,255,.35)' },
+    iteration: { icon: '📚', bg: 'linear-gradient(135deg, #1fa38a, #38c9ac)', shadow: 'rgba(31,163,138,.35)' },
+    csenergy:  { icon: '📊', bg: 'linear-gradient(135deg, #8b6cff, #a68bff)', shadow: 'rgba(139,108,255,.35)' },
+    plan:      { icon: '🗓️', bg: 'linear-gradient(135deg, #f59a24, #ffb857)', shadow: 'rgba(245,154,36,.35)' },
+    settings:  { icon: '⚙',  bg: 'linear-gradient(135deg, #8a94a6, #a6b0c2)', shadow: 'rgba(138,148,166,.35)' },
+    help:      { icon: '📖', bg: 'linear-gradient(135deg, #8a94a6, #a6b0c2)', shadow: 'rgba(138,148,166,.35)' }
+  };
+  function navLook(id) {
+    return NAV_ICON_COLORS[id] || { icon: '', bg: 'linear-gradient(135deg, #8a94a6, #a6b0c2)', shadow: 'rgba(138,148,166,.35)' };
+  }
+
   /**
    * Render sidebar navigation items into #sidebarNav.
    * Only renders modules with sidebar !== false, sorted by order.
@@ -35,12 +48,21 @@ const Platform = (() => {
 
     nav.innerHTML = sidebarModules.map(m => {
       const href = '#/' + (m.id === 'dashboard' ? 'dashboard' : m.id);
-      return `<a class="sidebar-nav-item" href="${SharedUI.esc(href)}" data-module="${SharedUI.esc(m.id)}" data-tooltip="${SharedUI.esc(m.name)}">
-        <span class="nav-icon">${SharedUI.esc(m.icon || '')}</span>
+      const look = navLook(m.id);
+      return `<a class="sidebar-nav-item" href="${SharedUI.esc(href)}" data-module="${SharedUI.esc(m.id)}" data-tooltip="${SharedUI.esc(m.name)}" data-navcolor="${SharedUI.esc(m.id)}">
+        <span class="nav-icon" style="--nav-bg:${look.bg};--nav-shadow:${look.shadow}">${SharedUI.esc(m.icon || look.icon)}</span>
         <span class="nav-label">${SharedUI.esc(m.name)}</span>
         <span class="nav-badge hidden" id="badge-${SharedUI.esc(m.id)}"></span>
       </a>`;
     }).join('');
+
+    // 静态 footer 项（系统设置 / 使用帮助）也应用同款图标瓦片
+    nav.querySelectorAll('.nav-icon[data-fixed]').forEach(ic => {
+      const id = ic.getAttribute('data-fixed');
+      const look = navLook(id);
+      ic.style.setProperty('--nav-bg', look.bg);
+      ic.style.setProperty('--nav-shadow', look.shadow);
+    });
 
     // Bind click handlers for mobile close
     nav.querySelectorAll('.sidebar-nav-item').forEach(item => {
@@ -100,6 +122,77 @@ const Platform = (() => {
     try {
       localStorage.setItem(SIDEBAR_KEY, sidebarCollapsed ? 'true' : 'false');
     } catch (e) { /* localStorage might be unavailable */ }
+    // 用户手动切换（无论收/展），都清除「自动收起」标记：
+    // - 手动展开 → 允许 iframe 日后因拥挤再自动收起
+    // - 手动收起 → 若再自动展开会打扰用户，故也清除，避免 iframe 误恢复
+    autoCollapseFired = false;
+    notifySidebarState(true);
+  }
+
+  /*
+   * 子页（迭代工作台 iframe）因内容拥挤发起自动收起侧栏，
+   * 或内容不再拥挤时发起恢复展开。
+   * 收起只在侧栏当前展开且尚未曾自动收起时响应一次，避免每次渲染都强行打断用户手动展开。
+   */
+  let autoCollapseFired = false;
+  function collapseSidebar() {
+    if (sidebarCollapsed || autoCollapseFired) return;
+    sidebarCollapsed = true;
+    autoCollapseFired = true;
+    applySidebarState();
+    try {
+      localStorage.setItem(SIDEBAR_KEY, 'true');
+    } catch (e) { /* localStorage might be unavailable */ }
+    notifySidebarState();
+  }
+  /* 子页请求恢复展开：收起是自动发起的才恢复，用户手动收起不打扰 */
+  function expandSidebar() {
+    if (!sidebarCollapsed) return;
+    if (!autoCollapseFired) return; // 用户手动收起 → 不自动展开
+    sidebarCollapsed = false;
+    autoCollapseFired = false;
+    applySidebarState();
+    try {
+      localStorage.setItem(SIDEBAR_KEY, 'false');
+    } catch (e) { /* localStorage might be unavailable */ }
+    notifySidebarState();
+  }
+
+  /* 向子树广播当前侧栏状态，供 iframe 判断是否需要恢复。
+     manual=true 表示用户手动切换（此时应解除 iframe 的防闪避、允许再次自动收起）。 */
+  function notifySidebarState(manual) {
+    try {
+      const frame = document.getElementById('iterationFrame');
+      if (frame && frame.contentWindow) {
+        frame.contentWindow.postMessage(
+          { source: 'platform', type: 'sidebarState', collapsed: sidebarCollapsed, auto: autoCollapseFired, manual: !!manual },
+          window.location.origin
+        );
+      }
+    } catch (e) { /* 跨源或已卸载，忽略 */ }
+  }
+
+  /* 接收 iframe 的「内容拥挤 → 收起侧栏」/「内容不再拥挤 → 恢复展开」/「查询当前状态」请求 */
+  function handleFrameMessage(event) {
+    const data = event.data;
+    if (!data || typeof data !== 'object') return;
+    if (data.source !== 'iterationFrame') return;
+    if (data.type !== 'autoCollapseSidebar' && data.type !== 'restoreSidebar' && data.type !== 'getSidebarState') return;
+    // 同源校验：仅接受本平台自己 iframe 的消息
+    if (event.origin && event.source && event.origin !== window.location.origin) return;
+    if (data.type === 'getSidebarState') {
+      try {
+        if (event.source) {
+          event.source.postMessage(
+            { source: 'platform', type: 'sidebarState', collapsed: sidebarCollapsed, auto: autoCollapseFired },
+            window.location.origin
+          );
+        }
+      } catch (e) { /* 已卸载，忽略 */ }
+      return;
+    }
+    if (data.type === 'autoCollapseSidebar') collapseSidebar();
+    else expandSidebar();
   }
 
   /**
@@ -429,6 +522,9 @@ const Platform = (() => {
       collapseBtn.addEventListener('click', toggleSidebar);
     }
 
+    // Listen for iteration-frame auto-collapse requests
+    window.addEventListener('message', handleFrameMessage);
+
     // Bind hamburger button (mobile)
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     if (hamburgerBtn) {
@@ -530,6 +626,8 @@ const Platform = (() => {
     setBreadcrumb,
     setBadge,
     toggleSidebar,
+    collapseSidebar,
+    expandSidebar,
     whoami,
 
     // Internal helper exposed for Router to call

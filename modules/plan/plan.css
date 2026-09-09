@@ -1698,3 +1698,29 @@ input.pl-date:hover { border-color: var(--accent); }
 
 body.dark-theme .pl-dp,
 [data-theme="dark"] .pl-dp { box-shadow: 0 12px 32px rgba(0,0,0,.5); }
+
+
+/* ==========================================================
+   层级缩进容器（配合 index.js 的 indWrap）
+   缩进吃在容器 padding 上，而不是加在输入框的 margin 上。
+   否则 width:100% 的输入框 + margin-left 会溢出单元格、压到右列。
+   ========================================================== */
+.pl-ind {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+/* 缩进后输入框必须允许收缩：不清掉 min-width，深层级会被重新挤出单元格 */
+.pl-ov-table .pl-ind > input,
+.pl-form-table .pl-ind > input,
+.pl-ind > input,
+.pl-ind > select {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+/* 缩进层级的视觉引导线，替代原先靠 margin 撑出来的位移感 */
+.pl-ind[style*="padding-left"] > input {
+  border-left: 2px solid var(--accent-soft, rgba(82,196,26,.25));
+}

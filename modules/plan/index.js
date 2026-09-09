@@ -234,6 +234,16 @@ const PlanModule = (() => {
     });
     return out;
   }
+  /* 层级缩进包裹：缩进必须加在「外层容器的 padding」上，不能加在输入框的 margin 上。
+     输入框是 width:100%（已占满单元格），再给它 margin-left 会让总宽变成 100%+缩进，
+     直接溢出单元格、压到右边那一列上。包一层 div 把缩进吃进 padding，
+     输入框的 100% 就是基于收窄后的内容宽度算的，任何层级都不会溢出。
+     步长与层级上限保持保守：缩进吃掉的是可输入宽度，太深会窄到没法编辑。 */
+  const IND_STEP = 16, IND_MAX_LVL = 6;
+  function indWrap(d, inner) {
+    const ind = Math.min(Number(d) || 0, IND_MAX_LVL) * IND_STEP;
+    return `<div class="pl-ind"${ind ? ` style="padding-left:${ind}px"` : ''}>${inner}</div>`;
+  }
   // 某节点的全部后代 id（父级下拉需排除，避免选成自己的子孙形成环）
   function descendantIds(list, id) {
     const arr = Array.isArray(list) ? list : [];
@@ -1160,7 +1170,7 @@ const PlanModule = (() => {
       return `
       <tr data-task-idx="${i}" data-depth="${d}">
         <td class="pl-ov-seq">${o.code}</td>
-        <td><input class="pl-f-name" data-f="name" value="${esc(t.name)}" placeholder="任务名称" style="margin-left:${d * 20}px${d ? '' : ';font-weight:600'}"></td>
+        <td>${indWrap(d, `<input class="pl-f-name" data-f="name" value="${esc(t.name)}" placeholder="任务名称"${d ? '' : ' style="font-weight:600"'}>`)}</td>
         <td><select data-f="type">${Object.keys(TASK_TYPE_LABELS).map(k => `<option value="${k}" ${t.type === k ? 'selected' : ''}>${TASK_TYPE_LABELS[k]}</option>`).join('')}</select></td>
         <td><select data-f="status">${Object.keys(TASK_STATUS_LABELS).map(k => `<option value="${k}" ${t.status === k ? 'selected' : ''}>${TASK_STATUS_LABELS[k]}</option>`).join('')}</select></td>
         <td><select data-f="priority">${Object.keys(PRIORITY_LABELS).map(k => `<option value="${k}" ${t.priority === k ? 'selected' : ''}>${PRIORITY_LABELS[k]}</option>`).join('')}</select></td>
@@ -1176,7 +1186,7 @@ const PlanModule = (() => {
       </tr>`;
     }).join('');
     return `<div class="table-wrapper pl-form-table-wrap"><table class="data-table pl-form-table"><thead><tr>
-        <th style="min-width:58px">#</th><th class="txt" style="min-width:200px">任务名称</th><th>类型</th><th>状态</th><th>优先级</th>
+        <th style="min-width:58px">#</th><th class="txt" style="min-width:260px">任务名称</th><th>类型</th><th>状态</th><th>优先级</th>
         <th class="txt">负责人</th><th class="txt">主责部门</th><th style="min-width:70px">人天</th><th style="min-width:60px">进度%</th>
         <th class="txt">开始</th><th class="txt">结束</th><th class="txt" style="min-width:170px">父任务</th><th class="txt">依赖</th><th></th>
       </tr></thead><tbody>${rows}</tbody></table></div>`;
@@ -1236,7 +1246,7 @@ const PlanModule = (() => {
       return `
       <tr data-ref-idx="${i}" data-depth="${d}">
         <td class="pl-ov-seq">${o.code}</td>
-        <td><input data-f="title" value="${esc(r.title)}" placeholder="${d ? '子项名称' : '交付产物'}" style="margin-left:${d * 20}px${d ? '' : ';font-weight:600'}"></td>
+        <td>${indWrap(d, `<input data-f="title" value="${esc(r.title)}" placeholder="${d ? '子项名称' : '交付产物'}"${d ? '' : ' style="font-weight:600"'}>`)}</td>
         <td><select data-f="stage">${Object.keys(REF_STAGE_LABELS).map(k => `<option value="${k}" ${r.stage === k ? 'selected' : ''}>${REF_STAGE_LABELS[k]}</option>`).join('')}</select></td>
         <td><input data-f="dept" value="${esc(r.dept)}" placeholder="责任部门/人"></td>
         <td><input data-f="owner" value="${esc(r.owner)}" placeholder="提交人员"></td>
@@ -1253,7 +1263,7 @@ const PlanModule = (() => {
         <table class="data-table pl-ref-table">
           <thead><tr>
             <th style="min-width:58px">#</th>
-            <th class="txt" style="min-width:240px">交付产物</th>
+            <th class="txt" style="min-width:260px">交付产物</th>
             <th style="min-width:88px">评审阶段</th>
             <th class="txt" style="min-width:130px">责任部门(人)</th>
             <th class="txt" style="min-width:110px">提交人员</th>
@@ -1347,7 +1357,7 @@ const PlanModule = (() => {
       return `
       <tr data-ov-idx="${i}" data-depth="${d}">
         <td class="pl-ov-seq">${o.code}</td>
-        <td><input data-f="name" value="${esc(s.name)}" placeholder="${d ? '子项名称' : '阶段名称'}" style="margin-left:${d * 20}px${d ? '' : ';font-weight:600'}"></td>
+        <td>${indWrap(d, `<input data-f="name" value="${esc(s.name)}" placeholder="${d ? '子项名称' : '阶段名称'}"${d ? '' : ' style="font-weight:600"'}>`)}</td>
         <td><input data-f="owner" value="${esc(s.owner)}" placeholder="负责人"></td>
         <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="startDate" value="${esc(s.startDate)}"></td>
         <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="endDate" value="${esc(s.endDate)}"></td>
@@ -1363,7 +1373,7 @@ const PlanModule = (() => {
       <div class="table-wrapper pl-ov-table-wrap">
         <table class="data-table pl-ov-table">
           <thead><tr>
-            <th style="min-width:58px">#</th><th class="txt" style="min-width:190px">阶段 / 子项</th><th class="txt">负责人</th>
+            <th style="min-width:58px">#</th><th class="txt" style="min-width:260px">阶段 / 子项</th><th class="txt">负责人</th>
             <th class="txt">开始</th><th class="txt">结束</th><th>状态</th><th style="min-width:70px">进度%</th>
             <th class="txt" style="min-width:150px">交付物</th><th class="txt" style="min-width:140px">备注</th>
             <th class="txt" style="min-width:170px">上级</th><th></th>
@@ -1523,7 +1533,7 @@ const PlanModule = (() => {
         <table class="data-table pl-market-table">
           <thead><tr>
             <th style="min-width:52px">#</th>
-            <th class="txt" style="min-width:210px">任务</th>
+            <th class="txt" style="min-width:260px">任务</th>
             <th class="txt" style="min-width:150px">计划开始时间</th>
             <th class="txt" style="min-width:150px">计划结束时间</th>
             <th class="txt" style="min-width:110px">任务执行人</th>
@@ -1537,7 +1547,7 @@ const PlanModule = (() => {
             return `
             <tr data-market-idx="${i}" data-depth="${d}">
               <td class="pl-ov-seq">${o.code}</td>
-              <td><input data-f="name" value="${esc(x.name)}" placeholder="${d ? '子任务名称' : '阶段名称'}" style="margin-left:${d * 20}px${d ? '' : ';font-weight:600'}"></td>
+              <td>${indWrap(d, `<input data-f="name" value="${esc(x.name)}" placeholder="${d ? '子任务名称' : '阶段名称'}"${d ? '' : ' style="font-weight:600"'}>`)}</td>
               <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="startDate" value="${esc(x.startDate)}"></td>
               <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="endDate" value="${esc(x.endDate)}"></td>
               <td><input data-f="owner" value="${esc(x.owner)}" placeholder="执行人"></td>

@@ -287,6 +287,27 @@ const PlanModule = (() => {
       </div>`).join('')}</div>`;
   }
 
+  /* ---------- Dashboard 空态：说明各区块建计划后会呈现什么，避免首屏看起来"坏了" ---------- */
+  function renderDashboardEmptyGuide() {
+    const blocks = [
+      { ic: '🚨', t: '需要关注的计划', d: '按关注度排序（逾期里程碑×3 + 逾期/受阻任务×2 + 未闭环风险 + 待办问题），带「当前阶段」，点击直达详情。' },
+      { ic: '🎯', t: '近期里程碑', d: '未来 30 天跨全部计划的节点时间线，逾期标红——用来发现多个项目节点撞车。' },
+      { ic: '📊', t: '阶段分布', d: '进行中/草稿计划分别处在标准 8 阶段的哪一步，暴露部门产能瓶颈环节。' }
+    ];
+    return `
+    <div class="cs-panel pl-dash-panel pl-dash-guide">
+      <h4>指挥台预览 <small>新建第一个计划后，下面三块会自动汇总出来</small></h4>
+      <div class="pl-guide-grid">
+        ${blocks.map(b => `
+          <div class="pl-guide-item">
+            <span class="pl-guide-ic">${b.ic}</span>
+            <div class="pl-guide-text"><b>${esc(b.t)}</b><p>${esc(b.d)}</p></div>
+          </div>`).join('')}
+      </div>
+      <div class="section-note">数据来源：各计划的「项目总览 / WBS任务 / 里程碑 / 遗留问题 / 项目风险」标签页，填写后本页自动聚合，无需额外维护。</div>
+    </div>`;
+  }
+
   /* ---------- Dashboard ② 需要关注的计划（按关注度排序） ---------- */
   function renderAttentionTable(plans) {
     const list = plans.filter(s => (s.attentionScore || 0) > 0)
@@ -450,14 +471,14 @@ const PlanModule = (() => {
       </div>
       <button class="btn primary" id="plNewPlan">＋ 新建计划</button>
     </div>
+    ${renderMetricStrip()}
     ${hasPlans ? `
-      ${renderMetricStrip()}
       ${renderAttentionTable(plans)}
       <div class="pl-dash-grid">
         ${renderMilestoneTimeline(plans)}
         ${renderStageDistribution(plans)}
       </div>
-    ` : ''}
+    ` : renderDashboardEmptyGuide()}
     <div class="pl-allplans-head">
       <h4>全部计划 <span class="pl-count-pill">${fmtNum(plans.length)}</span></h4>
       <div class="pl-list-bar pl-list-bar-inline">
@@ -1108,8 +1129,8 @@ const PlanModule = (() => {
       overview: (p && p.overview && p.overview.length ? p.overview.map(o => ({ ...o })) : seedOverviewStages()),
       // RPD 规范文档模板库链接（部门知识库，可自定义）
       rpdTemplateUrl: (p && p.rpdTemplateUrl) || '',
-      // 二阶段占位板块：上市计划 / 遗留问题 / 项目风险（一阶段仅预留数据字段，页面占位）
-      marketPlan: (p && p.marketPlan ? p.marketPlan : []).map(x => ({ ...x })),
+      // 上市计划：默认直接带出标准 5 阶段模板（新建自动生成；编辑时为空也补一版）
+      marketPlan: (p && p.marketPlan && p.marketPlan.length ? p.marketPlan.map(x => ({ ...x })) : seedMarketPlan()),
       issues: (p && p.issues ? p.issues : []).map(x => ({ ...x })),
       risks: (p && p.risks ? p.risks : []).map(x => ({ ...x })),
       aiConfig: (p && p.aiConfig) || {}

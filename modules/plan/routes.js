@@ -309,7 +309,30 @@ function computePlanSummary(plan) {
   const upcomingMilestones = milestones
     .filter(m => m.status !== 'done')
     .sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'))
-    .slice(0, 5);
+    .slice(0, 5)
+    .map(m => ({ ...m, planId: plan.id, planName: plan.name || '' }));
+
+  /* ---------- Dashboard 派生指标 ---------- */
+  // 当前阶段：项目总览里第一个未完成的顶层阶段（部门视角横向对比"各项目走到哪一步"）
+  const overview = Array.isArray(plan.overview) ? plan.overview : [];
+  const topStages = overview.filter(s => !s.parentId);
+  let currentStage = '';
+  if (topStages.length) {
+    const pending = topStages.find(s => s.status !== 'completed');
+    currentStage = pending ? (pending.name || '') : '已完成';
+  }
+  // 遗留问题未闭环数（resolved/closed 视为已闭环）
+  const issueOpen = (Array.isArray(plan.issues) ? plan.issues : [])
+    .filter(x => x.status !== 'resolved' && x.status !== 'closed').length;
+  // 项目风险未关闭数（mitigated/closed 视为已收口）
+  const projectRiskOpen = (Array.isArray(plan.risks) ? plan.risks : [])
+    .filter(x => x.status !== 'mitigated' && x.status !== 'closed').length;
+  // 里程碑：逾期数 + 本月待达成数
+  const overdueMilestones = milestones.filter(m => m.status !== 'done' && m.date && m.date < today).length;
+  const monthPrefix = today.slice(0, 7);
+  const milestoneThisMonth = milestones.filter(m => m.status !== 'done' && m.date && m.date.slice(0, 7) === monthPrefix).length;
+  // 关注度评分：逾期里程碑最重，其次逾期/受阻任务，再算未闭环事项
+  const attentionScore = overdueMilestones * 3 + riskyTasks.length * 2 + projectRiskOpen + issueOpen;
 
   return {
     id: plan.id,
@@ -331,6 +354,13 @@ function computePlanSummary(plan) {
     resource: { load: resourceLoad, total: resources.length, overloaded: resourceLoad.filter(r => r.load >= 100).length },
     risks: riskyTasks,
     upcomingMilestones,
+    // Dashboard 用派生字段
+    currentStage,
+    issueOpen,
+    projectRiskOpen,
+    overdueMilestones,
+    milestoneThisMonth,
+    attentionScore,
     today
   };
 }
@@ -346,7 +376,17 @@ function computeSummary(state) {
     totalTasks: summaries.reduce((s, x) => s + x.wbs.total, 0),
     totalHours: summaries.reduce((s, x) => s + x.wbs.sumHours, 0),
     avgProgress: summaries.length ? Math.round(summaries.reduce((s, x) => s + x.wbs.overallProgress, 0) / summaries.length) : 0,
-    riskCount: summaries.reduce((s, x) => s + x.risks.length, 0)
+    riskCount: summaries.reduce((s, x) => s + x.risks.length, 0),
+    /* ---------- Dashboard 聚合 ---------- */
+    // 需关注计划数：存在逾期里程碑 / 逾期或受阻任务 / 未闭环风险问题
+    attentionCount: summaries.filter(x => x.attentionScore > 0).length,
+    // 本月待达成里程碑（跨全部计划）与其中已逾期数
+    milestoneThisMonth: summaries.reduce((s, x) => s + x.milestoneThisMonth, 0),
+    overdueMilestoneTotal: summaries.reduce((s, x) => s + x.overdueMilestones, 0),
+    // 待闭环事项 = 未闭环遗留问题 + 未关闭项目风险
+    openIssueTotal: summaries.reduce((s, x) => s + x.issueOpen, 0),
+    openRiskTotal: summaries.reduce((s, x) => s + x.projectRiskOpen, 0),
+    openItemsTotal: summaries.reduce((s, x) => s + x.issueOpen + x.projectRiskOpen, 0)
   };
 
   return { plans: summaries, agg };

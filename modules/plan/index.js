@@ -36,6 +36,13 @@ const PlanModule = (() => {
   const RES_KIND_LABELS = { team: '团队', person: '个人' };
   const MEMBER_ROLE_LABELS = { pm: '项目经理', product: '产品经理', system: '系统经理', dev: '研发', test: '测试', design: '设计', other: '其他' };
   const REF_TYPE_LABELS = { requirement: '需求文档', design: '设计文档', test: '测试文档', api: '接口文档', other: '其他' };
+  /* ★ RPD 规范文档模板库（部门级知识库链接）
+     —— 这是部门统一的文档模板库，不需要每个项目单独填写。
+        换库只改这一行即可全局生效；留空则「打开模板库」按钮置灰并提示未配置。 */
+  const RPD_TEMPLATE_URL = '';
+  // 取生效链接：优先用计划自带（兼容历史数据/特殊项目覆盖），否则用部门统一常量
+  function rpdUrlOf(obj) { return String((obj && obj.rpdTemplateUrl) || RPD_TEMPLATE_URL || '').trim(); }
+
   /* 参考文档 / 交付件（评审阶段 + 提交状态） */
   const REF_STAGE_LABELS = { TR2: 'TR2', TR3: 'TR3', TR4: 'TR4', TR5: 'TR5', other: '其他' };
   const REF_DOC_STATUS_LABELS = { pending: '待提交', submitted: '已提交', reviewing: '评审中', passed: '已通过', na: '不适用' };
@@ -262,22 +269,123 @@ const PlanModule = (() => {
   /* ==========================================================
      计划列表页（平铺卡片 + 指标条）
      ========================================================== */
+  /* ---------- Dashboard ① 4 个 KPI（只保留有决策价值的口径） ---------- */
   function renderMetricStrip() {
     const agg = (summary && summary.agg) || {};
+    const overdueMs = agg.overdueMilestoneTotal || 0;
     const cards = [
-      { icon: '📋', value: fmtNum(agg.planCount), label: '计划总数', sub: '全部计划', color: 'green' },
-      { icon: '▶️', value: fmtNum(agg.activeCount), label: '进行中', sub: '当前推进', color: 'blue' },
-      { icon: '🗂️', value: fmtNum(agg.totalTasks), label: '任务总数', sub: 'WBS 任务', color: 'purple' },
-      { icon: '⏱️', value: round1(agg.totalHours) + ' 人天', label: '计划工时', sub: '合计投入', color: 'orange' },
-      { icon: '📈', value: (agg.avgProgress || 0) + '%', label: '平均进度', sub: '加权', color: 'teal' },
-      { icon: '⚠️', value: fmtNum(agg.riskCount), label: '风险项', sub: '逾期/受阻', color: agg.riskCount > 0 ? 'red' : 'green' }
+      { icon: '▶️', value: `${fmtNum(agg.activeCount)}<small> / ${fmtNum(agg.planCount)}</small>`, label: '进行中计划', sub: '当前在推 / 总数', color: 'blue' },
+      { icon: '🚨', value: fmtNum(agg.attentionCount), label: '需关注计划', sub: '逾期或未闭环', color: (agg.attentionCount > 0) ? 'pink' : 'green' },
+      { icon: '🎯', value: fmtNum(agg.milestoneThisMonth), label: '本月待达成里程碑', sub: overdueMs ? `其中 ${fmtNum(overdueMs)} 项已逾期` : '本月节点', color: overdueMs ? 'orange' : 'teal' },
+      { icon: '📌', value: fmtNum(agg.openItemsTotal), label: '待闭环事项', sub: `问题 ${fmtNum(agg.openIssueTotal)} · 风险 ${fmtNum(agg.openRiskTotal)}`, color: (agg.openItemsTotal > 0) ? 'purple' : 'green' }
     ];
-    return `<div class="cs-metric-grid">${cards.map(c => `
+    return `<div class="cs-metric-grid pl-kpi-grid">${cards.map(c => `
       <div class="cs-metric cs-metric-${c.color}">
         <div class="cs-metric-top"><span class="cs-metric-icon">${c.icon}</span><span class="cs-metric-trend">${esc(c.sub)}</span></div>
         <div class="cs-metric-value">${c.value}</div>
         <div class="cs-metric-label">${esc(c.label)}</div>
       </div>`).join('')}</div>`;
+  }
+
+  /* ---------- Dashboard ② 需要关注的计划（按关注度排序） ---------- */
+  function renderAttentionTable(plans) {
+    const list = plans.filter(s => (s.attentionScore || 0) > 0)
+      .slice().sort((a, b) => (b.attentionScore || 0) - (a.attentionScore || 0));
+    if (!list.length) {
+      return `<div class="cs-panel pl-dash-panel">
+        <h4>需要关注的计划 <small>逾期 / 受阻 / 未闭环</small></h4>
+        <div class="pl-none-risks">✓ 暂无需要关注的计划，所有节点与事项均在控</div>
+      </div>`;
+    }
+    const rows = list.map(s => {
+      const wbs = s.wbs || {};
+      const next = (s.upcomingMilestones || [])[0];
+      const nextTxt = next
+        ? `${esc(fmtDate(next.date))} ${esc(next.name || '')}${(next.date && next.date < s.today) ? ' <span class="pl-overdue">已逾期</span>' : ''}`
+        : '—';
+      return `
+      <tr class="pl-attention-row" data-plan-id="${esc(s.id)}">
+        <td class="txt"><b>${esc(s.name || s.id)}</b></td>
+        <td class="txt">${esc(s.owner || '未指派')}</td>
+        <td class="txt">${s.currentStage ? `<span class="pl-chip">${esc(s.currentStage)}</span>` : '—'}</td>
+        <td class="pl-progress-cell">${progressBadge(wbs.overallProgress || 0)}</td>
+        <td>${(s.risks || []).length ? `<b class="pl-danger">${fmtNum((s.risks || []).length)}</b>` : '0'}</td>
+        <td>${s.overdueMilestones ? `<b class="pl-danger">${fmtNum(s.overdueMilestones)}</b>` : '0'}</td>
+        <td>${s.projectRiskOpen ? `<b class="pl-danger">${fmtNum(s.projectRiskOpen)}</b>` : '0'}</td>
+        <td>${s.issueOpen ? `<b class="pl-warnnum">${fmtNum(s.issueOpen)}</b>` : '0'}</td>
+        <td class="txt">${nextTxt}</td>
+      </tr>`;
+    }).join('');
+    return `
+    <div class="cs-panel pl-dash-panel">
+      <h4>需要关注的计划 <small>按关注度排序（逾期里程碑×3 + 逾期/受阻任务×2 + 未闭环风险 + 待办问题）</small></h4>
+      <div class="table-wrapper pl-attention-wrap">
+        <table class="data-table pl-attention-table">
+          <thead><tr>
+            <th class="txt" style="min-width:180px">计划</th><th class="txt">负责人</th><th class="txt" style="min-width:120px">当前阶段</th>
+            <th style="min-width:110px">整体进度</th><th>逾期/受阻任务</th><th>逾期里程碑</th><th>未闭环风险</th><th>待办问题</th>
+            <th class="txt" style="min-width:200px">最近里程碑</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="section-note">点击任意行进入该计划详情。</div>
+    </div>`;
+  }
+
+  /* ---------- Dashboard ③ 近期里程碑时间线（未来 30 天，跨全部计划） ---------- */
+  function renderMilestoneTimeline(plans) {
+    const today = todayStamp();
+    const horizon = today + 30 * 86400000;
+    const items = [];
+    plans.forEach(s => (s.upcomingMilestones || []).forEach(m => {
+      const ts = dateStamp(m.date);
+      if (ts == null) return;
+      if (ts <= horizon) items.push({ ts: ts, date: m.date, name: m.name || '', plan: m.planName || s.name || '', overdue: ts < today });
+    }));
+    items.sort((a, b) => a.ts - b.ts);
+    const body = items.length ? items.slice(0, 12).map(x => `
+      <div class="pl-tl-row ${x.overdue ? 'overdue' : ''}">
+        <span class="pl-tl-date">${esc(fmtDate(x.date))}</span>
+        <span class="pl-tl-dot"></span>
+        <span class="pl-tl-name">${esc(x.name)}</span>
+        <span class="pl-tl-plan">${esc(x.plan)}</span>
+        ${x.overdue ? '<span class="pl-overdue">逾期</span>' : ''}
+      </div>`).join('') : '<div class="pl-none">未来 30 天内没有待达成里程碑</div>';
+    return `
+    <div class="cs-panel pl-dash-panel">
+      <h4>近期里程碑 <small>未来 30 天 · 跨全部计划（可看节点撞车）</small></h4>
+      <div class="pl-tl-list">${body}</div>
+      ${items.length > 12 ? `<div class="section-note">仅显示最近 12 项，共 ${fmtNum(items.length)} 项。</div>` : ''}
+    </div>`;
+  }
+
+  /* ---------- Dashboard ④ 阶段分布（部门盘子全景，看瓶颈卡在哪一环） ---------- */
+  function renderStageDistribution(plans) {
+    const actives = plans.filter(s => s.status === 'active' || s.status === 'draft');
+    const counts = {};
+    actives.forEach(s => {
+      const k = s.currentStage || '未设置总览';
+      counts[k] = (counts[k] || 0) + 1;
+    });
+    // 按标准 8 阶段顺序排列，其余追加在后
+    const order = OVERVIEW_STAGES.map(s => s.name);
+    const keys = Object.keys(counts).sort((a, b) => {
+      const ia = order.indexOf(a), ib = order.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+    const max = Math.max(1, ...keys.map(k => counts[k]));
+    const body = keys.length ? keys.map(k => `
+      <div class="pl-stage-row">
+        <span class="pl-stage-name">${esc(k)}</span>
+        <div class="pl-stage-bar"><div class="pl-stage-fill" style="width:${Math.round(counts[k] / max * 100)}%"></div></div>
+        <span class="pl-stage-num">${fmtNum(counts[k])}</span>
+      </div>`).join('') : '<div class="pl-none">暂无进行中/草稿计划</div>';
+    return `
+    <div class="cs-panel pl-dash-panel">
+      <h4>阶段分布 <small>进行中/草稿计划当前所处阶段（部门瓶颈一目了然）</small></h4>
+      <div class="pl-stage-bars">${body}</div>
+    </div>`;
   }
 
   function renderPlanCard(s) {
@@ -333,25 +441,36 @@ const PlanModule = (() => {
       const q = filterText.toLowerCase();
       return [s.name, s.id, s.owner, s.projectName].filter(Boolean).some(v => String(v).toLowerCase().includes(q));
     });
+    const hasPlans = plans.length > 0;
     return `
     <div class="cs-view-head">
       <div class="cs-view-head-left">
         <h3>项目计划</h3>
-        <p class="pl-head-desc">任务 WBS · 里程碑 · 资源 · 甘特 · 高管视图，平铺完整展示</p>
+        <p class="pl-head-desc">部门项目执行指挥台：先看要出事的，再看最近要交的</p>
       </div>
       <button class="btn primary" id="plNewPlan">＋ 新建计划</button>
     </div>
-    ${renderMetricStrip()}
-    <div class="pl-list-bar">
-      <div class="pl-search">
-        <span class="pl-search-ic">🔍</span>
-        <input type="text" id="plFilter" class="pl-search-input" placeholder="按计划名 / 项目 / 负责人筛选" value="${esc(filterText)}">
+    ${hasPlans ? `
+      ${renderMetricStrip()}
+      ${renderAttentionTable(plans)}
+      <div class="pl-dash-grid">
+        ${renderMilestoneTimeline(plans)}
+        ${renderStageDistribution(plans)}
       </div>
-      <div class="pl-list-count">共 ${fmtNum(plans.length)} 个计划${filtered.length !== plans.length ? `，匹配 ${fmtNum(filtered.length)}` : ''}</div>
+    ` : ''}
+    <div class="pl-allplans-head">
+      <h4>全部计划 <span class="pl-count-pill">${fmtNum(plans.length)}</span></h4>
+      <div class="pl-list-bar pl-list-bar-inline">
+        <div class="pl-search">
+          <span class="pl-search-ic">🔍</span>
+          <input type="text" id="plFilter" class="pl-search-input" placeholder="按计划名 / 项目 / 负责人筛选" value="${esc(filterText)}">
+        </div>
+        <div class="pl-list-count">${filtered.length !== plans.length ? `匹配 ${fmtNum(filtered.length)} / ${fmtNum(plans.length)}` : `共 ${fmtNum(plans.length)} 个`}</div>
+      </div>
     </div>
     ${filtered.length === 0 ? `<div class="pl-empty"><div class="pl-empty-ic">🗓️</div><p>${plans.length === 0 ? '还没有计划，点击右上角「新建计划」开始' : '没有匹配的计划'}</p></div>`
       : `<div class="pl-card-grid">${filtered.map(s => renderPlanCard(s)).join('')}</div>`}
-    ${plans.length === 0 ? `<div class="section-note">新建计划后，可在详情页维护 WBS 任务树、里程碑、资源负荷，并生成高管视图与 AI 规则建议。</div>` : ''}`;
+    ${plans.length === 0 ? `<div class="section-note">新建计划后，可在「项目总览 / WBS任务 / 里程碑 / 上市计划 / 遗留问题 / 项目风险 / 交付件」等标签页维护内容，本页会自动汇总为部门指挥台。</div>` : ''}`;
   }
 
   /* ==========================================================
@@ -983,7 +1102,8 @@ const PlanModule = (() => {
       milestones: (p && p.milestones ? p.milestones : []).map(m => ({ ...m })),
       resources: (p && p.resources ? p.resources : []).map(r => ({ ...r })),
       members: (p && p.members ? p.members : []).map(m => ({ ...m })),
-      references: (p && p.references ? p.references : []).map(r => ({ ...r })),
+      // 参考文档/交付件：默认直接带出 VRC 标准清单（新建自动生成；编辑时为空也补一版）
+      references: (p && p.references && p.references.length ? p.references.map(r => ({ ...r })) : seedReferenceDocs()),
       // 项目总览：新建计划时自动初始化标准 8 阶段（含测试计划的 6 条固定子流程）；编辑时保留原有大纲，若为空也补一版
       overview: (p && p.overview && p.overview.length ? p.overview.map(o => ({ ...o })) : seedOverviewStages()),
       // RPD 规范文档模板库链接（部门知识库，可自定义）
@@ -1130,20 +1250,21 @@ const PlanModule = (() => {
     </div>`;
   }
 
-  // RPD 规范文档模板库入口卡片（部门内部知识库链接，可自定义）
+  // RPD 规范文档模板库入口卡片（链接内置为部门级常量，无需逐个项目填写）
   function renderRpdCard(draft) {
-    const url = draft.rpdTemplateUrl || '';
+    const url = rpdUrlOf(draft);
     return `
     <div class="pl-rpd-card">
       <div class="pl-rpd-main">
         <span class="pl-rpd-ic">📚</span>
         <div class="pl-rpd-text">
           <h4>RPD 规范文档模板库</h4>
-          <p>部门内部项目文档模板与规范知识库，团队可直接查阅各交付件的标准模板样式。</p>
+          <p>${url
+            ? '部门内部项目文档模板与规范知识库，团队可直接查阅各交付件的标准模板样式。'
+            : '尚未配置知识库链接。请在 <code>modules/plan/index.js</code> 的 <code>RPD_TEMPLATE_URL</code> 填入部门知识库地址，即可全局生效。'}</p>
         </div>
       </div>
       <div class="pl-rpd-actions">
-        <input type="url" data-f="rpdTemplateUrl" class="pl-rpd-input" value="${esc(url)}" placeholder="粘贴知识库链接，如 https://alidocs.dingtalk.com/...">
         <button type="button" class="btn primary" id="plRpdOpen" ${url ? '' : 'disabled'}>打开模板库 ↗</button>
       </div>
     </div>`;
@@ -1279,17 +1400,7 @@ const PlanModule = (() => {
       ${renderFormMembers(draft)}
     </div>`;
   }
-  function renderFormReferenceTab(draft) {
-    return `
-    <div class="cs-form-section">
-      <div class="cs-form-section-head">
-        <div class="cs-form-section-title">参考文档 <span class="pl-count-pill">${draft.references.length} 项</span></div>
-        <div class="pl-form-actions"><button type="button" class="btn pl-add-btn" id="plAddReference">＋ 添加文档</button></div>
-      </div>
-      <div class="pl-form-note">关联需求清单、设计方案、测试方案、接口文档等，统一沉淀，方便团队查阅。</div>
-      ${renderFormReferences(draft)}
-    </div>`;
-  }
+  /* 参考文档 Tab 直接由 renderFormReferences 输出完整分区（含 RPD 卡片与操作条），无需再包一层 */
   /* ---------- 遗留问题 Tab ---------- */
   function renderFormIssues(draft) {
     const list = draft.issues || [];
@@ -1445,7 +1556,7 @@ const PlanModule = (() => {
       case 'risk': return renderFormRisks(draft);
       case 'resource': return renderFormResourceTab(draft);
       case 'member': return renderFormMemberTab(draft);
-      case 'reference': return renderFormReferenceTab(draft);
+      case 'reference': return renderFormReferences(draft);
       default: return renderFormBasic(draft);
     }
   }
@@ -1685,9 +1796,6 @@ const PlanModule = (() => {
       if (!x) return;
       row.querySelectorAll('[data-f]').forEach(inp => { x[inp.getAttribute('data-f')] = inp.value; });
     });
-    // RPD 模板库链接（不在 .cs-field 内，单独收集）
-    const rpd = el.querySelector('.pl-rpd-input[data-f="rpdTemplateUrl"]');
-    if (rpd) dirtyForm.rpdTemplateUrl = rpd.value.trim();
   }
 
   function validateDraft() {
@@ -1846,6 +1954,12 @@ const PlanModule = (() => {
         currentTab = 'overview'; currentView = 'detail';
         expandAuto(); render();
       }));
+      // Dashboard「需要关注的计划」行 → 进入该计划详情
+      el.querySelectorAll('.pl-attention-row').forEach(row => row.addEventListener('click', () => {
+        currentPlanId = row.getAttribute('data-plan-id');
+        currentTab = 'overview'; currentView = 'detail';
+        expandAuto(); render();
+      }));
     } else if (currentView === 'detail') {
       el.querySelector('#plBack')?.addEventListener('click', () => { currentView = 'list'; render(); });
       el.querySelector('#plEditPlan')?.addEventListener('click', () => { dirtyForm = initFormDraft(getPlan(currentPlanId)); currentFormTab = 'basic'; currentView = 'edit'; render(); });
@@ -1905,18 +2019,12 @@ const PlanModule = (() => {
         SharedUI.confirm('初始化交付件清单', '<p>确认用 VRC 标准交付件清单覆盖当前内容？</p>', doSeed, { confirmText: '覆盖', confirmClass: 'danger' });
       } else { doSeed(); }
     });
-    // 打开 RPD 模板库
+    // 打开 RPD 模板库（链接来自部门级常量 RPD_TEMPLATE_URL）
     el.querySelector('#plRpdOpen')?.addEventListener('click', () => {
-      syncFormFromDom();
-      const url = (dirtyForm.rpdTemplateUrl || '').trim();
-      if (!url) { SharedUI.toast('请先填写 RPD 模板库链接', 'warning'); return; }
+      const url = rpdUrlOf(dirtyForm);
+      if (!url) { SharedUI.toast('尚未配置 RPD 模板库链接（modules/plan/index.js → RPD_TEMPLATE_URL）', 'warning'); return; }
       if (!/^https?:\/\//i.test(url)) { SharedUI.toast('链接需以 http:// 或 https:// 开头', 'warning'); return; }
       window.open(url, '_blank', 'noopener');
-    });
-    // 链接填写后即时启用/禁用「打开」按钮
-    el.querySelector('.pl-rpd-input')?.addEventListener('input', (e) => {
-      const btn = el.querySelector('#plRpdOpen');
-      if (btn) btn.disabled = !e.target.value.trim();
     });
     el.querySelector('#plAddStage')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.overview.push(blankStage('')); renderFormTabBody(); });
     el.querySelector('#plAddIssue')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.issues.push(blankIssue()); renderFormTabBody(); });

@@ -1397,3 +1397,79 @@ tr[data-depth="0"] > .pl-ov-seq { color: var(--text); font-weight: 600; }
   .pl-rpd-actions { width: 100%; }
   .pl-rpd-actions .pl-rpd-input { min-width: 0; flex: 1 1 auto; }
 }
+
+
+/* ==========================================================
+   首页 Dashboard（KPI / 需关注计划 / 里程碑时间线 / 阶段分布）
+   ========================================================== */
+.pl-kpi-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.pl-kpi-grid .cs-metric-value small { font-size: 16px; font-weight: 600; color: var(--muted); }
+
+.pl-dash-panel { margin-bottom: 18px; }
+.pl-dash-panel > h4 {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin: 0 0 14px; font-size: 15px; font-weight: 700; color: var(--text);
+}
+.pl-dash-panel > h4 small { font-size: 12px; font-weight: 500; color: var(--muted); }
+
+/* 需要关注的计划 */
+.pl-attention-wrap { overflow-x: auto; min-width: 0; }
+.pl-attention-table { min-width: 1060px; }
+.pl-attention-table th { white-space: nowrap; }
+.pl-attention-row { cursor: pointer; transition: background .15s; }
+.pl-attention-row:hover > td { background: var(--accent-soft); }
+.pl-warnnum { color: var(--orange, #fa8c16); }
+
+/* 两栏：时间线 + 阶段分布 */
+.pl-dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 16px;
+  margin-bottom: 4px;
+}
+
+/* 近期里程碑时间线 */
+.pl-tl-list { display: flex; flex-direction: column; }
+.pl-tl-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 2px;
+  border-bottom: 1px dashed var(--line);
+  font-size: 13px;
+}
+.pl-tl-row:last-child { border-bottom: none; }
+.pl-tl-date { flex: 0 0 92px; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12.5px; }
+.pl-tl-dot {
+  flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--blue); box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.pl-tl-row.overdue .pl-tl-dot { background: var(--warn); box-shadow: 0 0 0 3px rgba(245,34,45,.14); }
+.pl-tl-name { flex: 1 1 auto; min-width: 0; color: var(--text); word-break: break-word; }
+.pl-tl-plan { flex: 0 0 auto; max-width: 40%; color: var(--muted); font-size: 12px; text-align: right; word-break: break-word; }
+
+/* 阶段分布条 */
+.pl-stage-bars { display: flex; flex-direction: column; gap: 10px; }
+.pl-stage-row { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.pl-stage-name { flex: 0 0 120px; color: var(--text); word-break: break-word; }
+.pl-stage-bar {
+  flex: 1 1 auto; height: 10px; min-width: 0;
+  background: var(--panel-soft); border-radius: 999px; overflow: hidden;
+}
+.pl-stage-fill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+}
+.pl-stage-num { flex: 0 0 32px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* 全部计划区标题栏 */
+.pl-allplans-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap;
+  margin: 22px 0 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.pl-allplans-head h4 {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0; font-size: 15px; font-weight: 700; color: var(--text);
+}
+.pl-list-bar-inline { margin: 0; }

@@ -191,8 +191,28 @@ const Platform = (() => {
       } catch (e) { /* 已卸载，忽略 */ }
       return;
     }
+    /* 只有「迭代工作台」正在前台时才响应它的侧栏请求。
+       iframe 一旦创建就常驻 DOM，即使切到别的模块也还在。它内部监听 window resize
+       重新测量拥挤度，而侧栏收/展本身就会改变 iframe 宽度 —— 于是：
+         别的模块（如项目计划）因宽表收起侧栏
+           → iframe 变宽被 resize
+           → 这个当前不可见的迭代视图判定「我不挤」
+           → 发 restoreSidebar
+           → 侧栏又展开，宽表被裁
+       两个模块共用同一个 autoCollapseFired 标志，后台模块就这样否决了前台模块的决定，
+       表现为「切到内容多的 Tab，先收起又自动展开」。加前台校验即可切断这条回路。 */
+    if (!isIterationActive()) return;
     if (data.type === 'autoCollapseSidebar') collapseSidebar();
     else expandSidebar();
+  }
+  function isIterationActive() {
+    try {
+      if (typeof Router === 'undefined' || typeof Router.current !== 'function') return true;
+      const cur = Router.current();
+      return !!(cur && cur.moduleId === 'iteration');
+    } catch (e) {
+      return true;   // 取不到路由时保持原有行为，不要把功能整个关掉
+    }
   }
 
   /**

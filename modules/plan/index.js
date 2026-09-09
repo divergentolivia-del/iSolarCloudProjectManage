@@ -2109,6 +2109,33 @@ const PlanModule = (() => {
      只在「侧栏当前展开」时请求收起；不再拥挤则请求恢复（Platform 内部只会恢复"自动收起"的情况，
      用户手动收起不会被打扰）。 */
   let crowdRaf = 0;
+  /* ---------- 拥挤判定的三个辅助 ----------
+     曾经的写法是 `wrap.scrollWidth - wrap.clientWidth > 4`，即「当前是否溢出」。
+     问题：clientWidth 取决于侧栏是收还是展，而判定结果又会去改侧栏 —— 判据被自己的
+     动作改掉。现在改成拿不随容器变化的最小内容宽度做判据，判定与侧栏当前状态无关。 */
+  function sidebarWidthDelta() {
+    const cs = getComputedStyle(document.documentElement);
+    const w = parseFloat(cs.getPropertyValue('--sidebar-width')) || 220;
+    const c = parseFloat(cs.getPropertyValue('--sidebar-collapsed-width')) || 60;
+    return Math.max(0, w - c);
+  }
+  function isSidebarCollapsed() {
+    const sb = document.querySelector('.sidebar');
+    return !!(sb && sb.classList.contains('collapsed'));
+  }
+  /* 容器内容的「最小内容宽度」：表格用 width:min-content 量一次再还原，得到的是各列
+     min-width 之和，不受容器宽度影响。表格平时是 100% 拉伸的，直接读 scrollWidth 会
+     等于容器宽度，量不出真实需求。读写都在同一帧内完成，中间不让出控制权，不会闪。 */
+  function intrinsicWidthOf(wrap) {
+    const table = wrap.querySelector('table');
+    if (!table) return wrap.scrollWidth;
+    const prev = table.style.width;
+    table.style.width = 'min-content';
+    const w = table.offsetWidth;
+    if (prev) table.style.width = prev; else table.style.removeProperty('width');
+    return w;
+  }
+
   function syncSidebarByCrowding() {
     if (!el || typeof Platform === 'undefined') return;
     if (crowdRaf) cancelAnimationFrame(crowdRaf);
@@ -2117,7 +2144,17 @@ const PlanModule = (() => {
       crowdRaf = 0;
       const wraps = el.querySelectorAll('.table-wrapper, .pl-gantt-scroll');
       let crowded = false;
-      wraps.forEach(w => { if (w.scrollWidth - w.clientWidth > 4) crowded = true; });
+      if (wraps.length) {
+        // 「侧栏展开时」的可用宽度：容器当前宽度，若此刻是收起状态则减去侧栏展/收差值。
+        // 判据因此与侧栏当前状态无关，不会自己把自己的判断前提改掉。
+        const delta = sidebarWidthDelta();
+        const collapsedNow = isSidebarCollapsed();
+        wraps.forEach(w => {
+          const need = intrinsicWidthOf(w);
+          const availWhenExpanded = w.clientWidth - (collapsedNow ? delta : 0);
+          if (need > availWhenExpanded - 8) crowded = true;
+        });
+      }
       try {
         if (crowded) Platform.collapseSidebar && Platform.collapseSidebar();
         else Platform.expandSidebar && Platform.expandSidebar();

@@ -36,6 +36,10 @@ const PlanModule = (() => {
   const RES_KIND_LABELS = { team: '团队', person: '个人' };
   const MEMBER_ROLE_LABELS = { pm: '项目经理', product: '产品经理', system: '系统经理', dev: '研发', test: '测试', design: '设计', other: '其他' };
   const REF_TYPE_LABELS = { requirement: '需求文档', design: '设计文档', test: '测试文档', api: '接口文档', other: '其他' };
+  /* 参考文档 / 交付件（评审阶段 + 提交状态） */
+  const REF_STAGE_LABELS = { TR2: 'TR2', TR3: 'TR3', TR4: 'TR4', TR5: 'TR5', other: '其他' };
+  const REF_DOC_STATUS_LABELS = { pending: '待提交', submitted: '已提交', reviewing: '评审中', passed: '已通过', na: '不适用' };
+  const REF_DOC_STATUS_CLASS = { pending: 'status-planned', submitted: 'status-active', reviewing: 'status-active', passed: 'status-done', na: 'status-hold' };
   /* 遗留问题 / 项目风险（二阶段） */
   const ISSUE_STATUS_LABELS = { pending: '待处理', processing: '处理中', resolved: '已解决', closed: '已关闭' };
   const ISSUE_STATUS_CLASS = { pending: 'status-hold', processing: 'status-active', resolved: 'status-done', closed: 'status-planned' };
@@ -175,6 +179,72 @@ const PlanModule = (() => {
     deepSort(roots);
     return roots;
   }
+  /* ==========================================================
+     通用多层级树工具（项目总览 / WBS任务 / 上市计划 / 参考文档 共用）
+     支持无限层级：1 → 1.1 → 1.1.1 → 1.1.1.1 …
+     ========================================================== */
+  // 取节点显示名（不同板块字段名不同）
+  function nodeLabel(x) { return x.name || x.title || '(未命名)'; }
+  // 按 parentId 组树，返回「树序」平铺结果：[{ item, depth, code, index }]
+  // index = 该项在原数组中的下标（供 data-*-idx 与 syncFormFromDom 定位）
+  function treeOrder(list) {
+    const arr = Array.isArray(list) ? list : [];
+    const idxOf = {};
+    arr.forEach((x, i) => { idxOf[x.id] = i; });
+    const childrenOf = {};
+    const roots = [];
+    arr.forEach(x => {
+      const pid = (x.parentId && x.parentId !== x.id && idxOf[x.parentId] !== undefined) ? x.parentId : '';
+      if (pid) (childrenOf[pid] = childrenOf[pid] || []).push(x);
+      else roots.push(x);
+    });
+    const out = [];
+    const seen = new Set();
+    const walk = (nodes, depth, prefix) => {
+      nodes.forEach((x, k) => {
+        if (seen.has(x.id)) return;          // 防御环引用
+        seen.add(x.id);
+        const code = prefix ? prefix + '.' + (k + 1) : String(k + 1);
+        out.push({ item: x, depth: depth, code: code, index: idxOf[x.id] });
+        walk(childrenOf[x.id] || [], depth + 1, code);
+      });
+    };
+    walk(roots, 0, '');
+    // 兜底：环引用等异常导致未收录的行，按原序追加到末尾，避免"数据在但看不见"
+    arr.forEach((x, i) => {
+      if (!seen.has(x.id)) out.push({ item: x, depth: 0, code: String(out.length + 1), index: i });
+    });
+    return out;
+  }
+  // 某节点的全部后代 id（父级下拉需排除，避免选成自己的子孙形成环）
+  function descendantIds(list, id) {
+    const arr = Array.isArray(list) ? list : [];
+    const set = new Set();
+    const walk = (pid) => {
+      arr.forEach(x => { if (x.parentId === pid && !set.has(x.id)) { set.add(x.id); walk(x.id); } });
+    };
+    walk(id);
+    return set;
+  }
+  // 父级下拉选项（缩进 + 层级编号；排除自身与后代）
+  function parentOptions(list, selfId, selected, topLabel) {
+    const bad = descendantIds(list, selfId);
+    bad.add(selfId);
+    const opts = treeOrder(list).filter(o => !bad.has(o.item.id)).map(o =>
+      `<option value="${esc(o.item.id)}" ${o.item.id === selected ? 'selected' : ''}>${esc('　'.repeat(o.depth) + o.code + ' ' + nodeLabel(o.item))}</option>`
+    ).join('');
+    return `<option value="">${esc(topLabel || '— 顶层 —')}</option>` + opts;
+  }
+  // 删除某行时连带删除其所有后代（树语义），返回新数组
+  function removeWithDescendants(list, idx) {
+    const arr = Array.isArray(list) ? list : [];
+    const target = arr[idx];
+    if (!target) return arr.slice();
+    const kill = descendantIds(arr, target.id);
+    kill.add(target.id);
+    return arr.filter(x => !kill.has(x.id));
+  }
+
   function wbsDepth(plan) {
     // 计算 wbs 编码深度：根=1
     if (!plan || !plan.tasks || !plan.tasks.length) return 1;
@@ -296,12 +366,15 @@ const PlanModule = (() => {
   function renderDetailReferences(plan) {
     const refs = plan.references || [];
     if (!refs.length) return '';
-    const items = refs.map(r => {
-      const label = `${REF_TYPE_LABELS[r.type] || r.type || ''}`;
+    const MAX = 8;
+    const items = refs.slice(0, MAX).map(r => {
+      const label = REF_STAGE_LABELS[r.stage] || REF_TYPE_LABELS[r.type] || '';
       const link = r.link ? `<a class="pl-ref-link" href="${esc(r.link)}" target="_blank" rel="noopener">${esc(r.title)}</a>` : `<span>${esc(r.title)}</span>`;
-      return `<span class="pl-ref-item"><span class="pl-chip">${esc(label)}</span>${link}${r.note ? `<i class="pl-ref-note">${esc(r.note)}</i>` : ''}</span>`;
+      return `<span class="pl-ref-item">${label ? `<span class="pl-chip">${esc(label)}</span>` : ''}${link}</span>`;
     }).join('');
-    return `<div class="pl-detail-block"><span class="pl-block-label">📎 参考文档</span><div class="pl-ref-list">${items}</div></div>`;
+    const more = refs.length > MAX ? `<span class="pl-ref-more">共 ${refs.length} 项，编辑计划查看全部</span>` : '';
+    const rpd = plan.rpdTemplateUrl ? `<a class="pl-ref-link pl-rpd-inline" href="${esc(plan.rpdTemplateUrl)}" target="_blank" rel="noopener">📚 RPD 模板库 ↗</a>` : '';
+    return `<div class="pl-detail-block"><span class="pl-block-label">📎 交付件</span><div class="pl-ref-list">${items}${more}${rpd}</div></div>`;
   }
   function renderDetailHeader(plan, ms) {
     const wbs = ms.wbs || {};
@@ -355,19 +428,13 @@ const PlanModule = (() => {
     if (stages.length === 0) {
       return `<div class="pl-wrap"><div class="pl-empty"><div class="pl-empty-ic">📋</div><p>暂无项目总览。点击右下角「编辑计划」，在「项目总览」标签页维护 8 阶段大纲。</p></div></div>`;
     }
-    const idToSeq = {}; let topSeq = 0;
-    stages.forEach(s => { if (!s.parentId) { topSeq++; idToSeq[s.id] = topSeq; } });
-    const subSeq = {};
-    const rows = stages.map(s => {
-      const isChild = !!s.parentId;
-      let seqLabel;
-      if (!isChild) seqLabel = String(idToSeq[s.id]);
-      else { subSeq[s.parentId] = (subSeq[s.parentId] || 0) + 1; seqLabel = (idToSeq[s.parentId] || '') + '.' + subSeq[s.parentId]; }
+    const rows = treeOrder(stages).map(o => {
+      const s = o.item, d = o.depth;
       const pct = Number(s.progress || 0);
       return `
-      <tr class="${isChild ? 'pl-ov-child' : 'pl-ov-parent'}">
-        <td class="pl-ov-seq">${seqLabel}</td>
-        <td class="txt" style="${isChild ? 'padding-left:26px' : 'font-weight:600'}">${esc(s.name)}</td>
+      <tr data-depth="${d}">
+        <td class="pl-ov-seq">${o.code}</td>
+        <td class="txt" style="padding-left:${6 + d * 20}px${d ? '' : ';font-weight:600'}">${esc(s.name)}</td>
         <td class="txt">${esc(s.owner || '—')}</td>
         <td class="txt">${esc(fmtDate(s.startDate))}</td>
         <td class="txt">${esc(fmtDate(s.endDate))}</td>
@@ -788,8 +855,45 @@ const PlanModule = (() => {
   function blankMember() {
     return { id: 'mb-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: '', role: 'dev', dept: '', duty: '', contact: '' };
   }
-  function blankReference() {
-    return { id: 'rf-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), title: '', type: 'requirement', link: '', note: '' };
+  // 参考文档/交付件：支持多层级(parentId)，字段对齐部门交付件清单
+  function blankReference(parentId) {
+    return { id: 'rf-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), parentId: parentId || '', title: '', stage: 'TR2', dept: '', owner: '', date: '', status: 'pending', requirement: '', link: '', note: '', type: 'requirement' };
+  }
+  /* VRC 版本项目交付时的标准交付件清单模板（支持用户增删改；层级用 subs 表达） */
+  const REF_DOC_TEMPLATE = [
+    { title: '产品规格书/需求规格说明书', stage: 'TR2', dept: '系统工程师' },
+    { title: '项目任务书', stage: 'other', dept: '项目经理' },
+    { title: '立项材料', stage: 'other', dept: '项目经理', subs: [
+      { title: '立项评审汇报材料', stage: 'other', dept: '项目经理' },
+      { title: '立项评审会议纪要', stage: 'other', dept: '项目经理' }
+    ] },
+    { title: '系统方案设计报告/系统方案设计说明书', stage: 'TR2', dept: '系统工程师' },
+    { title: '【系统部内控】系统方案准出checklist', stage: 'TR2', dept: '系统工程师' },
+    { title: '知识产权分析与计划', stage: 'other', dept: '系统工程师' },
+    { title: '测试方案/软件测试方案', stage: 'TR3', dept: '智慧能源TSE' },
+    { title: '【智慧能源测试部内控】测试方案准出checklist', stage: 'TR3', dept: '智慧能源TSE' },
+    { title: '【研发内控】代码安全检查报告', stage: 'TR4', dept: '软件工程师' },
+    { title: '【应用软件】软件测试用例', stage: 'TR4', dept: '测试代表' },
+    { title: '【应用软件】前端软件详细设计', stage: 'TR4', dept: '软件工程师' },
+    { title: '【应用软件】接口软件详细设计', stage: 'TR4', dept: '软件工程师' },
+    { title: '【应用软件】数据软件详细设计', stage: 'TR4', dept: '软件工程师' },
+    { title: '【应用软件】算法软件详细设计', stage: 'TR4', dept: '软件工程师' },
+    { title: '【应用软件】软件测试报告', stage: 'TR4', dept: '智慧能源测试代表' },
+    { title: 'TR5结项材料', stage: 'TR5', dept: '项目经理', subs: [
+      { title: 'TR5技术评审汇报', stage: 'TR5', dept: '项目经理' },
+      { title: 'TR5技术评审会议纪要', stage: 'TR5', dept: '项目经理' }
+    ] }
+  ];
+  function seedReferenceDocs() {
+    const out = [];
+    const push = (def, parentId) => {
+      const r = blankReference(parentId);
+      r.title = def.title; r.stage = def.stage || 'other'; r.dept = def.dept || '';
+      out.push(r);
+      (def.subs || []).forEach(sub => push(sub, r.id));
+    };
+    REF_DOC_TEMPLATE.forEach(def => push(def, ''));
+    return out;
   }
 
   /* ==========================================================
@@ -882,6 +986,8 @@ const PlanModule = (() => {
       references: (p && p.references ? p.references : []).map(r => ({ ...r })),
       // 项目总览：新建计划时自动初始化标准 8 阶段（含测试计划的 6 条固定子流程）；编辑时保留原有大纲，若为空也补一版
       overview: (p && p.overview && p.overview.length ? p.overview.map(o => ({ ...o })) : seedOverviewStages()),
+      // RPD 规范文档模板库链接（部门知识库，可自定义）
+      rpdTemplateUrl: (p && p.rpdTemplateUrl) || '',
       // 二阶段占位板块：上市计划 / 遗留问题 / 项目风险（一阶段仅预留数据字段，页面占位）
       marketPlan: (p && p.marketPlan ? p.marketPlan : []).map(x => ({ ...x })),
       issues: (p && p.issues ? p.issues : []).map(x => ({ ...x })),
@@ -890,23 +996,19 @@ const PlanModule = (() => {
     };
   }
 
-  function taskOptions(draft, selectedId, selfId) {
-    // 供选择父任务；排除自身，避免自引用
-    return draft.tasks.filter(t => t.id !== selfId).map(t => {
-      const label = (t.wbsCode ? t.wbsCode + ' ' : '') + (t.name || '(未命名任务)');
-      return `<option value="${esc(t.id)}" ${t.id === selectedId ? 'selected' : ''}>${esc(label)}</option>`;
-    }).join('');
-  }
-  function taskNameOf(draft, id) { const t = draft.tasks.find(x => x.id === id); return t ? t.name : ''; }
+  /* 父任务下拉已统一改用通用 parentOptions（带缩进层级编号 + 排除后代防成环） */
 
   function renderFormTasks(draft) {
     if (!draft.tasks.length) {
       return `<div class="pl-empty pl-empty-sm"><div class="pl-empty-ic">🌳</div><p>暂无任务，点击「添加任务」</p></div>`;
     }
-    // WBS 编码在保存时由 buildWbsCodes 依据「父任务」层级自动生成，无需手填，故不展示 WBS 列
-    const rows = draft.tasks.map((t, i) => `
-      <tr data-task-idx="${i}">
-        <td><input class="pl-f-name" data-f="name" value="${esc(t.name)}" placeholder="任务名称"></td>
+    // 按树序展示（支持无限层级），层级编号由 treeOrder 计算，保存时 buildWbsCodes 再写入 wbsCode
+    const rows = treeOrder(draft.tasks).map(o => {
+      const t = o.item, i = o.index, d = o.depth;
+      return `
+      <tr data-task-idx="${i}" data-depth="${d}">
+        <td class="pl-ov-seq">${o.code}</td>
+        <td><input class="pl-f-name" data-f="name" value="${esc(t.name)}" placeholder="任务名称" style="margin-left:${d * 20}px${d ? '' : ';font-weight:600'}"></td>
         <td><select data-f="type">${Object.keys(TASK_TYPE_LABELS).map(k => `<option value="${k}" ${t.type === k ? 'selected' : ''}>${TASK_TYPE_LABELS[k]}</option>`).join('')}</select></td>
         <td><select data-f="status">${Object.keys(TASK_STATUS_LABELS).map(k => `<option value="${k}" ${t.status === k ? 'selected' : ''}>${TASK_STATUS_LABELS[k]}</option>`).join('')}</select></td>
         <td><select data-f="priority">${Object.keys(PRIORITY_LABELS).map(k => `<option value="${k}" ${t.priority === k ? 'selected' : ''}>${PRIORITY_LABELS[k]}</option>`).join('')}</select></td>
@@ -916,15 +1018,16 @@ const PlanModule = (() => {
         <td><input type="number" data-f="progress" value="${esc(t.progress)}" placeholder="0-100" min="0" max="100"></td>
         <td><input type="date" data-f="startDate" value="${esc(t.startDate)}"></td>
         <td><input type="date" data-f="endDate" value="${esc(t.endDate)}"></td>
-        <td><select data-f="parentId" class="pl-f-parent"><option value="">— 顶层 —</option>${taskOptions(draft, t.parentId, t.id)}</select></td>
+        <td><select data-f="parentId" class="pl-f-parent">${parentOptions(draft.tasks, t.id, t.parentId, '— 顶层 —')}</select></td>
         <td><input data-f="deps" value="${esc((t.dependencies || []).join(', '))}" placeholder="依赖任务WBS"></td>
-        <td><button type="button" class="cs-del-btn pl-del-task" data-del-task="${i}" title="删除">✕</button></td>
-      </tr>`);
+        <td><button type="button" class="cs-del-btn pl-del-task" data-del-task="${i}" title="删除（连带子任务）">✕</button></td>
+      </tr>`;
+    }).join('');
     return `<div class="table-wrapper pl-form-table-wrap"><table class="data-table pl-form-table"><thead><tr>
-        <th class="txt" style="min-width:200px">任务名称</th><th>类型</th><th>状态</th><th>优先级</th>
+        <th style="min-width:58px">#</th><th class="txt" style="min-width:200px">任务名称</th><th>类型</th><th>状态</th><th>优先级</th>
         <th class="txt">负责人</th><th class="txt">主责部门</th><th style="min-width:70px">人天</th><th style="min-width:60px">进度%</th>
-        <th class="txt">开始</th><th class="txt">结束</th><th class="txt">父任务</th><th class="txt">依赖</th><th></th>
-      </tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+        <th class="txt">开始</th><th class="txt">结束</th><th class="txt" style="min-width:170px">父任务</th><th class="txt">依赖</th><th></th>
+      </tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
   function renderFormResources(draft) {
@@ -975,18 +1078,75 @@ const PlanModule = (() => {
   }
 
   function renderFormReferences(draft) {
-    if (!draft.references.length) {
-      return `<div class="pl-empty pl-empty-sm"><div class="pl-empty-ic">📎</div><p>暂无参考文档，点击「添加文档」</p></div>`;
-    }
-    const rows = draft.references.map((r, i) => `
-      <tr data-ref-idx="${i}">
-        <td><input data-f="title" value="${esc(r.title)}" placeholder="文档名称"></td>
-        <td><select data-f="type">${Object.keys(REF_TYPE_LABELS).map(k => `<option value="${k}" ${r.type === k ? 'selected' : ''}>${REF_TYPE_LABELS[k]}</option>`).join('')}</select></td>
-        <td><input data-f="link" value="${esc(r.link)}" placeholder="链接 / 路径"></td>
-        <td><input data-f="note" value="${esc(r.note)}" placeholder="说明"></td>
-        <td><button type="button" class="cs-del-btn pl-del-ref" data-del-ref="${i}" title="删除">✕</button></td>
-      </tr>`);
-    return `<div class="table-wrapper"><table class="data-table"><thead><tr><th class="txt" style="min-width:190px">文档名称</th><th>类型</th><th class="txt" style="min-width:220px">链接/路径</th><th class="txt">说明</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+    const list = draft.references || [];
+    const rows = treeOrder(list).map(o => {
+      const r = o.item, i = o.index, d = o.depth;
+      return `
+      <tr data-ref-idx="${i}" data-depth="${d}">
+        <td class="pl-ov-seq">${o.code}</td>
+        <td><input data-f="title" value="${esc(r.title)}" placeholder="${d ? '子项名称' : '交付产物'}" style="margin-left:${d * 20}px${d ? '' : ';font-weight:600'}"></td>
+        <td><select data-f="stage">${Object.keys(REF_STAGE_LABELS).map(k => `<option value="${k}" ${r.stage === k ? 'selected' : ''}>${REF_STAGE_LABELS[k]}</option>`).join('')}</select></td>
+        <td><input data-f="dept" value="${esc(r.dept)}" placeholder="责任部门/人"></td>
+        <td><input data-f="owner" value="${esc(r.owner)}" placeholder="提交人员"></td>
+        <td><input type="date" data-f="date" value="${esc(r.date)}"></td>
+        <td><select data-f="status">${Object.keys(REF_DOC_STATUS_LABELS).map(k => `<option value="${k}" ${r.status === k ? 'selected' : ''}>${REF_DOC_STATUS_LABELS[k]}</option>`).join('')}</select></td>
+        <td><textarea data-f="requirement" rows="2" placeholder="评审要求（必选/可选及范围）">${esc(r.requirement)}</textarea></td>
+        <td><input data-f="link" value="${esc(r.link)}" placeholder="模板/文档链接"></td>
+        <td><select data-f="parentId">${parentOptions(list, r.id, r.parentId, '— 顶层 —')}</select></td>
+        <td><button type="button" class="cs-del-btn pl-del-ref" data-del-ref="${i}" title="删除（连带子项）">✕</button></td>
+      </tr>`;
+    }).join('');
+    const table = list.length ? `
+      <div class="table-wrapper pl-ref-table-wrap">
+        <table class="data-table pl-ref-table">
+          <thead><tr>
+            <th style="min-width:58px">#</th>
+            <th class="txt" style="min-width:240px">交付产物</th>
+            <th style="min-width:88px">评审阶段</th>
+            <th class="txt" style="min-width:130px">责任部门(人)</th>
+            <th class="txt" style="min-width:110px">提交人员</th>
+            <th class="txt" style="min-width:150px">提交日期</th>
+            <th style="min-width:110px">状态</th>
+            <th class="txt" style="min-width:200px">评审要求</th>
+            <th class="txt" style="min-width:200px">模板链接</th>
+            <th class="txt" style="min-width:170px">上级</th>
+            <th></th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>` : `<div class="pl-empty pl-empty-sm"><div class="pl-empty-ic">📎</div><p>暂无交付件，点击「一键初始化标准交付件清单」按 VRC 流程生成，或「添加文档」自定义</p></div>`;
+    return `
+    <div class="cs-form-section">
+      ${renderRpdCard(draft)}
+      <div class="cs-form-section-head">
+        <div class="cs-form-section-title">参考文档 / 交付件 <span class="pl-count-pill">${list.filter(r => !r.parentId).length} 项 / ${list.length} 行</span></div>
+        <div class="pl-form-actions">
+          <button type="button" class="btn pl-add-btn" id="plAddReference">＋ 添加文档</button>
+          <button type="button" class="btn" id="plRefSeed">↻ 一键初始化标准交付件清单</button>
+        </div>
+      </div>
+      <div class="pl-form-note">按评审阶段（TR2/TR3/TR4/TR5）梳理项目交付件：责任部门、提交人员、提交日期、状态、评审要求与模板链接。<b>支持无限层级</b>（如「立项材料」下挂汇报材料/会议纪要）。模板为 VRC 版本常用清单，可自由增删改。</div>
+      ${table}
+    </div>`;
+  }
+
+  // RPD 规范文档模板库入口卡片（部门内部知识库链接，可自定义）
+  function renderRpdCard(draft) {
+    const url = draft.rpdTemplateUrl || '';
+    return `
+    <div class="pl-rpd-card">
+      <div class="pl-rpd-main">
+        <span class="pl-rpd-ic">📚</span>
+        <div class="pl-rpd-text">
+          <h4>RPD 规范文档模板库</h4>
+          <p>部门内部项目文档模板与规范知识库，团队可直接查阅各交付件的标准模板样式。</p>
+        </div>
+      </div>
+      <div class="pl-rpd-actions">
+        <input type="url" data-f="rpdTemplateUrl" class="pl-rpd-input" value="${esc(url)}" placeholder="粘贴知识库链接，如 https://alidocs.dingtalk.com/...">
+        <button type="button" class="btn primary" id="plRpdOpen" ${url ? '' : 'disabled'}>打开模板库 ↗</button>
+      </div>
+    </div>`;
   }
 
   /* ---------- 表单 Tab 定义 ---------- */
@@ -1026,23 +1186,15 @@ const PlanModule = (() => {
     </div>`;
   }
 
-  // 项目总览（表单内）：固定 8 阶段大纲，测试计划下挂 6 条固定子流程，可增删改
+  // 项目总览（表单内）：标准 8 阶段大纲，支持无限层级（1 / 1.1 / 1.1.1 …）
   function renderFormOverview(draft) {
     const stages = draft.overview || [];
-    // 计算每个一级阶段的序号 + 子行缩进
-    const idToSeq = {};
-    let topSeq = 0;
-    stages.forEach(s => { if (!s.parentId) { topSeq++; idToSeq[s.id] = topSeq; } });
-    const subSeq = {};
-    const rows = stages.map((s, i) => {
-      const isChild = !!s.parentId;
-      let seqLabel;
-      if (!isChild) seqLabel = String(idToSeq[s.id]);
-      else { subSeq[s.parentId] = (subSeq[s.parentId] || 0) + 1; seqLabel = (idToSeq[s.parentId] || '') + '.' + subSeq[s.parentId]; }
+    const rows = treeOrder(stages).map(o => {
+      const s = o.item, i = o.index, d = o.depth;
       return `
-      <tr data-ov-idx="${i}" class="${isChild ? 'pl-ov-child' : 'pl-ov-parent'}">
-        <td class="pl-ov-seq">${seqLabel}</td>
-        <td><input data-f="name" value="${esc(s.name)}" placeholder="${isChild ? '子流程名称' : '阶段名称'}" style="${isChild ? 'margin-left:22px' : 'font-weight:600'}"></td>
+      <tr data-ov-idx="${i}" data-depth="${d}">
+        <td class="pl-ov-seq">${o.code}</td>
+        <td><input data-f="name" value="${esc(s.name)}" placeholder="${d ? '子项名称' : '阶段名称'}" style="margin-left:${d * 20}px${d ? '' : ';font-weight:600'}"></td>
         <td><input data-f="owner" value="${esc(s.owner)}" placeholder="负责人"></td>
         <td><input type="date" data-f="startDate" value="${esc(s.startDate)}"></td>
         <td><input type="date" data-f="endDate" value="${esc(s.endDate)}"></td>
@@ -1050,16 +1202,18 @@ const PlanModule = (() => {
         <td><input type="number" data-f="progress" value="${esc(s.progress)}" min="0" max="100" placeholder="0-100"></td>
         <td><input data-f="deliverable" value="${esc(s.deliverable)}" placeholder="交付物"></td>
         <td><input data-f="note" value="${esc(s.note)}" placeholder="备注"></td>
-        <td><button type="button" class="cs-del-btn pl-del-ov" data-del-ov="${i}" title="删除">✕</button></td>
+        <td><select data-f="parentId" class="pl-f-parent">${parentOptions(stages, s.id, s.parentId, '— 顶层阶段 —')}</select></td>
+        <td><button type="button" class="cs-del-btn pl-del-ov" data-del-ov="${i}" title="删除（连带子项）">✕</button></td>
       </tr>`;
     }).join('');
     const body = stages.length ? `
       <div class="table-wrapper pl-ov-table-wrap">
         <table class="data-table pl-ov-table">
           <thead><tr>
-            <th style="min-width:44px">#</th><th class="txt" style="min-width:170px">阶段 / 子流程</th><th class="txt">负责人</th>
+            <th style="min-width:58px">#</th><th class="txt" style="min-width:190px">阶段 / 子项</th><th class="txt">负责人</th>
             <th class="txt">开始</th><th class="txt">结束</th><th>状态</th><th style="min-width:70px">进度%</th>
-            <th class="txt" style="min-width:150px">交付物</th><th class="txt" style="min-width:140px">备注</th><th></th>
+            <th class="txt" style="min-width:150px">交付物</th><th class="txt" style="min-width:140px">备注</th>
+            <th class="txt" style="min-width:170px">上级</th><th></th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
@@ -1067,13 +1221,13 @@ const PlanModule = (() => {
     return `
     <div class="cs-form-section">
       <div class="cs-form-section-head">
-        <div class="cs-form-section-title">项目总览 <span class="pl-count-pill">${stages.filter(s => !s.parentId).length} 阶段</span></div>
+        <div class="cs-form-section-title">项目总览 <span class="pl-count-pill">${stages.filter(s => !s.parentId).length} 阶段 / ${stages.length} 行</span></div>
         <div class="pl-form-actions">
           <button type="button" class="btn pl-add-btn" id="plAddStage">＋ 添加阶段</button>
           <button type="button" class="btn" id="plOvReset">↻ 重置为标准 8 阶段</button>
         </div>
       </div>
-      <div class="pl-form-note">项目级大纲：标准 8 阶段（测试计划内置 6 条固定子流程）。新建计划自动带出，可调整负责人/起止/状态/进度，也可增删阶段。</div>
+      <div class="pl-form-note">项目级大纲：默认标准 8 阶段（测试计划内置 6 条子流程）。<b>支持无限层级</b>——用「上级」下拉把任意行挂到别的行下面，可形成 1 / 1.1 / 1.1.1 …；删除某行会连带删除其子项。</div>
       ${body}
     </div>`;
   }
@@ -1221,13 +1375,6 @@ const PlanModule = (() => {
   /* ---------- 上市计划 Tab（树形：阶段 + 子任务） ---------- */
   function renderFormMarket(draft) {
     const list = draft.marketPlan || [];
-    // 阶段序号与子任务编号
-    const idToSeq = {}; let topSeq = 0;
-    list.forEach(x => { if (!x.parentId) { topSeq++; idToSeq[x.id] = topSeq; } });
-    const subSeq = {};
-    // 父任务下拉（仅一级阶段可作为父）
-    const stageOptions = (selected, selfId) => list.filter(x => !x.parentId && x.id !== selfId)
-      .map(x => `<option value="${esc(x.id)}" ${x.id === selected ? 'selected' : ''}>${esc(x.name || '(未命名阶段)')}</option>`).join('');
     const body = list.length ? `
       <div class="table-wrapper pl-market-table-wrap">
         <table class="data-table pl-market-table">
@@ -1242,22 +1389,19 @@ const PlanModule = (() => {
             <th class="txt" style="min-width:150px">所属阶段</th>
             <th></th>
           </tr></thead>
-          <tbody>${list.map((x, i) => {
-            const isChild = !!x.parentId;
-            let seqLabel;
-            if (!isChild) seqLabel = String(idToSeq[x.id]);
-            else { subSeq[x.parentId] = (subSeq[x.parentId] || 0) + 1; seqLabel = (idToSeq[x.parentId] || '') + '.' + subSeq[x.parentId]; }
+          <tbody>${treeOrder(list).map(o => {
+            const x = o.item, i = o.index, d = o.depth;
             return `
-            <tr data-market-idx="${i}" class="${isChild ? 'pl-mk-child' : 'pl-mk-parent'}">
-              <td class="pl-ov-seq">${seqLabel}</td>
-              <td><input data-f="name" value="${esc(x.name)}" placeholder="${isChild ? '子任务名称' : '阶段名称'}" style="${isChild ? 'margin-left:22px' : 'font-weight:600'}"></td>
+            <tr data-market-idx="${i}" data-depth="${d}">
+              <td class="pl-ov-seq">${o.code}</td>
+              <td><input data-f="name" value="${esc(x.name)}" placeholder="${d ? '子任务名称' : '阶段名称'}" style="margin-left:${d * 20}px${d ? '' : ';font-weight:600'}"></td>
               <td><input type="date" data-f="startDate" value="${esc(x.startDate)}"></td>
               <td><input type="date" data-f="endDate" value="${esc(x.endDate)}"></td>
               <td><input data-f="owner" value="${esc(x.owner)}" placeholder="执行人"></td>
               <td><select data-f="status">${Object.keys(TASK_STATUS_LABELS).map(k => `<option value="${k}" ${x.status === k ? 'selected' : ''}>${TASK_STATUS_LABELS[k]}</option>`).join('')}</select></td>
               <td><input data-f="note" value="${esc(x.note)}" placeholder="备注"></td>
-              <td><select data-f="parentId"><option value="">— 阶段(顶层) —</option>${stageOptions(x.parentId, x.id)}</select></td>
-              <td><button type="button" class="cs-del-btn pl-del-market" data-del-market="${i}" title="删除">✕</button></td>
+              <td><select data-f="parentId">${parentOptions(list, x.id, x.parentId, '— 阶段(顶层) —')}</select></td>
+              <td><button type="button" class="cs-del-btn pl-del-market" data-del-market="${i}" title="删除（连带子项）">✕</button></td>
             </tr>`;
           }).join('')}</tbody>
         </table>
@@ -1271,7 +1415,7 @@ const PlanModule = (() => {
           <button type="button" class="btn" id="plMarketSeed">↻ 一键初始化标准上市计划</button>
         </div>
       </div>
-      <div class="pl-form-note">上市全流程阶段化管理：上市策略 → 上市计划 → 上市准备 → 产品试销 → 产品上线。可用「所属阶段」把任务挂到某个阶段下形成两级结构。</div>
+      <div class="pl-form-note">上市全流程阶段化管理：上市策略 → 上市计划 → 上市准备 → 产品试销 → 产品上线。<b>支持无限层级</b>——用「所属阶段」把任务挂到任意行下面；删除某行会连带删除其子项。</div>
       ${body}
     </div>`;
   }
@@ -1541,6 +1685,9 @@ const PlanModule = (() => {
       if (!x) return;
       row.querySelectorAll('[data-f]').forEach(inp => { x[inp.getAttribute('data-f')] = inp.value; });
     });
+    // RPD 模板库链接（不在 .cs-field 内，单独收集）
+    const rpd = el.querySelector('.pl-rpd-input[data-f="rpdTemplateUrl"]');
+    if (rpd) dirtyForm.rpdTemplateUrl = rpd.value.trim();
   }
 
   function validateDraft() {
@@ -1592,13 +1739,15 @@ const PlanModule = (() => {
       ...m, name: String(m.name).trim(), role: m.role || 'other'
     }));
     const references = (dirtyForm.references || []).filter(r => r.title && String(r.title).trim()).map(r => ({
-      ...r, title: String(r.title).trim(), type: r.type || 'other'
+      ...r, title: String(r.title).trim(), type: r.type || 'other',
+      parentId: r.parentId || '', stage: r.stage || 'other', status: r.status || 'pending'
     }));
     const plan = {
       id: dirtyForm.id, name: String(dirtyForm.name).trim(), year: Number(dirtyForm.year) || new Date().getFullYear(),
       status: dirtyForm.status || 'draft', owner: dirtyForm.owner || '', projectId: dirtyForm.projectId || '',
       projectName: dirtyForm.projectName || '', startDate: dirtyForm.startDate || '', endDate: dirtyForm.endDate || '',
       description: dirtyForm.description || '',
+      rpdTemplateUrl: dirtyForm.rpdTemplateUrl || '',
       overview: (dirtyForm.overview || []).filter(s => s.name && String(s.name).trim()).map(s => ({
         ...s, name: String(s.name).trim(), progress: Math.max(0, Math.min(100, Math.round(num(s.progress)))), status: s.status || 'not-started', parentId: s.parentId || ''
       })),
@@ -1748,7 +1897,27 @@ const PlanModule = (() => {
     el.querySelector('#plAddMilestone')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.milestones.push(blankMilestone()); renderFormTabBody(); });
     el.querySelector('#plAddResource')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.resources.push(blankResource()); renderFormTabBody(); });
     el.querySelector('#plAddMember')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.members.push(blankMember()); renderFormTabBody(); });
-    el.querySelector('#plAddReference')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.references.push(blankReference()); renderFormTabBody(); });
+    el.querySelector('#plAddReference')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.references.push(blankReference('')); renderFormTabBody(); });
+    // 一键初始化标准交付件清单（VRC 常用）
+    el.querySelector('#plRefSeed')?.addEventListener('click', () => {
+      const doSeed = () => { dirtyForm.references = seedReferenceDocs(); renderFormTabBody(); };
+      if ((dirtyForm.references || []).length) {
+        SharedUI.confirm('初始化交付件清单', '<p>确认用 VRC 标准交付件清单覆盖当前内容？</p>', doSeed, { confirmText: '覆盖', confirmClass: 'danger' });
+      } else { doSeed(); }
+    });
+    // 打开 RPD 模板库
+    el.querySelector('#plRpdOpen')?.addEventListener('click', () => {
+      syncFormFromDom();
+      const url = (dirtyForm.rpdTemplateUrl || '').trim();
+      if (!url) { SharedUI.toast('请先填写 RPD 模板库链接', 'warning'); return; }
+      if (!/^https?:\/\//i.test(url)) { SharedUI.toast('链接需以 http:// 或 https:// 开头', 'warning'); return; }
+      window.open(url, '_blank', 'noopener');
+    });
+    // 链接填写后即时启用/禁用「打开」按钮
+    el.querySelector('.pl-rpd-input')?.addEventListener('input', (e) => {
+      const btn = el.querySelector('#plRpdOpen');
+      if (btn) btn.disabled = !e.target.value.trim();
+    });
     el.querySelector('#plAddStage')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.overview.push(blankStage('')); renderFormTabBody(); });
     el.querySelector('#plAddIssue')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.issues.push(blankIssue()); renderFormTabBody(); });
     el.querySelector('#plAddRisk')?.addEventListener('click', () => { syncFormFromDom(); dirtyForm.risks.push(blankRisk()); renderFormTabBody(); });
@@ -1770,15 +1939,15 @@ const PlanModule = (() => {
     // WBS 从需求清单导入
     el.querySelector('#plImportReq')?.addEventListener('click', () => { syncFormFromDom(); openRequirementImport(); });
     // 删除行
-    el.querySelectorAll('.pl-del-task').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.tasks.splice(Number(btn.getAttribute('data-del-task')), 1); renderFormTabBody(); }));
+    el.querySelectorAll('.pl-del-task').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.tasks = removeWithDescendants(dirtyForm.tasks, Number(btn.getAttribute('data-del-task'))); renderFormTabBody(); }));
     el.querySelectorAll('.pl-del-ms').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.milestones.splice(Number(btn.getAttribute('data-del-ms')), 1); renderFormTabBody(); }));
     el.querySelectorAll('.pl-del-res').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.resources.splice(Number(btn.getAttribute('data-del-res')), 1); renderFormTabBody(); }));
     el.querySelectorAll('.pl-del-member').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.members.splice(Number(btn.getAttribute('data-del-member')), 1); renderFormTabBody(); }));
-    el.querySelectorAll('.pl-del-ref').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.references.splice(Number(btn.getAttribute('data-del-ref')), 1); renderFormTabBody(); }));
-    el.querySelectorAll('.pl-del-ov').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.overview.splice(Number(btn.getAttribute('data-del-ov')), 1); renderFormTabBody(); }));
+    el.querySelectorAll('.pl-del-ref').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.references = removeWithDescendants(dirtyForm.references, Number(btn.getAttribute('data-del-ref'))); renderFormTabBody(); }));
+    el.querySelectorAll('.pl-del-ov').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.overview = removeWithDescendants(dirtyForm.overview, Number(btn.getAttribute('data-del-ov'))); renderFormTabBody(); }));
     el.querySelectorAll('.pl-del-issue').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.issues.splice(Number(btn.getAttribute('data-del-issue')), 1); renderFormTabBody(); }));
     el.querySelectorAll('.pl-del-risk').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.risks.splice(Number(btn.getAttribute('data-del-risk')), 1); renderFormTabBody(); }));
-    el.querySelectorAll('.pl-del-market').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.marketPlan.splice(Number(btn.getAttribute('data-del-market')), 1); renderFormTabBody(); }));
+    el.querySelectorAll('.pl-del-market').forEach(btn => btn.addEventListener('click', () => { syncFormFromDom(); dirtyForm.marketPlan = removeWithDescendants(dirtyForm.marketPlan, Number(btn.getAttribute('data-del-market'))); renderFormTabBody(); }));
   }
   function bindTabEvents() {
     if (!el) return;

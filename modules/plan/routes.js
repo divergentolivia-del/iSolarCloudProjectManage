@@ -29,6 +29,8 @@ const VALID_RES_KIND = ['team', 'person'];
 const VALID_ISSUE_STATUS = ['pending', 'processing', 'resolved', 'closed'];
 const VALID_RISK_TYPE = ['tech', 'market', 'quality', 'schedule', 'resource', 'other'];
 const VALID_RISK_STATUS = ['occurring', 'watching', 'mitigated', 'closed'];
+const VALID_REF_STAGE = ['TR2', 'TR3', 'TR4', 'TR5', 'other'];
+const VALID_REF_DOC_STATUS = ['pending', 'submitted', 'reviewing', 'passed', 'na'];
 
 /* 空状态模板 */
 const EMPTY_STATE = {
@@ -165,13 +167,22 @@ function validateState(next) {
         }
       }
 
-      // 参考文档校验（新增板块，弱约束：数组 + 每项有 id）
+      // 参考文档 / 交付件校验（支持多层级 parentId；阶段/状态/日期在提供时校验，兼容历史数据）
       if (p.references != null) {
         if (!Array.isArray(p.references)) return `计划 "${p.id}" references 必须为数组`;
+        const rfIds = new Set();
         for (const rf of p.references) {
           if (!rf.id || typeof rf.id !== 'string') return `计划 "${p.id}" 参考文档必须有 id`;
+          if (rfIds.has(rf.id)) return `计划 "${p.id}" 参考文档 ID 重复: ${rf.id}`;
+          rfIds.add(rf.id);
+          if (rf.stage && !VALID_REF_STAGE.includes(rf.stage)) return `交付件 "${rf.id}" 评审阶段无效: "${rf.stage}"`;
+          if (rf.status && !VALID_REF_DOC_STATUS.includes(rf.status)) return `交付件 "${rf.id}" 状态无效: "${rf.status}"`;
+          if (rf.date && !isValidDate(rf.date)) return `交付件 "${rf.id}" 提交日期必须为 YYYY-MM-DD`;
         }
       }
+
+      // RPD 模板库链接
+      if (p.rpdTemplateUrl != null && typeof p.rpdTemplateUrl !== 'string') return `计划 "${p.id}" rpdTemplateUrl 必须为字符串`;
 
       // 项目总览校验（固定阶段大纲，独立于 tasks；弱约束：数组 + 每项有 id + 进度/状态合法）
       if (p.overview != null) {

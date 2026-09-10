@@ -1,11 +1,13 @@
 /* modules/tb/routes.js — Teambition 同步模块服务端路由
    端点：
-     GET  /api/tb/config   — 返回看板模板元数据（团队/迭代/维度，不含 token）+ token 是否已配置
+     GET  /api/tb/config   — 返回看板模板元数据（团队/迭代/维度，不含凭据）+ 凭据是否已配置
+     GET  /api/tb/sprints  — 拉取项目下的迭代列表（供前端下拉选择，替代手填 sprintId）
      POST /api/tb/sync     — 触发同步，写入 iteration state，返回统计
      GET  /api/tb/status   — 返回上次同步的统计（data/tb/state.json）
 
-   ⚠️ User Token 来源优先级：环境变量 TB_TOKEN > data/tb/secret.json 的 { "token": "..." }。
-      两者都不进 git。前端永远拿不到 token 明文。
+   ⚠️ 凭据来源优先级：环境变量 > data/tb/secret.json。
+      应用凭据（appId/appSecret/tenantId/operatorId）优先，缺失时回退 User Token。
+      两者都不进 git。前端永远拿不到凭据明文。
 */
 
 'use strict';
@@ -15,6 +17,7 @@ const path = require('path');
 
 const tbConfig = require('../../tb-config');
 const tbSync = require('./sync');
+const tbClient = require('./client');
 const audit = require('../../audit');
 
 /* 数据目录 */
@@ -44,16 +47,20 @@ function sendJson(res, code, obj) {
   res.end(JSON.stringify(obj));
 }
 
-/** 读取 User Token：环境变量优先，其次密钥文件 */
+/** 读取 TB 凭据（应用凭据优先，缺失时回退 User Token）。实际解析逻辑在 client.js */
+function readCredentials() {
+  return tbClient.readCredentials();
+}
+
+/** 兼容旧调用：返回可用的 User Token（应用模式下可能为空，仅用于 /config 展示判断） */
 function readToken() {
-  const envTok = (process.env.TB_TOKEN || '').trim();
-  if (envTok) return envTok;
-  try {
-    const j = JSON.parse(fs.readFileSync(SECRET_FILE, 'utf8'));
-    return String(j.token || j.userToken || '').trim();
-  } catch (e) {
-    return '';
-  }
+  const c = readCredentials();
+  return c.mode === 'user' ? c.userToken : '';
+}
+
+/** 凭据是否可用（应用凭据齐全 或 有 User Token） */
+function hasCredentials() {
+  return readCredentials().mode !== 'none';
 }
 
 /** 原子写文件 */
@@ -172,11 +179,15 @@ module.exports = {
 
   ensureData() {
     ensureDir(TB_DIR);
-    // 若无密钥文件，写一个占位模板（不含真实 token），提醒用户填写
-    if (!fs.existsSync(SECRET_FILE) && !(process.env.TB_TOKEN || '').trim()) {
+    // 若无密钥文件，写一个占位模板（不含真实凭据），提醒用户填写
+    if (!fs.existsSync(SECRET_FILE) && readCredentials().mode === 'none') {
       try {
         writeJsonAtomic(SECRET_FILE, {
-          _comment: '把 TB User Token 填到 token 字段。本文件已 .gitignore，不会提交。也可改用环境变量 TB_TOKEN。',
+          _comment: '推荐用应用凭据：填 appId/appSecret/tenantId/operatorId（TB 后台创建企业内部应用后获得）。也可回退填 token（User Token）。本文件已 .gitignore，不会提交。环境变量 TB_APP_ID / TB_APP_SECRET / TB_TENANT_ID / TB_OPERATOR_ID / TB_TOKEN 可覆盖。',
+          appId: '',
+          appSecret: '',
+          tenantId: '',
+          operatorId: '',
           token: ''
         });
       } catch (e) { /* 忽略 */ }
@@ -187,8 +198,9 @@ module.exports = {
     const pathname = u.pathname || '';
     const sub = pathname.replace('/api/tb', '');
 
-    /* GET /api/tb/config — 看板模板元数据（脱敏，不含 token） */
+    /* GET /api/tb/config — 看板模板元数据（脱敏，不含凭据） */
     if (sub === '/config' && req.method === 'GET') {
+      const cred = readCredentials();
       const boards = Object.keys(tbConfig.TB_BOARDS).map(k => {
         const b = tbConfig.TB_BOARDS[k];
         return {
@@ -205,10 +217,57 @@ module.exports = {
       });
       return sendJson(res, 200, {
         projectId: tbConfig.TB_PROJECT_ID,
-        tokenConfigured: !!readToken(),
+        // authMode: app=应用凭据 / user=User Token / none=未配置
+        authMode: cred.mode,
+        tokenConfigured: cred.mode !== 'none',
+        operatorConfigured: !!cred.operatorId,
         sprintMap: readSprintMap(),
         boards: boards
       });
+    }
+
+    /* GET /api/tb/sprints — 拉取项目下的迭代列表（供前端下拉选择）
+       query: projectId?（默认用 tb-config 的 TB_PROJECT_ID）、status?（future/active/complete）
+       返回：[{ id, name, status, startDate, dueDate, accomplished }]，按时间倒序 */
+    if (sub === '/sprints' && req.method === 'GET') {
+      const cred = readCredentials();
+      if (cred.mode === 'none') {
+        return sendJson(res, 400, { error: '未配置 TB 凭据，无法拉取迭代列表。' });
+      }
+      // ⚠️ u 来自 url.parse(req.url, true)，query 在 u.query（没有 searchParams）
+      const q = u.query || {};
+      const projectId = (String(q.projectId || '').trim() || tbConfig.TB_PROJECT_ID || '').trim();
+      const status = String(q.status || '').trim();
+      tbClient.listSprints(projectId, { status: status || undefined }, cred)
+        .then(list => {
+          const rows = list.map(s => ({
+            id: s.id || s.sprintId || '',
+            name: s.name || '',
+            status: s.status || '',
+            startDate: s.startDate || null,
+            dueDate: s.dueDate || null,
+            accomplished: s.accomplished || null
+          })).filter(r => r.id)
+            // 排序：未完成/进行中优先（future=未开始，active=进行中），组内按开始时间倒序。
+            // ⚠️ 不能只按 startDate 排：部分迭代 startDate 为 null，会被挤到最后。
+            .sort((a, b) => {
+              const rank = s => (s === 'active' ? 0 : s === 'future' ? 1 : 2);
+              const ra = rank(a.status), rb = rank(b.status);
+              if (ra !== rb) return ra - rb;
+              const ta = String(a.startDate || a.dueDate || '');
+              const tb = String(b.startDate || b.dueDate || '');
+              return tb.localeCompare(ta);
+            });
+          return sendJson(res, 200, { ok: true, projectId: projectId, count: rows.length, sprints: rows });
+        })
+        .catch(e => {
+          const detail = e.body ? (' | ' + JSON.stringify(e.body).slice(0, 300)) : '';
+          return sendJson(res, 502, {
+            error: '拉取迭代列表失败: ' + e.message + detail,
+            statusCode: e.statusCode || null
+          });
+        });
+      return;
     }
 
     /* GET /api/tb/status — 上次同步统计 */
@@ -224,10 +283,10 @@ module.exports = {
        body: { boardOverrides?: { cloud:{sprintId}, middle:{sprintId}, productLine:{sprintIds} },
                sprintMap?: { sprintId: 迭代名 }, by?: string } */
     if (sub === '/sync' && req.method === 'POST') {
-      const token = readToken();
-      if (!token) {
+      const cred = readCredentials();
+      if (cred.mode === 'none') {
         return sendJson(res, 400, {
-          error: '未配置 TB User Token。请在服务器 data/tb/secret.json 填入 token，或设置环境变量 TB_TOKEN 后重启服务。'
+          error: '未配置 TB 凭据。请在服务器 data/tb/secret.json 填入 appId/appSecret/tenantId/operatorId（应用凭据），或填入 token（User Token）后重启服务。'
         });
       }
       readBody(req, 1 * 1024 * 1024, async (body) => {
@@ -239,7 +298,7 @@ module.exports = {
         try {
           // 迭代映射：优先取请求体传入，否则回退到 state 里已存的 tbSprintMap
           const sprintMap = Object.assign({}, readSprintMap(), incoming.sprintMap || {});
-          const result = await tbSync.syncAll(token, incoming.boardOverrides || {}, sprintMap);
+          const result = await tbSync.syncAll(cred, incoming.boardOverrides || {}, sprintMap);
           const rev = applySyncToState(result, incoming.by, sprintMap, incoming.tbBoardSprints);
 
           // 落盘同步状态
@@ -272,6 +331,8 @@ module.exports = {
   },
 
   readToken,
+  readCredentials,
+  hasCredentials,
   readSprintMap,
   applySyncToState
 };

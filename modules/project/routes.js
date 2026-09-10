@@ -151,6 +151,11 @@ function validateProjects(projects) {
       return `项目 "${p.id}" releaseDate 必须为 YYYY-MM 或 YYYY-MM-DD`;
     }
 
+    // TB 关联校验：tbProjectId 为 24 位十六进制（TB 项目 ID 格式），空串表示未关联
+    if (p.tbProjectId && !/^[0-9a-fA-F]{24}$/.test(String(p.tbProjectId))) {
+      return `项目 "${p.id}" tbProjectId 必须为 24 位十六进制的 TB 项目 ID`;
+    }
+
     // resourceSummary 数值校验
     if (p.resourceSummary) {
       const rs = p.resourceSummary;

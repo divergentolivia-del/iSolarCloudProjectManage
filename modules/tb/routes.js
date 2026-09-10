@@ -2,6 +2,8 @@
    端点：
      GET  /api/tb/config   — 返回看板模板元数据（团队/迭代/维度，不含凭据）+ 凭据是否已配置
      GET  /api/tb/sprints  — 拉取项目下的迭代列表（供前端下拉选择，替代手填 sprintId）
+     GET  /api/tb/projects — 按名称/ID 搜索 TB 项目（供项目管理模块建立关联）
+     GET  /api/tb/projectSummary — 单个 TB 项目概要（项目名/编码/进行中迭代/任务完成率）
      POST /api/tb/sync     — 触发同步，写入 iteration state，返回统计
      GET  /api/tb/status   — 返回上次同步的统计（data/tb/state.json）
 
@@ -264,6 +266,72 @@ module.exports = {
           const detail = e.body ? (' | ' + JSON.stringify(e.body).slice(0, 300)) : '';
           return sendJson(res, 502, {
             error: '拉取迭代列表失败: ' + e.message + detail,
+            statusCode: e.statusCode || null
+          });
+        });
+      return;
+    }
+
+    /* GET /api/tb/projects — 搜索 TB 项目（供项目管理模块关联时选择）
+       query: name?（模糊搜索关键字）、ids?（逗号分隔的项目 ID，精确查询）
+       ⚠️ 企业内项目 200+，不做无参全量返回，必须传 name 或 ids
+       返回：[{ id, name, code, isArchived, startDate, endDate }] */
+    if (sub === '/projects' && req.method === 'GET') {
+      const cred = readCredentials();
+      if (cred.mode === 'none') {
+        return sendJson(res, 400, { error: '未配置 TB 凭据，无法搜索项目。' });
+      }
+      const q = u.query || {};
+      const name = String(q.name || '').trim();
+      const idsRaw = String(q.ids || '').trim();
+      const ids = idsRaw ? idsRaw.split(',').map(s => s.trim()).filter(s => /^[0-9a-fA-F]{24}$/.test(s)) : [];
+      if (!name && !ids.length) {
+        return sendJson(res, 400, { error: '请提供 name（搜索关键字）或 ids（项目ID）。' });
+      }
+      tbClient.queryProjects({ ids: ids.length ? ids : undefined, name: name || undefined }, cred)
+        .then(list => {
+          const rows = list.map(p => ({
+            id: p.id || '',
+            name: p.name || '',
+            // 项目编码 = uniqueIdPrefix（任务号前缀，如 ST001）
+            code: p.uniqueIdPrefix || '',
+            isArchived: !!p.isArchived,
+            startDate: p.startDate || null,
+            endDate: p.endDate || null
+          })).filter(r => r.id)
+            // 未归档优先，其次按名称
+            .sort((a, b) => (a.isArchived - b.isArchived) || a.name.localeCompare(b.name, 'zh-CN'));
+          return sendJson(res, 200, { ok: true, count: rows.length, projects: rows });
+        })
+        .catch(e => {
+          const detail = e.body ? (' | ' + JSON.stringify(e.body).slice(0, 300)) : '';
+          return sendJson(res, 502, {
+            error: '搜索 TB 项目失败: ' + e.message + detail,
+            statusCode: e.statusCode || null
+          });
+        });
+      return;
+    }
+
+    /* GET /api/tb/projectSummary — 拉取单个 TB 项目概要（项目名/编码/进行中迭代/任务完成率）
+       query: projectId（必填，24 位十六进制）
+       只读、手动触发，不写库；子项失败不阻断，原因在 errors 里 */
+    if (sub === '/projectSummary' && req.method === 'GET') {
+      const cred = readCredentials();
+      if (cred.mode === 'none') {
+        return sendJson(res, 400, { error: '未配置 TB 凭据，无法拉取项目概要。' });
+      }
+      const q = u.query || {};
+      const projectId = String(q.projectId || '').trim();
+      if (!/^[0-9a-fA-F]{24}$/.test(projectId)) {
+        return sendJson(res, 400, { error: 'projectId 非法（应为 24 位十六进制）。' });
+      }
+      tbSync.syncProjectSummary(projectId, cred)
+        .then(summary => sendJson(res, 200, { ok: true, summary: summary }))
+        .catch(e => {
+          const detail = e.body ? (' | ' + JSON.stringify(e.body).slice(0, 300)) : '';
+          return sendJson(res, 502, {
+            error: '拉取 TB 项目概要失败: ' + e.message + detail,
             statusCode: e.statusCode || null
           });
         });

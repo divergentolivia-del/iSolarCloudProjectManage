@@ -77,7 +77,7 @@ GET /api/v2/all-task/search?tql=<TQL>&pageSize=200&pageToken=<token>
 projectId = '<项目ID>' AND isArchived = false AND sprintId = '<迭代ID>'
 ```
 
-> 备注：`projectId` 在任务查询里是合法字段；但在**项目搜索**里不合法（见 2.3）。
+> 备注：`projectId` 在任务查询里是合法字段（见 2.1）；项目查询走 `v3/project/query`，参数是 `projectIds`（见 2.4）。
 
 ### 2.2 任务详情（自定义字段）— 任务详情 / 自定义字段读取
 
@@ -138,19 +138,63 @@ GET /api/v3/sprint/info?sprintId=<迭代ID>
 > ⚠️ 另一个坑：TB **恒返回 HTTP 200**，真实结果在响应体 `code` 字段里。
 > 客户端若只判断 HTTP 状态码，会把 421 这类错误当成功。
 
-### 2.4 项目列表（弱关联，可选）
+### 2.4 项目查询（项目关联）— 项目查询权限
 
 ```
-GET /api/v3/project/search?tql=<TQL>&pageSize=...
+GET /api/v3/project/query?projectIds=<id1,id2>&pageSize=100&pageToken=<token>
+GET /api/v3/project/query?name=<关键字>&pageSize=100
 ```
 
-- `tql=name ~ '关键字'` 可用；`tql=id = '<项目ID>'` 可用
-- **`projectId` 和 `_id` 都不是合法字段名**（报 `invalid field name`）
-- 返回的 `result` 是**项目 id 字符串数组**（不是对象数组）；如需项目名要再调 `v3/project/query`
+- 返回 `result` 是**完整项目对象数组**（不是 id 字符串数组），翻页用 `nextPageToken`
+- 项目编码字段是 **`uniqueIdPrefix`**（任务号前缀，如 `ST001`）
+- 本企业共 200+ 项目，**必须带过滤条件**，不要无参全量查
+
+项目对象可用字段：
 
 ```
-GET /api/v3/project/{projectId}/application/list
+id, name, uniqueIdPrefix, isArchived, isSuspended, isTemplate,
+startDate, endDate, created, updated, creatorId, ownerIds,
+organizationId, description, logo, sourceId, visibility, labels, customfields
 ```
+
+> ⚠️ **重要更正**：早期文档写的 `GET /api/v3/project/search?tql=...` 是**无效路径**，
+> 实测返回 `code:421 MisdirectedRequest, url not found`。正确端点是 `v3/project/query`。
+> 同理 `v3/project/{projectId}`（直接取详情）也不存在，同样是 421。
+
+> ⚠️ **最坑的"错得像对"**：参数名是 **`projectIds`（复数）**。写成 `projectId`
+> 会被**静默忽略** —— 不报错，而是返回一批无关项目。看起来有数据，其实全是错的。
+
+### 2.5 任务计数（算完成率）— 复用任务列表权限
+
+```
+GET /api/v2/all-task/search?tql=<TQL>&pageSize=1
+```
+
+- 响应信封里的 **`count` 是全量匹配数**，与分页无关
+- 所以 `pageSize=1` 一次请求即可拿总数，**不必翻页拉全量任务**
+
+完成率 = 两次查询：
+
+```
+projectId = '<项目ID>' AND isArchived = false                  → count = 总数
+projectId = '<项目ID>' AND isArchived = false AND isDone = true → count = 已完成数
+```
+
+> `isDone` 在任务查询里是合法 TQL 字段。
+
+### 2.6 已确认不存在的能力
+
+**TB 开放平台没有「统计 / 视图」类接口。** 以下路径全部实测返回 `code:421`：
+
+```
+/api/v3/project/{id}/report/search
+/api/v3/project/{id}/statistic
+/api/v3/report/query?projectId=
+/api/v3/project/{id}/dashboard/search
+/api/v3/project/{id}/view/search
+```
+
+因此工时与完成率**只能自行按任务明细统计**，无法直接读取 TB「统计-视图」里的数字。
 
 ---
 
@@ -190,10 +234,24 @@ GET /api/v3/project/{projectId}/application/list
 | 接口 | 结果 |
 |---|---|
 | `POST /api/appToken` | ✅ 拿到 176 字符 JWT |
-| `GET /api/v2/all-task/search` | ✅ 分页正常 |
+| `GET /api/v2/all-task/search` | ✅ 分页正常，信封带全量 `count` |
 | `GET /api/v3/task/query` | ✅ 含 9 个自定义字段 |
 | `GET /api/v3/project/{id}/sprint/search` | ✅ 150 个迭代 |
 | `GET /api/v3/sprint/info` | ✅ |
 | `GET /api/v3/project/{id}/application/list` | ✅ |
+| `GET /api/v3/project/query?projectIds=` | ✅ 精确取项目，含 `uniqueIdPrefix` |
+| `GET /api/v3/project/query?name=` | ✅ 模糊搜索（本企业 200+ 项目） |
+| `GET /api/v2/all-task/search?pageSize=1` | ✅ 取信封 `count` 算完成率 |
+
+**已确认不存在（全部 `code:421`）**：
+
+| 接口 | 结果 |
+|---|---|
+| `GET /api/v3/project/search` | ❌ url not found —— 早期文档写错，应为 `v3/project/query` |
+| `GET /api/v3/project/{projectId}` | ❌ url not found —— 项目详情也走 `query?projectIds=` |
+| `GET /api/v3/organization/{tenantId}/project/search` | ❌ url not found |
+| 统计 / 报表 / 视图类 5 个候选端点 | ❌ 全部 url not found，**TB 无统计视图接口** |
 
 **全量同步实测**：阳光云 **765** 任务 / 中后台 **201** 任务 / 产品线 **998** 任务，耗时约 **6.7 秒**。
+
+**项目摘要实测**（智慧能源需求管理 `680dfb8c99c59515f40c1226`）：编码 `ST001`，未归档任务 **27691** 个、已完成 **23644** 个，完成率 **85.4%**，进行中迭代 **8** 个。

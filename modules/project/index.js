@@ -333,6 +333,8 @@ const ProjectModule = (() => {
 
         ${resourceHtml}
 
+        ${buildTbSectionShell(project)}
+
         ${project.note ? `<div class="detail-section"><h4>备注</h4><p>${SharedUI.esc(project.note)}</p></div>` : ''}
       </div>
     `;
@@ -355,6 +357,92 @@ const ProjectModule = (() => {
     });
     const addMsBtn = document.getElementById('addMilestoneBtn');
     if (addMsBtn) addMsBtn.addEventListener('click', () => showAddMilestone(project));
+
+    // TB 关联卡片：renderDetail 是同步的，先渲染占位壳，再异步填充（同 editProjectBtn 的"渲染后绑定"套路）
+    const tbRefreshBtn = document.getElementById('tbRefreshBtn');
+    if (tbRefreshBtn) tbRefreshBtn.addEventListener('click', () => loadTbSummary(project));
+    loadTbSummary(project);
+  }
+
+  /* ---------- TB 关联（详情页） ---------- */
+
+  function buildTbSectionShell(project) {
+    if (!project.tbProjectId) {
+      return `<div class="detail-section">
+        <h4>Teambition 关联</h4>
+        <p class="empty-hint">未关联 TB 项目。点击「编辑」可搜索并关联。</p>
+      </div>`;
+    }
+    return `
+      <div class="detail-section tb-link-section">
+        <div class="section-head compact">
+          <div>
+            <div class="section-kicker">Teambition 关联</div>
+            <h4 id="tbSectionTitle">${SharedUI.esc(project.tbProjectName || project.tbProjectId)}</h4>
+          </div>
+          <button class="btn" id="tbRefreshBtn">刷新</button>
+        </div>
+        <div id="tbSummaryBody"><p class="empty-hint">加载中…</p></div>
+      </div>`;
+  }
+
+  async function loadTbSummary(project) {
+    const body = document.getElementById('tbSummaryBody');
+    if (!body || !project.tbProjectId) return;
+    body.innerHTML = '<p class="empty-hint">加载中…</p>';
+    try {
+      const resp = await fetch('/api/tb/projectSummary?projectId=' + encodeURIComponent(project.tbProjectId));
+      const data = await resp.json();
+      if (!resp.ok) {
+        body.innerHTML = `<p class="empty-hint">读取失败：${SharedUI.esc(data.error || ('HTTP ' + resp.status))}</p>`;
+        return;
+      }
+      body.innerHTML = renderTbSummary(project, data.summary || {});
+    } catch (e) {
+      body.innerHTML = `<p class="empty-hint">网络错误：${SharedUI.esc(e.message)}</p>`;
+    }
+  }
+
+  /** TB 迭代日期是 UTC ISO 串，转成本地 YYYY-MM-DD，避免国内看到差一天 */
+  function formatIsoDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    const p = (n) => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+
+  function renderTbSummary(project, s) {
+    const rate = s.doneRate == null ? '—' : s.doneRate + '%';
+    const rateHint = (s.taskTotal == null || s.taskDone == null)
+      ? '—'
+      : `${s.taskDone} / ${s.taskTotal} 个未归档任务`;
+    // 名称不一致时只提示，绝不自动清掉 tbProjectId
+    const staleName = s.name && project.tbProjectName && s.name !== project.tbProjectName;
+    const code = s.code || project.tbProjectCode || '';
+    const sprints = (s.activeSprints || []);
+    const sprintHtml = sprints.length
+      ? sprints.map(sp =>
+          `<div class="release-detail-item release-detail-wide">
+             <span>进行中迭代</span>
+             <strong>${SharedUI.esc(sp.name)} <span class="tb-link-at">${SharedUI.esc(formatIsoDate(sp.startDate))} ~ ${SharedUI.esc(formatIsoDate(sp.dueDate))}</span></strong>
+           </div>`).join('')
+      : '<div class="release-detail-item release-detail-wide"><span>进行中迭代</span><strong>暂无</strong></div>';
+
+    return `
+      ${staleName ? `<p class="empty-hint">⚠️ TB 项目名已变为「${SharedUI.esc(s.name)}」，本地记录为「${SharedUI.esc(project.tbProjectName)}」。如确认是同一项目，请点「编辑」更新名称。</p>` : ''}
+      <div class="release-detail-grid">
+        <div class="release-detail-item"><span>项目编码</span><strong>${SharedUI.esc(code || '—')}</strong></div>
+        <div class="release-detail-item"><span>任务完成率</span><strong>${SharedUI.esc(rate)}</strong> <span class="tb-link-at">${SharedUI.esc(rateHint)}</span></div>
+        <div class="release-detail-item"><span>归档状态</span><strong>${s.isArchived ? '已归档' : '未归档'}</strong></div>
+        <div class="release-detail-item"><span>同步时间</span><strong>${SharedUI.esc(s.syncedAt || '—')}</strong></div>
+        ${sprintHtml}
+      </div>
+      <p style="margin-top:8px">
+        <a class="btn" href="https://www.teambition.com/project/${SharedUI.esc(project.tbProjectId)}" target="_blank" rel="noopener">在 TB 中打开 →</a>
+      </p>
+      ${(s.errors && s.errors.length) ? `<p class="empty-hint">部分数据未取到：${SharedUI.esc(s.errors.join('；'))}</p>` : ''}
+    `;
   }
 
   /* ---------- 里程碑操作 ---------- */
@@ -448,12 +536,17 @@ const ProjectModule = (() => {
       releaseRisk: 'low',
       impactScope: '',
       dependency: '',
-      note: ''
+      note: '',
+      tbProjectId: '',
+      tbProjectName: '',
+      tbProjectCode: '',
+      tbLinkedAt: ''
     }, '新增项目');
 
     SharedUI.confirm('新增项目', formHtml, () => {
       submitForm(true);
     }, { confirmText: '保存', cancelText: '取消' });
+    bindTbLinkControls();
   }
 
   function showEditForm(project) {
@@ -461,6 +554,7 @@ const ProjectModule = (() => {
     SharedUI.confirm('编辑项目', formHtml, () => {
       submitForm(false, project.id);
     }, { confirmText: '保存', cancelText: '取消' });
+    bindTbLinkControls();
   }
 
   function buildFormHtml(proj, title) {
@@ -574,6 +668,26 @@ const ProjectModule = (() => {
           <label>预计工期(月)</label>
           <input type="number" id="pf-durationMonths" value="${rs.durationMonths || ''}" min="0">
         </div>
+
+        <div class="form-row form-section"><label>Teambition 关联</label></div>
+        <div class="form-row form-row-wide">
+          <label>关联 TB 项目</label>
+          <div>
+            <!-- 四个隐藏域：TB 字段必须随表单回填，否则保存时会被 submitForm 的整体重建清空 -->
+            <input type="hidden" id="pf-tbProjectId" value="${SharedUI.esc(proj.tbProjectId || '')}">
+            <input type="hidden" id="pf-tbProjectName" value="${SharedUI.esc(proj.tbProjectName || '')}">
+            <input type="hidden" id="pf-tbProjectCode" value="${SharedUI.esc(proj.tbProjectCode || '')}">
+            <input type="hidden" id="pf-tbLinkedAt" value="${SharedUI.esc(proj.tbLinkedAt || '')}">
+            <div id="pf-tb-current" class="tb-link-current">${buildTbLinkText(proj)}</div>
+            <div style="display:flex;gap:6px;margin-top:6px">
+              <input type="text" id="pf-tb-search" placeholder="输入 TB 项目名关键字搜索" style="flex:1">
+              <button type="button" class="btn" id="pf-tb-searchBtn">搜索</button>
+              <button type="button" class="btn" id="pf-tb-clearBtn">解除关联</button>
+            </div>
+            <div id="pf-tb-results" class="tb-link-results"></div>
+          </div>
+        </div>
+
         <div class="form-row form-row-wide">
           <label>备注</label>
           <textarea id="pf-note" rows="3">${SharedUI.esc(proj.note || '')}</textarea>
@@ -581,6 +695,91 @@ const ProjectModule = (() => {
       </form>
     `;
   }
+
+  /* ---------- TB 关联（表单内） ---------- */
+
+  /** 当前关联状态的文案（未关联 / 项目名 + 编码） */
+  function buildTbLinkText(proj) {
+    if (!proj || !proj.tbProjectId) return '<span class="empty-hint">未关联 TB 项目</span>';
+    const code = proj.tbProjectCode ? `<code>${SharedUI.esc(proj.tbProjectCode)}</code> ` : '';
+    const at = proj.tbLinkedAt ? `<span class="tb-link-at">关联于 ${SharedUI.esc(proj.tbLinkedAt)}</span>` : '';
+    return `已关联：${code}<strong>${SharedUI.esc(proj.tbProjectName || proj.tbProjectId)}</strong> ${at}`;
+  }
+
+  /**
+   * 绑定表单里的 TB 搜索框。
+   * ⚠️ SharedUI.confirm 是同步写入 #modalBody 的，所以调用后立刻绑定即可，无需 setTimeout。
+   * 企业内项目 200+，后端拒绝无参全量查询，因此走搜索框而不是下拉。
+   */
+  function bindTbLinkControls() {
+    const searchInput = document.getElementById('pf-tb-search');
+    const searchBtn = document.getElementById('pf-tb-searchBtn');
+    const clearBtn = document.getElementById('pf-tb-clearBtn');
+    const resultsEl = document.getElementById('pf-tb-results');
+    if (!searchInput || !searchBtn || !resultsEl) return;
+
+    // 选中一条 TB 项目 → 写四个隐藏域（tbLinkedAt 留空，由 submitForm 判断是否刷新）
+    function pick(row) {
+      document.getElementById('pf-tbProjectId').value = row.id || '';
+      document.getElementById('pf-tbProjectName').value = row.name || '';
+      document.getElementById('pf-tbProjectCode').value = row.code || '';
+      const cur = document.getElementById('pf-tb-current');
+      if (cur) {
+        cur.innerHTML = buildTbLinkText({
+          tbProjectId: row.id, tbProjectName: row.name, tbProjectCode: row.code
+        });
+      }
+      resultsEl.innerHTML = '';
+      searchInput.value = '';
+    }
+
+    async function doSearch() {
+      const kw = (searchInput.value || '').trim();
+      if (!kw) { SharedUI.toast('请输入搜索关键字', 'warning'); return; }
+      resultsEl.innerHTML = '<p class="empty-hint">搜索中…</p>';
+      try {
+        const resp = await fetch('/api/tb/projects?name=' + encodeURIComponent(kw));
+        const data = await resp.json();
+        if (!resp.ok) {
+          resultsEl.innerHTML = `<p class="empty-hint">${SharedUI.esc(data.error || '搜索失败')}</p>`;
+          return;
+        }
+        const rows = data.projects || [];
+        if (!rows.length) {
+          resultsEl.innerHTML = '<p class="empty-hint">没有匹配的 TB 项目</p>';
+          return;
+        }
+        resultsEl.innerHTML = rows.slice(0, 20).map((r, i) =>
+          `<button type="button" class="btn tb-link-option" data-tb-pick="${i}">
+             ${r.code ? '<code>' + SharedUI.esc(r.code) + '</code> ' : ''}${SharedUI.esc(r.name)}${r.isArchived ? ' <span class="tb-link-archived">已归档</span>' : ''}
+           </button>`
+        ).join('');
+        resultsEl.querySelectorAll('[data-tb-pick]').forEach(btn => {
+          btn.addEventListener('click', () => pick(rows[+btn.dataset.tbPick]));
+        });
+      } catch (e) {
+        resultsEl.innerHTML = `<p class="empty-hint">网络错误: ${SharedUI.esc(e.message)}</p>`;
+      }
+    }
+
+    searchBtn.addEventListener('click', doSearch);
+    // 回车搜索（阻止默认提交，否则会触发表单提交把弹窗顶掉）
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); doSearch(); }
+    });
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        ['pf-tbProjectId', 'pf-tbProjectName', 'pf-tbProjectCode', 'pf-tbLinkedAt'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+        });
+        const cur = document.getElementById('pf-tb-current');
+        if (cur) cur.innerHTML = buildTbLinkText(null);
+        resultsEl.innerHTML = '';
+      });
+    }
+  }
+
   async function submitForm(isNew, existingId) {
     const id = document.getElementById('pf-id')?.value || existingId;
     const name = document.getElementById('pf-name')?.value?.trim();
@@ -607,6 +806,14 @@ const ProjectModule = (() => {
     const usedCost = Number(document.getElementById('pf-usedCost')?.value) || 0;
     const outsourceCount = Number(document.getElementById('pf-outsourceCount')?.value) || 0;
     const durationMonths = Number(document.getElementById('pf-durationMonths')?.value) || 0;
+
+    // TB 关联字段：从隐藏域读回。submitForm 会整体重建 project 对象，
+    // 只有 milestones/iterations/teams 会从旧数据兜回，所以 TB 字段必须走表单往返，
+    // 否则每次编辑保存都会把已建立的关联悄悄清掉。
+    const tbProjectId = document.getElementById('pf-tbProjectId')?.value?.trim() || '';
+    const tbProjectName = document.getElementById('pf-tbProjectName')?.value?.trim() || '';
+    const tbProjectCode = document.getElementById('pf-tbProjectCode')?.value?.trim() || '';
+    const tbLinkedAtRaw = document.getElementById('pf-tbLinkedAt')?.value?.trim() || '';
 
     if (!name) {
       SharedUI.toast('项目名称不能为空', 'warning');
@@ -659,6 +866,10 @@ const ProjectModule = (() => {
       impactScope: impactScope || '',
       dependency: dependency || '',
       note: note || '',
+      tbProjectId: tbProjectId,
+      tbProjectName: tbProjectId ? tbProjectName : '',
+      tbProjectCode: tbProjectId ? tbProjectCode : '',
+      tbLinkedAt: tbProjectId ? tbLinkedAtRaw : '',
       milestones: [],
       resourceSummary: resourceSummary,
       iterations: []
@@ -676,7 +887,17 @@ const ProjectModule = (() => {
             }
           });
         }
+        // 关联对象变了才刷新 tbLinkedAt，只改别的字段时保留原关联时间
+        if (tbProjectId && tbProjectId !== (existing.tbProjectId || '')) {
+          project.tbLinkedAt = new Date().toLocaleString('zh-CN');
+        } else if (tbProjectId && !project.tbLinkedAt) {
+          project.tbLinkedAt = existing.tbLinkedAt || new Date().toLocaleString('zh-CN');
+        }
       }
+    }
+    // 新建即关联时，补上关联时间
+    if (isNew && tbProjectId && !project.tbLinkedAt) {
+      project.tbLinkedAt = new Date().toLocaleString('zh-CN');
     }
 
     const newState = { ...(state || {}), year: state?.year || new Date().getFullYear() };

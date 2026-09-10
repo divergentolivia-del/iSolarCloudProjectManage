@@ -13,6 +13,8 @@
          批量查任务详情（customfields）
      - GET v3/project/{projectId}/sprint/search?pageSize=...&pageToken=...
          迭代列表
+     - GET v3/project/query?projectIds=id1,id2 / ?name=关键字 / ?pageSize=...
+         项目列表与详情（⚠️ v3/project/search 与 v3/project/{id} 都不存在，实测 421）
      - GET v3/project/{projectId}/application/list
    ⚠️ TB 恒返回 HTTP 200，业务错误在响应体 code 字段（200=ok，0=部分接口成功，
       421=MisdirectedRequest/url not found）。必须校验业务码，不能只看 HTTP 状态。
@@ -313,11 +315,63 @@ async function listSprints(projectId, opts, credOrToken) {
   return out;
 }
 
+/**
+ * 只取任务总数，不拉明细。
+ * v2/all-task/search 的响应信封里带 count（全量匹配数，与分页无关），
+ * 所以 pageSize=1 一次请求即可拿到总数 —— 用于算完成率时避免全量翻页。
+ * @param {string} tql
+ * @returns {Promise<number>}
+ */
+async function countTasks(tql, credOrToken) {
+  const qs = new URLSearchParams({ tql: tql, pageSize: '1' });
+  const resp = await tbGet('v2/all-task/search?' + qs.toString(), credOrToken);
+  const n = Number(resp.count);
+  return isFinite(n) ? n : 0;
+}
+
+/**
+ * 查询项目列表 / 项目详情。
+ * ⚠️ 实测结论（别改成 search）：
+ *   - v3/project/search        → 421 url not found（不存在）
+ *   - v3/project/{projectId}   → 421 url not found（不存在）
+ *   - 参数是 projectIds（复数）。写成 projectId 会被**静默忽略**，
+ *     返回一批无关项目 —— 这是最坑的"错得像对"的情况。
+ * @param {object} [opts] { ids?: string[], name?: string, pageSize?: number, maxPages?: number }
+ * @returns {Promise<Array>} 项目对象数组
+ */
+async function queryProjects(opts, credOrToken) {
+  const o = opts || {};
+  const out = [];
+  let pageToken = '';
+  let pages = 0;
+  const limitPages = Math.min(o.maxPages || MAX_PAGES, MAX_PAGES);
+
+  do {
+    const qs = new URLSearchParams({ pageSize: String(o.pageSize || 100) });
+    if (o.ids && o.ids.length) qs.set('projectIds', o.ids.join(','));
+    if (o.name) qs.set('name', o.name);
+    if (pageToken) qs.set('pageToken', pageToken);
+
+    const resp = await tbGet('v3/project/query?' + qs.toString(), credOrToken);
+    const list = resp.result || [];
+    for (const p of list) out.push(p);
+    pageToken = resp.nextPageToken || '';
+    pages++;
+    // 指定 ids 时只需一页；name 模糊搜索由 TB 侧限量，也不必翻太多页
+    if (o.ids && o.ids.length) break;
+    if (pages >= limitPages) break;
+  } while (pageToken);
+
+  return out;
+}
+
 module.exports = {
   tbGet,
   searchAllTaskIds,
   queryTaskDetails,
+  countTasks,
   listSprints,
+  queryProjects,
   readCredentials,
   getAppToken,
   TASK_QUERY_BATCH,

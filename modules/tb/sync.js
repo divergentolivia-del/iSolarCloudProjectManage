@@ -354,6 +354,62 @@ async function syncOne(boardKey, token, overrides) {
   return syncBoard(board, token, overrides);
 }
 
+/**
+ * 拉取单个 TB 项目的概要（供项目管理模块的「TB 关联」展示）。
+ * 只读，手动触发，不做轮询。
+ *
+ * 四项字段的来源：
+ *   项目名 / 项目编码 → v3/project/query?projectIds=（编码即 uniqueIdPrefix，
+ *                        也就是任务号前缀如 ST001-123；项目级 customfields 实测为空数组，
+ *                        没有别的「项目编码」可取）
+ *   进行中迭代        → v3/project/{id}/sprint/search 里 status = 'active' 的
+ *   任务完成率        → 两次 pageSize=1 的 all-task/search，读信封里的 count，
+ *                        不拉任务明细（口径与工时同步一致：isArchived = false）
+ *
+ * 任一子项失败不阻断其余部分，失败原因放在 errors 里返回。
+ * @param {string} projectId
+ * @returns {Promise<object>} { projectId, name, code, activeSprints, taskTotal, taskDone, doneRate, syncedAt, errors }
+ */
+async function syncProjectSummary(projectId, credOrToken) {
+  const pid = String(projectId || '').trim();
+  if (!/^[0-9a-fA-F]{24}$/.test(pid)) throw new Error('projectId 非法（应为 24 位十六进制）: ' + pid);
+
+  const baseTql = `projectId = '${pid}' AND isArchived = false`;
+  const errors = [];
+  const soft = (label) => (e) => { errors.push(label + ': ' + e.message); return null; };
+
+  const [proj, sprints, total, done] = await Promise.all([
+    client.queryProjects({ ids: [pid] }, credOrToken).catch(soft('项目详情')),
+    client.listSprints(pid, { status: 'active' }, credOrToken).catch(soft('进行中迭代')),
+    client.countTasks(baseTql, credOrToken).catch(soft('任务总数')),
+    client.countTasks(baseTql + ' AND isDone = true', credOrToken).catch(soft('已完成任务数'))
+  ]);
+
+  const p = (proj && proj[0]) || null;
+  const taskTotal = total == null ? null : total;
+  const taskDone = done == null ? null : done;
+
+  return {
+    projectId: pid,
+    name: p ? (p.name || '') : '',
+    code: p ? (p.uniqueIdPrefix || '') : '',
+    isArchived: p ? !!p.isArchived : null,
+    activeSprints: (sprints || []).map(s => ({
+      id: s.id || '',
+      name: s.name || '',
+      startDate: s.startDate || null,
+      dueDate: s.dueDate || null
+    })),
+    taskTotal: taskTotal,
+    taskDone: taskDone,
+    doneRate: (taskTotal && taskTotal > 0 && taskDone != null)
+      ? Math.round(taskDone / taskTotal * 1000) / 10
+      : null,
+    syncedAt: new Date().toLocaleString('zh-CN'),
+    errors: errors
+  };
+}
+
 module.exports = {
   readCf,
   readCfId,
@@ -366,5 +422,6 @@ module.exports = {
   resolveSprintName,
   syncBoard,
   syncAll,
-  syncOne
+  syncOne,
+  syncProjectSummary
 };

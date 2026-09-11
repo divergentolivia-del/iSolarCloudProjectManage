@@ -89,3 +89,85 @@ E:\PMWork\Project Materials\iSolarCloudProject\迭代版本\iSolarCloudProjectMa
 ## 八、整体设计思路（执行前）
 
 按 csenergy 模块为蓝本（它是现阶段最完整的"全能"模块）：**server auto-discovered route + 客户端 ModuleDefinition IIFE + 复用的平台/组件样式类 + 本地规则引擎**。服务端负责状态存取 + 摘要计算（WBS/里程碑/资源负荷/风险），客户端负责 6 个视图渲染与表单 CRUD。坚持"数据独立、铁律约束、复用 > 新建、本地规则先行、AI 入口预留"。图标重装在 `NAV_ICON_COLORS` 一处集中管理，未来加模块只需加一行。
+
+---
+
+# 交接文档 v2 — 2026-09-11（钉钉/Excel 导入导出）
+
+> 上一版（v1，项目计划模块初建）保留在上方，作为模块架构与早期踩坑记录。
+> **本节才是当前会话的真实状态**，接续工作请只看本节。
+
+## A. 当前分支与提交
+
+- 分支：`main`（用户明确要求**不要再开分支**，所有工作都在 `main` 上）
+- 最近提交：`6bcd009 feat(plan): 批1 导入钉钉/平台 Excel —— 解析内核 + 预览确认页`
+- 三条原始需求：
+  1. 项目计划导出 Excel —— **已完成**（`feat/plan-excel-export` 已并入 main）
+  2. 上传钉钉 Excel → 平台读表 → 按平台表单格式填充 —— **批1 已完成**
+  3. 与钉钉直接打通、有更新自动同步 —— **未开始**，等用户提供凭据（见 `docs/plan-dingtalk-checklist.md`）
+
+## B. 本会话新增的文件
+
+| 文件 | 说明 |
+|---|---|
+| `modules/plan/import-core.js` | 服务端解析内核，纯函数无 IO，~1310 行 |
+| `modules/plan/_import-test.js` | node:test 用例 11 条，全绿 |
+| `_t-import.js` | 对真实 xlsx 的端到端断言脚本 |
+| `docs/plan-dingtalk-checklist.md` | **钉钉打通需要用户提供什么**（给用户看的行动清单） |
+| `data/dingtalk/secret.example.json` | 凭据模板；`secret.json` 已在 .gitignore |
+
+服务端 `POST /api/plan/import-parse`（32MB 上限），客户端导入预览/确认/三种落库模式。
+
+## C. 关键机制（改动前必读）
+
+1. **双来源识别**：工作簿里有 `_元信息` 表 → 平台导出（`source: 'platform-export'`，
+   按 `_id`/`_parentId` 精确还原层级）；否则 → 钉钉/通用表（按表头智能映射）。
+2. **`_id` 沿用**：平台导出的行带 `_id`，`idGen.prefer()` 原样沿用，
+   保证「导出 → 改一改 → 导回」记录身份不变（外部关联挂在 id 上）。
+   只有钉钉表/异源表才现生成 id。
+3. **`linkParents`**：`_parentRow` 是 **rows 数组下标**不是行号，`-1` 表示根。
+4. **表 → 表单归属打分**：信号 2/3 必须建立在 `exLead >= 2` 之上，
+   否则「状态」这种通用列会让「应收账款」这类表被静默绑成参考文档。
+5. **预览页字段**：`filledKeys` 在 `renderImportPreview` 内计算；
+   `bindImportPreview` 的 radio 回调里需**重新调用 `importCounts()`**，
+   不能引用前者（不同函数作用域）。
+6. **落库三模式**：`new` / `append`（重编号后并入）/ `overwrite`（二次确认，
+   逐表显示「原有 N 条 → 换成 M 条」，`confirmClass: 'danger'`）。
+
+## D. 踩过的坑（本会话新增，务必别再踩）
+
+1. **`linkParents` 静默丢层级**：原实现只把 `_parentRow >= 0` 的行登记进 `byRowIdx`，
+   于是挂在**下标 0 的根行**下的子行找不到父，`parentId` 静默变空。
+   钉钉的 `Parent Record` 第一行走的正是这个坑。修复后真实文件从 0 个子节点
+   恢复为 **129 根 / 744 子，零孤儿**。**教训：下标索引表要登记每一个下标。**
+2. **`renderImportPreview` 引用未定义的 `keys`**：`keys` 只在 `applyImport` 里存在。
+   后果是预览页一渲染就抛 `keys is not defined`，整页白。
+   这个是**用 vm 探针实跑渲染才炸出来的**，`node --check` 查不出（语法合法）。
+   **教训：客户端渲染函数必须真跑一遍看输出，光做语法检查不够。**
+3. **vm 沙箱探针要插在 `return` 之前**：`index.js` 末尾是
+   `const PlanModule = (() => { ... return {...}; })();`，
+   在 `})();` 前追加代码**永远不会执行**（在 return 之后）。
+   正确做法是锚定 `if (!window._planApi) window._planApi = api;` 这一行做替换。
+4. **`/tmp` 不跨 Bash 工具调用共享**：每次调用都是新的临时目录。
+   需要在多次调用间传递的 fixture 要写在仓库内（用完记得删）。
+5. **Git Bash 下 `curl --data-binary @/tmp/x.json` 路径翻译失败**：
+   改用 `node -e` + `fetch` 发请求。
+6. **服务器端口冲突**：`PORT=8791 node server.js 8791 &` 会因旧进程占用报 EADDRINUSE，
+   还会连带杀掉外层 shell。改用子 shell：`(node server.js 8794 > log 2>&1 &)`。
+7. **SheetJS 对某些 xlsx 会刷 `Bad uncompressed size` 警告**：无害的 zip 噪声，
+   断言脚本要 `grep -v "^Bad"` 过滤，别误判为失败。
+
+## E. 安全铁律（未变）
+
+- `data/iteration/state.json` **已被 git 跟踪**且含真实工时数据 —— **绝不提交**。
+- **永远不要用 `git add .`**，只显式 add 具体文件。
+- 钉钉/TB 凭据一律放 `data/**/secret.json`（已 ignore），**绝不入库**。
+- 提交前先 `git status --short` 确认 `data/iteration/state.json` 处于未暂存状态。
+
+## F. 下一步
+
+1. 等用户交 `docs/samples/钉钉项目计划.xlsx` 与结构说明（2a 查漏补缺）
+2. 等用户拍板三个决策（同步方向 / 行匹配方式 / 冲突优先级）—— **第 10 项是硬阻塞**
+3. 等用户提供应用凭据 + 权限点名称 + 文档链接 + 网络连通性结论（2b）
+4. 凭据到手后**第一步只写最小连通性验证**（换 token → 解析 docUrl → 读区间打印），
+   **跑通之前不写任何同步逻辑**（TB 那次的教训）

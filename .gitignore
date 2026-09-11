@@ -25,3 +25,6 @@ data/tb/secret.json
 data/tb/state.json
 data/tb/history/
 tb-secret.json
+# 钉钉应用凭据（本机，绝不入库）
+data/dingtalk/secret.json
+data/dingtalk/state.json

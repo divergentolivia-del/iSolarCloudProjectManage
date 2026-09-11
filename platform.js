@@ -116,8 +116,16 @@ const Platform = (() => {
   /**
    * Toggle sidebar collapsed state and persist preference.
    */
+  /* 用户是否「主动展开」过侧栏。
+     必须单独记，不能靠 .expanded 类判断：applySidebarState() 只要处于非收起状态就会加
+     .expanded，于是「默认展开」和「用户主动展开」在 DOM 上无法区分，
+     handleResize 里那个 !contains('expanded') 的守卫因此永远为假、分支成为死代码
+     （表现：<1200px 时 CSS 本意让侧栏默认窄，JS 却始终把它撑回 220px）。 */
+  let userExpandedManually = false;
+
   function toggleSidebar() {
     sidebarCollapsed = !sidebarCollapsed;
+    userExpandedManually = !sidebarCollapsed;   // 展开=用户主动要宽的；收起=清除
     applySidebarState();
     try {
       localStorage.setItem(SIDEBAR_KEY, sidebarCollapsed ? 'true' : 'false');
@@ -137,6 +145,11 @@ const Platform = (() => {
   let autoCollapseFired = false;
   function collapseSidebar() {
     if (sidebarCollapsed || autoCollapseFired) return;
+    /* 用户主动展开过 → 不再自动收起。
+       原先只有「手动收起 → 不自动展开」这一半，缺了对称的另一半，导致用户手动展开侧栏后
+       立刻又被拥挤协议收回去，等于用户的明确意图被无视。宽表本身有独立横向滚动条，
+       让用户自己决定要不要那 160px 更合理。手动收起时该标记会被清掉，自动收起随之恢复。 */
+    if (userExpandedManually) return;
     sidebarCollapsed = true;
     autoCollapseFired = true;
     applySidebarState();
@@ -264,9 +277,10 @@ const Platform = (() => {
       // Mobile: sidebar hidden by default, controlled by hamburger
       closeMobileSidebar();
     } else if (width < 1200) {
-      // Tablet: auto-collapse unless user explicitly expanded
-      const sidebar = document.getElementById('sidebar');
-      if (sidebar && !sidebar.classList.contains('expanded')) {
+      /* 平板宽度：默认收起，除非用户主动展开过。
+         与 platform.css 的 @media (max-width:1199px) 一致 —— 该断点里
+         .sidebar 的默认宽度就是收起宽度，JS 状态理应跟 CSS 意图一致。 */
+      if (!userExpandedManually && !sidebarCollapsed) {
         sidebarCollapsed = true;
         applySidebarState();
       }

@@ -70,6 +70,11 @@ const PlanModule = (() => {
     if (v == null || isNaN(v)) return '0';
     return Number(v).toLocaleString('zh-CN', d ? { minimumFractionDigits: d, maximumFractionDigits: d } : undefined);
   }
+  /* 长单元格值截断（导入诊断里会带出整段任务描述，不截断会把弹窗撑爆） */
+  function shorten(s, n) {
+    const t = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+    return t.length > n ? t.slice(0, n) + '…' : t;
+  }
   function round1(v) {
     if (v == null || isNaN(v)) return '0';
     const n = Number(v);
@@ -496,7 +501,10 @@ const PlanModule = (() => {
         <h3>项目计划</h3>
         <p class="pl-head-desc">部门项目执行指挥台：先看要出事的，再看最近要交的</p>
       </div>
-      <button class="btn primary" id="plNewPlan">＋ 新建计划</button>
+      <div class="cs-head-actions">
+        <button class="btn" id="plImportPlan" title="从 Excel 导入：平台导出文件 / 钉钉多维表导出 / 任意表格">⬆ 导入 Excel</button>
+        <button class="btn primary" id="plNewPlan">＋ 新建计划</button>
+      </div>
     </div>
     ${renderMetricStrip()}
     ${hasPlans ? `
@@ -1002,6 +1010,7 @@ const PlanModule = (() => {
         <div class="pl-tab-body">${tabHtml}</div>
         <div class="pl-detail-actions">
           <button class="btn" id="plDeletePlan">🗑 删除计划</button>
+          <button class="btn" id="plImportExcel" title="从 Excel 导入到本计划（追加或覆盖）">⬆ 导入 Excel</button>
           <button class="btn" id="plExportPlan" title="导出为 Excel，各 Tab 对应一个 sheet">⬇ 导出 Excel</button>
           <button class="btn primary" id="plEditPlan">✏️ 编辑计划</button>
         </div>
@@ -1218,6 +1227,387 @@ const PlanModule = (() => {
     } catch (e) {
       SharedUI.toast('导出失败: ' + e.message, 'error');
     }
+  }
+
+  /* ==========================================================
+     导入 Excel（平台导出文件 / 钉钉多维表导出 / 任意表格）
+
+     两步式，中间必须过预览：
+       ① 上传 → 服务端 /api/plan/import-parse 解析（只读不落库）
+       ② 预览页展示「哪张表 → 哪个表单 / 几行 / 置信度」，允许手动改归属，
+          用户选好落库方式（新建计划 / 追加到已有 / 覆盖已有）才真正写入。
+
+     为什么落库方式要分开：
+       新建 = 从零建计划，最安全；
+       追加 = 只补数据，不清空现有内容；
+       覆盖 = 清空目标表单再灌入，破坏性最大，所以强制过预览且二次确认。
+     ========================================================== */
+
+  /* 平台表单 key → 中文名（预览页展示用，顺带当手动指定的下拉选项） */
+  const IMPORT_FORM_LABELS = {
+    overview: '项目总览', milestones: '里程碑', tasks: 'WBS任务', marketPlan: '上市计划',
+    issues: '遗留问题', risks: '项目风险', resources: '资源', members: '团队成员',
+    references: '参考文档'
+  };
+  const IMPORT_TIER_CLASS = { strong: 'pl-imp-tier-strong', medium: 'pl-imp-tier-medium', low: 'pl-imp-tier-low' };
+
+  let importFile = null;         // 用户选中的 File 对象（保留引用，重新解析时复用）
+  let importPreview = null;      // 服务端返回的解析结果（预览页的数据源）
+  let importOverrides = {};      // { 表名: 表单key }，手动指定归属
+  let importFileName = '';
+  let importMode = 'new';        // new | append | overwrite
+  let importTargetId = '';       // append / overwrite 时的目标计划 id
+
+  /* 读文件为 base64（去掉 data: 前缀，服务端按裸 base64 解） */
+  function readFileBase64(file) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => {
+        const s = String(fr.result || '');
+        resolve(s.indexOf(',') >= 0 ? s.slice(s.indexOf(',') + 1) : s);
+      };
+      fr.onerror = () => reject(new Error('文件读取失败'));
+      fr.readAsDataURL(file);
+    });
+  }
+
+  /* 上传并解析；override 变化时重解析（服务端重算映射比前端猜更准） */
+  async function parseImportFile(file, overrides) {
+    const b64 = await readFileBase64(file);
+    const resp = await fetch('/api/plan/import-parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileBase64: b64,
+        planName: '',
+        sheetOverrides: overrides && Object.keys(overrides).length ? overrides : null
+      })
+    });
+    const result = await resp.json();
+    if (!resp.ok) throw new Error(result.error || '解析失败');
+    return result;
+  }
+
+  /* 各级表单的 id 前缀与生成器，落库前统一重编号，避免与已有数据撞 id */
+  function reIdImportPlan(plan) {
+    const maps = {};
+    const remap = (list, prefix) => {
+      const m = {};
+      (list || []).forEach(x => {
+        const old = x.id;
+        x.id = prefix + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        m[old] = x.id;
+        if (x._parentRow != null) delete x._parentRow;
+        if (x._rowNo != null) delete x._rowNo;
+      });
+      return m;
+    };
+    maps.tasks = remap(plan.tasks, 't');
+    maps.overview = remap(plan.overview, 'o');
+    maps.marketPlan = remap(plan.marketPlan, 'mp');
+    maps.milestones = remap(plan.milestones, 'm');
+    maps.resources = remap(plan.resources, 'r');
+    maps.members = remap(plan.members, 'mb');
+    maps.issues = remap(plan.issues, 'is');
+    maps.risks = remap(plan.risks, 'rk');
+    maps.references = remap(plan.references, 'rf');
+    // parentId 指向旧 id，重编号后要跟着换；换不到的（悬空父级）置空，退化成根节点
+    ['tasks', 'overview', 'marketPlan', 'references'].forEach(k => {
+      (plan[k] || []).forEach(x => {
+        if (!x.parentId) return;
+        const mapped = maps[k][x.parentId];
+        // 导入内核按行号生成的临时父引用（@row:12）在重编号后无法对应，直接断开
+        x.parentId = mapped || '';
+      });
+    });
+    return plan;
+  }
+
+  /* 统计每个表单落到目标计划后的行数，预览页与确认文案共用 */
+  function importCounts() {
+    if (!importPreview) return {};
+    const p = importPreview.plan || {};
+    return {
+      overview: (p.overview || []).length, milestones: (p.milestones || []).length,
+      tasks: (p.tasks || []).length, marketPlan: (p.marketPlan || []).length,
+      issues: (p.issues || []).length, risks: (p.risks || []).length,
+      resources: (p.resources || []).length, members: (p.members || []).length,
+      references: (p.references || []).length
+    };
+  }
+
+  /* 把解析结果并进目标计划。mode = new | append | overwrite */
+  function applyImport() {
+    const p = importPreview && importPreview.plan;
+    if (!p) { SharedUI.toast('没有可导入的数据', 'warning'); return; }
+    const counts = importCounts();
+    const keys = Object.keys(counts).filter(k => counts[k] > 0);
+
+    if (importMode === 'new') {
+      const draft = initFormDraft(null);
+      Object.assign(draft, {
+        name: draft.name || p.name || importFileName.replace(/\.(xlsx|xls)$/i, ''),
+        status: 'draft',
+        owner: p.owner || draft.owner || '',
+        startDate: p.startDate || draft.startDate || '',
+        endDate: p.endDate || draft.endDate || ''
+      });
+      // 空数据的表单保留平台的标准模板（总览 8 阶段 / 上市 5 阶段 / 交付件清单）
+      keys.forEach(k => { draft[k] = p[k]; });
+      dirtyForm = reIdImportPlan(draft);
+      currentPlanId = null;
+      currentFormTab = 'basic';
+      currentView = 'new';
+      render();
+      SharedUI.toast(`已载入 ${importFileName}，请核对后点「保存计划」`, 'success');
+      return;
+    }
+
+    const target = getPlan(importTargetId);
+    if (!target) { SharedUI.toast('请选择要导入的目标计划', 'warning'); return; }
+    const merged = JSON.parse(JSON.stringify(target));
+    if (importMode === 'append') {
+      // 追加：导入进来的 parentId 只在本次导入内有效，重编号后并到末尾
+      const incoming = reIdImportPlan(JSON.parse(JSON.stringify(p)));
+      keys.forEach(k => { merged[k] = (merged[k] || []).concat(incoming[k] || []); });
+      if (!merged.name && incoming.name) merged.name = incoming.name;
+    } else {
+      // 覆盖：只清空「本次有数据」的表单，没数据的表单保持原样（避免误清空）
+      const incoming = reIdImportPlan(JSON.parse(JSON.stringify(p)));
+      keys.forEach(k => { merged[k] = incoming[k] || []; });
+    }
+    const plans = (state.plans || []).slice();
+    const idx = plans.findIndex(x => x.id === merged.id);
+    if (idx < 0) plans.push(merged); else plans[idx] = merged;
+    const next = Object.assign({}, state, { plans: plans });
+    saveState(next).then(ok => {
+      if (!ok) return;
+      currentPlanId = merged.id;
+      currentView = 'detail';
+      currentTab = 'overview';
+      render();
+      SharedUI.toast(`已${importMode === 'append' ? '追加' : '覆盖'}导入 ${importFileName}`, 'success');
+    });
+  }
+
+  /* 落库方式的风险提示文案：覆盖最危险，必须把「会清空哪些表」写清楚 */
+  function modeWarnText(keys) {
+    if (importMode === 'overwrite') {
+      return '将要清空目标计划中这些表的原有数据：' +
+        keys.map(k => IMPORT_FORM_LABELS[k] || k).join('、') + '；清单外的表保持不动，且不可撤销';
+    }
+    if (importMode === 'append') return '导入内容会追加到目标计划末尾，原有内容保留';
+    return '';
+  }
+
+  function renderImportPreview() {
+    const r = importPreview;
+    if (!r) return '';
+    const counts = importCounts();
+    const totalRows = Object.keys(counts).reduce((s, k) => s + counts[k], 0);
+
+    /* 已归属的表 */
+    const rows = (r.sheets || []).map(s => {
+      const opts = Object.keys(IMPORT_FORM_LABELS)
+        .map(k => `<option value="${k}" ${k === s.form ? 'selected' : ''}>${esc(IMPORT_FORM_LABELS[k])}</option>`).join('');
+      const cols = (s.mappedCols || []).map(m => `<span class="pl-imp-col">${esc(m.header)}<i>→</i>${esc(IMPORT_FORM_LABELS[m.field] || m.field)}</span>`).join('');
+      return `
+        <div class="pl-imp-sheet">
+          <div class="pl-imp-sheet-head">
+            <span class="pl-imp-sheet-name">「${esc(s.sheetName)}」</span>
+            <span class="pl-imp-arrow">→</span>
+            <select class="pl-imp-sel" data-sheet="${esc(s.sheetName)}">${opts}</select>
+            <span class="pl-imp-badge ${IMPORT_TIER_CLASS[s.tier] || ''}">${esc(s.confidence || '')}</span>
+            <span class="pl-imp-rows">${fmtNum(s.rows)} 行${s.headerRow > 1 ? ` · 表头第${s.headerRow}行` : ''}</span>
+          </div>
+          <div class="pl-imp-cols">${cols || '<span class="pl-imp-none">未识别到可映射的列</span>'}</div>
+          ${s.unmatchedHeaders && s.unmatchedHeaders.length
+            ? `<div class="pl-imp-drop">未映射列（默认丢弃）：${s.unmatchedHeaders.slice(0, 10).map(esc).join(' · ')}${s.unmatchedHeaders.length > 10 ? ` …共 ${s.unmatchedHeaders.length} 列` : ''}</div>` : ''}
+        </div>`;
+    }).join('') || '<div class="pl-imp-none">没有识别到可用的表</div>';
+
+    /* 跳过的表：允许用户手动指定救回 */
+    const skippedHtml = (r.skipped || []).map(s => {
+      const suggest = s.suggest ? `
+        <span class="pl-imp-arrow">→</span>
+        <select class="pl-imp-sel" data-sheet="${esc(s.sheetName)}">
+          <option value="">（不导入）</option>
+          ${Object.keys(IMPORT_FORM_LABELS).map(k => `<option value="${k}" ${s.suggest.form === k ? 'selected' : ''}>${esc(IMPORT_FORM_LABELS[k])}</option>`).join('')}
+        </select>` : '<span class="pl-imp-none">无可用映射</span>';
+      return `<div class="pl-imp-skip"><span class="pl-imp-sheet-name">「${esc(s.sheetName)}」</span>${suggest}
+        <span class="pl-imp-reason">${esc(s.reason)}</span></div>`;
+    }).join('');
+
+    /* 诊断：内容质量提示，不阻塞导入。
+       只给「几处」没用——用户要知道是哪几行，才能回表格里改。所以按表分组，
+       每组给前 5 行样例，其余折叠成计数。 */
+    const KIND_TEXT = {
+      dangling: '表格里找不到父级（会挂成一级）', selfRef: '自己指向自己（忽略）',
+      cycle: '父子成环（已断开）', ambiguous: '父级重名，归属不确定'
+    };
+    const diagGroups = {};
+    (r.diagnostics || []).forEach(d => {
+      const key = d.kind + '@' + (d.sheet || '');
+      (diagGroups[key] = diagGroups[key] || { kind: d.kind, sheet: d.sheet, rows: [] }).rows.push(d);
+    });
+    const diagHtml = Object.keys(diagGroups).length ? Object.keys(diagGroups).map(k => {
+      const g = diagGroups[k];
+      const samples = g.rows.slice(0, 5).map(d =>
+        `<li>第 ${fmtNum(d.row)} 行「${esc(shorten(d.name, 24))}」${d.parentName ? ` → 父级「${esc(shorten(d.parentName, 24))}」` : ''}</li>`).join('');
+      const more = g.rows.length > 5 ? `<li class="pl-imp-none">…另有 ${fmtNum(g.rows.length - 5)} 处</li>` : '';
+      return `<details class="pl-imp-diag-group">
+        <summary><b>${esc(KIND_TEXT[g.kind] || g.kind)}</b>
+          <span class="pl-imp-rows">${esc(g.sheet || '')} · ${fmtNum(g.rows.length)} 处</span></summary>
+        <ul class="pl-imp-diag-list">${samples}${more}</ul>
+      </details>`;
+    }).join('') : '<span class="pl-imp-none">未发现层级问题</span>';
+
+    const SRC_TEXT = {
+      'platform-export': '平台导出文件（可 1:1 往返）',
+      dingtalk: '钉钉多维表导出（按表头智能映射）',
+      generic: '通用表格（能对上的列才导入）'
+    };
+    /* 本次真正会有内容的表：覆盖提示、告警文案都按这个清单走 */
+    const filledKeys = Object.keys(counts).filter(k => counts[k] > 0);
+    const filled = filledKeys
+      .map(k => `${IMPORT_FORM_LABELS[k]} ${fmtNum(counts[k])}`).join(' · ');
+
+    const planOptions = (state && state.plans || []).map(p =>
+      `<option value="${esc(p.id)}" ${p.id === importTargetId ? 'selected' : ''}>${esc(p.name || '(未命名)')}</option>`).join('');
+
+    return `
+      <div class="pl-import">
+        <div class="pl-imp-head">
+          <b>${esc(r.plan && r.plan.name || importFileName)}</b>
+          <span class="pl-imp-src">识别来源：${esc(SRC_TEXT[r.source] || SRC_TEXT.generic)}</span>
+          <span class="pl-imp-rows">共 ${fmtNum(totalRows)} 行</span>
+        </div>
+        ${filled ? `<div class="pl-imp-sum">将写入：${esc(filled)}</div>` : ''}
+        <div class="pl-imp-sec"><div class="pl-imp-sec-t">表 → 表单 归属（可手动改）</div>${rows}</div>
+        ${skippedHtml ? `<div class="pl-imp-sec"><div class="pl-imp-sec-t">跳过的表</div>${skippedHtml}</div>` : ''}
+        <div class="pl-imp-sec"><div class="pl-imp-sec-t">数据质量提示（不阻塞导入）</div><div class="pl-imp-diags">${diagHtml}</div></div>
+        <div class="pl-imp-sec">
+          <div class="pl-imp-sec-t">导入方式</div>
+          <div class="pl-imp-modes">
+            <label class="pl-imp-mode"><input type="radio" name="plImpMode" value="new" ${importMode === 'new' ? 'checked' : ''}> 新建计划（推荐）</label>
+            <label class="pl-imp-mode"><input type="radio" name="plImpMode" value="append" ${importMode === 'append' ? 'checked' : ''}> 追加到已有计划（保留原内容）</label>
+            <label class="pl-imp-mode"><input type="radio" name="plImpMode" value="overwrite" ${importMode === 'overwrite' ? 'checked' : ''}> 覆盖已有计划（清空本次涉及的表）</label>
+          </div>
+          <div class="pl-imp-target" id="plImpTargetWrap" style="display:${importMode === 'new' ? 'none' : 'block'}">
+            <select class="pl-imp-sel" id="plImpTarget">${planOptions || '<option value="">（暂无计划）</option>'}</select>
+            <span class="pl-imp-warn" id="plImpModeWarn">${esc(modeWarnText(filledKeys))}</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  /* 预览页的所有交互（放在渲染后，因为 HTML 是整块重建的） */
+  function bindImportPreview(onApply) {
+    const root = document.getElementById('plImportBody');
+    if (!root) return;
+    root.querySelectorAll('select[data-sheet]').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        const sheet = sel.getAttribute('data-sheet');
+        const val = sel.value;
+        if (val) importOverrides[sheet] = val; else delete importOverrides[sheet];
+        const hint = document.getElementById('plImpBusy');
+        if (hint) hint.textContent = '按新的归属重新解析…';
+        try {
+          importPreview = await parseImportFile(importFile, importOverrides);
+          renderImportModal(onApply);
+        } catch (e) {
+          SharedUI.toast('重新解析失败: ' + e.message, 'error');
+          importPreview = null;
+          renderImportModal(onApply);
+        }
+      });
+    });
+    root.querySelectorAll('input[name="plImpMode"]').forEach(rb => {
+      rb.addEventListener('change', () => {
+        importMode = rb.value;
+        const wrap = document.getElementById('plImpTargetWrap');
+        if (wrap) wrap.style.display = importMode === 'new' ? 'none' : 'block';
+        const warn = document.getElementById('plImpModeWarn');
+        if (warn) {
+          const c = importCounts();
+          warn.textContent = modeWarnText(Object.keys(c).filter(k => c[k] > 0));
+        }
+      });
+    });
+    const tgt = document.getElementById('plImpTarget');
+    if (tgt) {
+      importTargetId = importTargetId || (tgt.value || '');
+      tgt.addEventListener('change', () => { importTargetId = tgt.value; });
+    }
+  }
+
+  function renderImportModal(onApply) {
+    const body = `<div id="plImportBody">${renderImportPreview()}</div><div class="pl-imp-busy" id="plImpBusy"></div>`;
+    SharedUI.confirm('导入项目计划', body, () => {
+      if (!importPreview) { SharedUI.toast('解析未完成，请重新选择文件', 'warning'); return; }
+      if (importMode !== 'new' && !importTargetId) { SharedUI.toast('请选择目标计划', 'warning'); return; }
+      if (importMode === 'overwrite') {
+        const t = getPlan(importTargetId);
+        const counts = importCounts();
+        const clear = Object.keys(counts).filter(k => counts[k] > 0);
+        const rows = clear.map(k => {
+          const had = ((t && t[k]) || []).length;
+          return `<li>${esc(IMPORT_FORM_LABELS[k] || k)}：原有 <b>${fmtNum(had)}</b> 条 → 换成 <b>${fmtNum(counts[k])}</b> 条</li>`;
+        }).join('');
+        SharedUI.confirm('确认覆盖？',
+          `<p>即将清空「${esc(t ? t.name : '')}」中以下表单的<b>全部原有数据</b>，写入 <b>${esc(importFileName)}</b> 的内容：</p>
+           <ul class="pl-imp-confirm-list">${rows}</ul>
+           <p>未列出的表单保持不动。此操作不可撤销。</p>`,
+          () => { applyImport(); },
+          { confirmText: '确认覆盖', confirmClass: 'danger' });
+        return;
+      }
+      onApply();
+    }, { confirmText: importMode === 'overwrite' ? '覆盖导入' : '导入', cancelText: '取消', confirmClass: importMode === 'overwrite' ? 'danger' : 'primary' });
+    setTimeout(() => bindImportPreview(onApply), 0);
+  }
+
+  /* 入口：选文件 → 解析 → 弹预览 */
+  function openImportDialog() {
+    if (typeof XLSX === 'undefined') {
+      // 解析在服务端做，前端不依赖 XLSX；这里只提示可能的老缓存页面
+      console.warn('[plan] XLSX 未加载，导入仍由服务端解析');
+    }
+    const body = `
+      <div class="pl-import-start">
+        <p class="pl-dec-desc">选择要导入的 Excel（.xlsx / .xls）。支持三类来源：
+          <b>平台自己导出的文件</b>（可 1:1 往返，含层级与关联）、
+          <b>钉钉多维表导出的表格</b>（按表头智能映射）、
+          <b>任意其他表格</b>（能对上的列就填，对不上的列丢弃）。</p>
+        <p class="pl-dec-desc">解析只读不写，下一步会先给你看「哪张表导成哪个表单、多少行」，确认后才写入。</p>
+        <div class="pl-dec-toolbar">
+          <label class="pl-dec-upload btn">📎 选择 Excel<input type="file" id="plImpFile" accept=".xlsx,.xls" hidden></label>
+          <span class="pl-dec-filehint" id="plImpFileHint"></span>
+        </div>
+      </div>`;
+    SharedUI.confirm('导入项目计划', body, () => {
+      const f = importFile;
+      if (!f) { SharedUI.toast('请先选择文件', 'warning'); return; }
+      parseImportFile(f, {}).then(r => {
+        importPreview = r;
+        renderImportModal(applyImport);
+      }).catch(e => SharedUI.toast('解析失败: ' + e.message, 'error'));
+    }, { confirmText: '解析并预览', cancelText: '取消' });
+
+    setTimeout(() => {
+      const fileEl = document.getElementById('plImpFile');
+      const hint = document.getElementById('plImpFileHint');
+      if (!fileEl) return;
+      fileEl.addEventListener('change', () => {
+        const f = fileEl.files && fileEl.files[0];
+        if (!f) return;
+        if (f.size > 32 * 1024 * 1024) { if (hint) hint.textContent = '✗ 文件超过 32MB'; importFile = null; return; }
+        importFile = f;
+        importFileName = f.name;
+        importOverrides = {};
+        if (hint) hint.textContent = `✓ 已选择 ${f.name}（${Math.round(f.size / 1024)} KB）`;
+      });
+    }, 0);
   }
 
   /* ==========================================================
@@ -2636,6 +3026,12 @@ const PlanModule = (() => {
     if (!el) return;
     if (currentView === 'list') {
       el.querySelector('#plNewPlan')?.addEventListener('click', () => { dirtyForm = initFormDraft(null); currentFormTab = 'basic'; currentView = 'new'; render(); });
+      // 列表页导入：默认「新建计划」，也可在预览页改成并进已有计划
+      el.querySelector('#plImportPlan')?.addEventListener('click', () => {
+        importMode = 'new';
+        importTargetId = '';
+        openImportDialog();
+      });
       el.querySelector('#plFilter')?.addEventListener('input', (e) => {
         filterText = e.target.value.trim();
         const grid = el.querySelector('.pl-card-grid');
@@ -2669,6 +3065,12 @@ const PlanModule = (() => {
       el.querySelector('#plEditPlan')?.addEventListener('click', () => { dirtyForm = initFormDraft(getPlan(currentPlanId)); currentFormTab = 'basic'; currentView = 'edit'; render(); });
       el.querySelector('#plExportPlan')?.addEventListener('click', () => {
         exportPlanExcel(getPlan(currentPlanId));
+      });
+      // 详情页导入：默认落到「当前计划 + 追加」，用户可在预览页改成覆盖或新建
+      el.querySelector('#plImportExcel')?.addEventListener('click', () => {
+        importMode = 'append';
+        importTargetId = currentPlanId || '';
+        openImportDialog();
       });
       el.querySelector('#plDeletePlan')?.addEventListener('click', () => {
         const plan = getPlan(currentPlanId);

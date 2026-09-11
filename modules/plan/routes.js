@@ -2,15 +2,19 @@
    数据完全独立：data/plan/state.json（不触碰 TB 工作台真实数据）
    可选项：与全年度项目（csenergy/project）通过 projectId 弱关联，仅用于展示跳转
    路由：
-     GET  /api/plan/state    — 读取完整状态（plans[]）
-     POST /api/plan/state    — 提交状态变更（乐观锁）
-     GET  /api/plan/summary  — 各计划的执行汇总（WBS/里程碑/资源/风险）
+     GET  /api/plan/state         — 读取完整状态（plans[]）
+     POST /api/plan/state         — 提交状态变更（乐观锁）
+     GET  /api/plan/summary       — 各计划的执行汇总（WBS/里程碑/资源/风险）
+     POST /api/plan/import-parse  — 解析上传的 Excel（平台导出 / 钉钉导出 / 任意表格），
+                                    只解析不落库，返回预览数据供前端确认后再走 /state
 */
 
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
+const XLSX = require('xlsx');
+const importCore = require('./import-core.js');
 
 const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
@@ -446,6 +450,43 @@ module.exports = {
     if (sub === '/config' && req.method === 'GET') {
       const cfg = readConfig();
       return sendJson(res, 200, { rpdTemplateUrl: cfg.rpdTemplateUrl || '' });
+    }
+
+    // 表格解析（只读，不落库）。前端上传 base64，这里解出 zip/xlsx 交给 import-core。
+    if (sub === '/import-parse' && req.method === 'POST') {
+      let body = '';
+      req.on('data', c => {
+        body += c;
+        if (body.length > 48 * 1024 * 1024) req.destroy();   // 表格文件比状态大，放宽到 48MB
+      });
+      req.on('end', () => {
+        let incoming;
+        try { incoming = JSON.parse(body); }
+        catch (e) { return sendJson(res, 400, { error: 'JSON 解析失败' }); }
+
+        const b64 = String(incoming.fileBase64 || '');
+        if (!b64) return sendJson(res, 400, { error: '缺少 fileBase64' });
+        // 允许带 data:application/...;base64, 前缀
+        const raw = b64.indexOf(',') >= 0 ? b64.slice(b64.indexOf(',') + 1) : b64;
+        let buf;
+        try { buf = Buffer.from(raw, 'base64'); }
+        catch (e) { return sendJson(res, 400, { error: 'base64 解码失败' }); }
+        if (!buf.length) return sendJson(res, 400, { error: '文件内容为空' });
+        if (buf.length > 32 * 1024 * 1024) return sendJson(res, 400, { error: '文件超过 32MB，请拆分后再导入' });
+
+        let result;
+        try {
+          result = importCore.parseWorkbook(buf, XLSX, {
+            planName: incoming.planName ? String(incoming.planName).slice(0, 120) : '',
+            sheetOverrides: incoming.sheetOverrides || null
+          });
+        } catch (e) {
+          // 不是合法工作簿时给出可读提示，而不是 500
+          return sendJson(res, 400, { error: '表格解析失败：' + e.message + '（请确认是 .xlsx / .xls 文件）' });
+        }
+        sendJson(res, 200, result);
+      });
+      return;
     }
 
     if (sub === '/state' && req.method === 'POST') {

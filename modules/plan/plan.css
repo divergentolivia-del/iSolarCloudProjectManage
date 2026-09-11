@@ -1807,3 +1807,79 @@ tr.pl-drop-deny > td {
 }
 body.dark-theme .pl-drag-ghost,
 [data-theme="dark"] .pl-drag-ghost { box-shadow: 0 8px 22px rgba(0,0,0,.5); }
+
+
+/* ==========================================================
+   Excel 导入预览（平台导出文件 / 钉钉多维表导出 / 任意表格）
+   结构：来源行 → 表归属（可改）→ 跳过的表（可救回）→ 数据质量 → 导入方式
+   ========================================================== */
+.pl-import { min-width: 0; }
+.pl-imp-head {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1px solid var(--line);
+}
+.pl-imp-head b { font-size: 14px; color: var(--text); }
+.pl-imp-src {
+  font-size: 11.5px; padding: 2px 8px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-strong); font-weight: 600;
+}
+.pl-imp-rows { font-size: 12px; color: var(--muted); margin-left: auto; }
+.pl-imp-sec { margin-bottom: 14px; }
+.pl-imp-sec-t {
+  font-size: 12px; font-weight: 700; color: var(--muted);
+  text-transform: none; letter-spacing: .02em; margin-bottom: 8px;
+}
+.pl-imp-sheet, .pl-imp-skip {
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 8px 10px; margin-bottom: 8px; background: var(--panel);
+}
+.pl-imp-sheet-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pl-imp-sheet-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.pl-imp-arrow { color: var(--muted); font-size: 12px; }
+.pl-imp-sel {
+  font-size: 12.5px; padding: 4px 8px; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--panel); color: var(--text);
+}
+.pl-imp-badge {
+  font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600;
+}
+.pl-imp-tier-strong { background: var(--ok-soft, #f6ffed); color: var(--ok); }
+.pl-imp-tier-medium { background: #fffbe6; color: #d48806; }
+.pl-imp-tier-low { background: var(--warn-soft, #fff1f0); color: var(--warn); }
+.pl-imp-cols { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 5px; }
+.pl-imp-col {
+  font-size: 11.5px; padding: 2px 7px; border-radius: var(--radius-sm);
+  background: var(--panel-soft); color: var(--muted);
+}
+.pl-imp-col i { font-style: normal; color: var(--accent); margin: 0 3px; }
+.pl-imp-drop, .pl-imp-reason { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+.pl-imp-reason { margin-left: auto; }
+.pl-imp-none { font-size: 12px; color: var(--muted); }
+.pl-imp-diags { display: flex; flex-direction: column; gap: 6px; }
+/* 诊断按「表 + 问题类型」折叠：只报计数没用，用户要看到具体是哪几行 */
+.pl-imp-diag-group {
+  font-size: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  padding: 7px 10px; background: var(--panel-soft);
+}
+.pl-imp-diag-group > summary {
+  cursor: pointer; display: flex; align-items: center; gap: 8px;
+  list-style: none; color: var(--text);
+}
+.pl-imp-diag-group > summary::-webkit-details-marker { display: none; }
+.pl-imp-diag-group > summary::before { content: '▸'; color: var(--muted); font-size: 10px; }
+.pl-imp-diag-group[open] > summary::before { content: '▾'; }
+.pl-imp-diag-group > summary .pl-imp-rows { margin-left: auto; }
+.pl-imp-diag-list { margin: 7px 0 0; padding-left: 20px; color: var(--muted); line-height: 1.7; }
+.pl-imp-diag-list li { word-break: break-all; }
+/* 预览页顶部「将写入」一行：一眼看清这次导入会产出什么 */
+.pl-imp-sum {
+  font-size: 12px; color: var(--text); background: var(--accent-soft);
+  border-radius: var(--radius-sm); padding: 6px 10px; margin-bottom: 12px;
+}
+.pl-imp-confirm-list { margin: 8px 0; padding-left: 20px; line-height: 1.8; }
+.pl-imp-modes { display: flex; flex-direction: column; gap: 6px; }
+.pl-imp-mode { font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 7px; cursor: pointer; }
+.pl-imp-target { margin-top: 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pl-imp-warn { font-size: 11.5px; color: var(--warn); }
+.pl-imp-busy { font-size: 12px; color: var(--muted); min-height: 18px; margin-top: 6px; }
+.pl-import-start .pl-dec-toolbar { margin-top: 12px; }

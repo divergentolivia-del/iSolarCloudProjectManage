@@ -1002,9 +1002,222 @@ const PlanModule = (() => {
         <div class="pl-tab-body">${tabHtml}</div>
         <div class="pl-detail-actions">
           <button class="btn" id="plDeletePlan">🗑 删除计划</button>
+          <button class="btn" id="plExportPlan" title="导出为 Excel，各 Tab 对应一个 sheet">⬇ 导出 Excel</button>
           <button class="btn primary" id="plEditPlan">✏️ 编辑计划</button>
         </div>
       </div>`;
+  }
+
+  /* ==========================================================
+     导出 Excel
+     一个计划 → 一个 .xlsx，10 个 Tab 对应 10 个 sheet。
+
+     两条硬性约束：
+     1) 必须能被自己读回去（round-trip）。树形表末尾固定带 _id / _parentId 两列，
+        否则导出再导入就丢层级与关联，阶段二的「导入钉钉表格」也没有落脚点。
+        层级编码（1 / 1.1）是渲染期算出来的，不能当作身份标识。
+     2) 单元格给人看的是中文标签（"未开始"而非 not-started），导入时按标签字典反查。
+        因此字典是导出与导入共用的唯一映射源，不另写一份。
+     ========================================================== */
+  const EXPORT_SCHEMA = 1;   // 表结构版本，导入时校验，日后加列可据此兼容
+
+  /* 每张表的列定义：h=表头，f=字段名，dict=值→中文标签字典，num=按数字写入 */
+  function planSheetSpecs() {
+    return [
+      {
+        key: 'overview', sheet: '项目总览', tree: true, nameField: 'name',
+        cols: [
+          { h: '负责人', f: 'owner' }, { h: '开始', f: 'startDate' }, { h: '结束', f: 'endDate' },
+          { h: '状态', f: 'status', dict: TASK_STATUS_LABELS }, { h: '进度%', f: 'progress', num: true },
+          { h: '交付物', f: 'deliverable' }, { h: '备注', f: 'note' }
+        ]
+      },
+      {
+        key: 'milestones', sheet: '里程碑', tree: false,
+        cols: [
+          { h: '里程碑', f: 'name' }, { h: '日期', f: 'date' },
+          { h: '状态', f: 'status', dict: MILESTONE_STATUS_LABELS },
+          { h: '负责人', f: 'owner' }, { h: '说明', f: 'desc' }
+        ]
+      },
+      {
+        key: 'tasks', sheet: 'WBS任务', tree: true, nameField: 'name',
+        cols: [
+          { h: '类型', f: 'type', dict: TASK_TYPE_LABELS },
+          { h: '状态', f: 'status', dict: TASK_STATUS_LABELS },
+          { h: '优先级', f: 'priority', dict: PRIORITY_LABELS },
+          { h: '负责人', f: 'owner' }, { h: '主责部门', f: 'dept' },
+          { h: '人天', f: 'plannedHours', num: true }, { h: '进度%', f: 'progress', num: true },
+          { h: '开始', f: 'startDate' }, { h: '结束', f: 'endDate' },
+          { h: 'WBS编码', f: 'wbsCode' },
+          { h: '依赖', get: t => (t.dependencies || []).join(', ') },
+          { h: '备注', f: 'note' }
+        ]
+      },
+      {
+        key: 'marketPlan', sheet: '上市计划', tree: true, nameField: 'name',
+        cols: [
+          { h: '计划开始时间', f: 'startDate' }, { h: '计划结束时间', f: 'endDate' },
+          { h: '任务执行人', f: 'owner' },
+          { h: '状态', f: 'status', dict: TASK_STATUS_LABELS }, { h: '备注', f: 'note' }
+        ]
+      },
+      {
+        key: 'issues', sheet: '遗留问题', tree: false,
+        cols: [
+          { h: '问题编号', f: 'code' }, { h: '遗留问题描述', f: 'desc' },
+          { h: '应对方案', f: 'solution' }, { h: '责任人', f: 'owner' },
+          { h: '预计闭环时间', f: 'dueDate' }, { h: '当前进展', f: 'progress' },
+          { h: '结论', f: 'conclusion' },
+          { h: '当前状态', f: 'status', dict: ISSUE_STATUS_LABELS }
+        ]
+      },
+      {
+        key: 'risks', sheet: '项目风险', tree: false,
+        cols: [
+          { h: '风险类型', f: 'type', dict: RISK_TYPE_LABELS },
+          { h: '风险描述', f: 'desc' }, { h: '应对方案', f: 'solution' },
+          { h: '责任人', f: 'owner' }, { h: '计划闭环时间', f: 'dueDate' },
+          { h: '风险状态', f: 'status', dict: RISK_STATUS_LABELS },
+          { h: '进展状态', f: 'progress' }
+        ]
+      },
+      {
+        key: 'resources', sheet: '资源', tree: false,
+        cols: [
+          { h: '资源', f: 'name' }, { h: '类型', f: 'kind', dict: RES_KIND_LABELS },
+          { h: '部门', f: 'dept' }, { h: '总容量(人天)', f: 'total', num: true }
+        ]
+      },
+      {
+        key: 'members', sheet: '团队成员', tree: false,
+        cols: [
+          { h: '姓名', f: 'name' }, { h: '角色', f: 'role', dict: MEMBER_ROLE_LABELS },
+          { h: '部门/团队', f: 'dept' }, { h: '职责分工', f: 'duty' }, { h: '联系方式', f: 'contact' }
+        ]
+      },
+      {
+        key: 'references', sheet: '参考文档', tree: true, nameField: 'title',
+        cols: [
+          { h: '评审阶段', f: 'stage', dict: REF_STAGE_LABELS },
+          { h: '责任部门(人)', f: 'dept' }, { h: '提交人员', f: 'owner' },
+          { h: '提交日期', f: 'date' },
+          { h: '提交状态', f: 'status', dict: REF_DOC_STATUS_LABELS },
+          { h: '评审要求', f: 'requirement' }, { h: '模板链接', f: 'link' }
+        ]
+      }
+    ];
+  }
+
+  function cellValue(item, col) {
+    if (col.get) return col.get(item);
+    const raw = item[col.f];
+    if (col.dict) return col.dict[raw] != null ? col.dict[raw] : (raw == null ? '' : String(raw));
+    if (col.num) {
+      if (raw === '' || raw == null) return '';
+      const n = Number(raw);
+      return isFinite(n) ? n : String(raw);
+    }
+    return raw == null ? '' : String(raw);
+  }
+
+  /* 基本信息 sheet：纵向「字段 | 值」两列，比横排一行可读 */
+  function basicSheetAoa(plan) {
+    return [
+      ['字段', '值'],
+      ['计划名称', plan.name || ''],
+      ['年度', plan.year || ''],
+      ['状态', PLAN_STATUS_LABELS[plan.status] || plan.status || ''],
+      ['负责人', plan.owner || ''],
+      ['关联项目', plan.projectName || ''],
+      ['开始日期', plan.startDate || ''],
+      ['结束日期', plan.endDate || ''],
+      ['计划说明', plan.description || '']
+    ];
+  }
+
+  /* 树形表：层级编码 + 缩进后的名称，末尾 _id/_parentId 供导入还原层级 */
+  function treeSheetAoa(list, spec) {
+    const head = ['层级', spec.sheet === '参考文档' ? '交付产物' : '名称']
+      .concat(spec.cols.map(c => c.h)).concat(['_id', '_parentId']);
+    const rows = treeOrder(list).map(o => {
+      const it = o.item;
+      const label = String(it[spec.nameField] || '');
+      return [o.code, '　'.repeat(o.depth) + label]
+        .concat(spec.cols.map(c => cellValue(it, c)))
+        .concat([it.id || '', it.parentId || '']);
+    });
+    return [head].concat(rows);
+  }
+
+  /* 平铺表：序号 + 各列，末尾 _id（无层级，不需要 _parentId） */
+  function flatSheetAoa(list, spec) {
+    const head = ['#'].concat(spec.cols.map(c => c.h)).concat(['_id']);
+    const rows = (list || []).map((it, i) =>
+      [i + 1].concat(spec.cols.map(c => cellValue(it, c))).concat([it.id || '']));
+    return [head].concat(rows);
+  }
+
+  /* 按内容估算列宽，避免导出后每列都要手动拉宽 */
+  function autoColWidths(aoa) {
+    const width = s => String(s == null ? '' : s)
+      .split('').reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 2 : 1), 0);
+    const n = aoa.reduce((m, r) => Math.max(m, r.length), 0);
+    const out = [];
+    for (let c = 0; c < n; c++) {
+      let w = 8;
+      for (const r of aoa) w = Math.max(w, Math.min(width(r[c]) + 2, 50));
+      out.push({ wch: w });
+    }
+    return out;
+  }
+
+  /* 构建工作簿（与写文件分离，便于自动化校验内容而不必真的下载） */
+  function buildPlanWorkbook(plan) {
+    if (typeof XLSX === 'undefined') throw new Error('Excel 组件未加载');
+    const wb = XLSX.utils.book_new();
+
+    const add = (name, aoa) => {
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = autoColWidths(aoa);
+      XLSX.utils.book_append_sheet(wb, ws, name);
+    };
+
+    add('基本信息', basicSheetAoa(plan));
+    planSheetSpecs().forEach(spec => {
+      const list = plan[spec.key] || [];
+      add(spec.sheet, spec.tree ? treeSheetAoa(list, spec) : flatSheetAoa(list, spec));
+    });
+    // 元信息放最后：导入时据此识别来源与版本；_id 列的用途也写在这里
+    add('_元信息', [
+      ['键', '值'],
+      ['schema', EXPORT_SCHEMA],
+      ['planId', plan.id || ''],
+      ['planName', plan.name || ''],
+      ['exportedAt', new Date().toISOString()],
+      ['exportedBy', (typeof Platform !== 'undefined' && Platform.getUser && Platform.getUser()) || ''],
+      ['说明', '各表末尾的 _id / _parentId 列用于回导时还原层级与对应关系，请勿修改或删除。「层级」列是渲染期计算值，不作为身份标识。']
+    ]);
+
+    const safe = String(plan.name || '项目计划').replace(/[\\/:*?"<>|]/g, '_').slice(0, 60);
+    const d = new Date();
+    const stamp = d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+    return { wb: wb, fileName: `${safe}_${stamp}.xlsx` };
+  }
+
+  function exportPlanExcel(plan) {
+    if (typeof XLSX === 'undefined') {
+      SharedUI.toast('Excel 组件未加载，请刷新页面后重试', 'error');
+      return;
+    }
+    if (!plan) { SharedUI.toast('未找到计划数据', 'error'); return; }
+    try {
+      const { wb, fileName } = buildPlanWorkbook(plan);
+      XLSX.writeFile(wb, fileName);
+      SharedUI.toast('已导出 ' + fileName, 'success');
+    } catch (e) {
+      SharedUI.toast('导出失败: ' + e.message, 'error');
+    }
   }
 
   /* ==========================================================
@@ -2454,6 +2667,9 @@ const PlanModule = (() => {
     } else if (currentView === 'detail') {
       el.querySelector('#plBack')?.addEventListener('click', () => { currentView = 'list'; render(); });
       el.querySelector('#plEditPlan')?.addEventListener('click', () => { dirtyForm = initFormDraft(getPlan(currentPlanId)); currentFormTab = 'basic'; currentView = 'edit'; render(); });
+      el.querySelector('#plExportPlan')?.addEventListener('click', () => {
+        exportPlanExcel(getPlan(currentPlanId));
+      });
       el.querySelector('#plDeletePlan')?.addEventListener('click', () => {
         const plan = getPlan(currentPlanId);
         if (!plan) return;
@@ -2675,7 +2891,11 @@ const PlanModule = (() => {
   // 暴露内部 debug 钩子
   const api = {
     moduleId: 'plan',
-    refresh: async () => { await Promise.all([fetchState(), fetchSummary()]); render(); }
+    refresh: async () => { await Promise.all([fetchState(), fetchSummary()]); render(); },
+    // 导出相关钩子：便于自动化校验工作簿内容，无需真的触发文件下载
+    buildPlanWorkbook: buildPlanWorkbook,
+    exportPlanExcel: exportPlanExcel,
+    getPlan: (id) => getPlan(id)
   };
   if (!window._planApi) window._planApi = api;
 

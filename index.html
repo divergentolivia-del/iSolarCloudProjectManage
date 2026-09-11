@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>云平台人力产能工作台</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- SheetJS：本地同源加载。原先挂在 cdn.jsdelivr.net，内网访问不到时导入/导出会静默失效 -->
+<script src="vendor/xlsx.full.min.js?v=0.18.5"></script>
 <link rel="stylesheet" href="app.css">
 </head>
 <body>

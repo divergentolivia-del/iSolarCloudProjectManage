@@ -1877,6 +1877,13 @@ async function deleteArchive(id) {
 
 /* 通用导出 xlsx 逻辑（可用于当前 state 或归档 state） */
 function exportXlsxFromState(s, res, fileName) {
+  /* SheetJS 未加载时给出明确提示。原先此处直接用 XLSX，库加载失败会抛
+     ReferenceError 崩在控制台里，界面上只是「点了没反应」，很难排查。
+     （budget / plan 两处早有此兜底，唯独这里漏了） */
+  if (typeof XLSX === 'undefined') {
+    toast('Excel 组件未加载，请刷新页面后重试');
+    return;
+  }
   const wb = XLSX.utils.book_new();
 
   const head = ['分类'].concat(TEAMS.map(t => t.key)).concat(['合计（人天）']);

@@ -714,7 +714,43 @@ function tbSumRows(rows) {
    旧结构 state.tbSprintMap = { sprintId: 迭代名 }（只有「改名」，不能解锁换月）。
    新结构 state.tbBoardSprints = { cloud:[{sid,name}], middle:[{sid,name}], productLine:[{sid,name}] }，
    按看板分别编辑 sprintId + 迭代名，同步时据此构造 boardOverrides（决定拉哪个迭代）。
-   两者并存并互相同步：save 时同时写 tbSprintMap，保证旧读取逻辑兼容。 */
+   两者并存并互相同步：save 时同时写 tbSprintMap，保证旧读取逻辑兼容。
+   sprintId 现在从 TB 实时拉取（/api/tb/sprints）用下拉选择，不再手填 24 位 ID。 */
+
+/* 迭代列表缓存（仅前端内存，不落库）：从 /api/tb/sprints 拉取后供下拉复用。
+   形如 { list: [{id,name,status,startDate,dueDate}], at: 时间戳, error: '' } */
+let TB_SPRINT_CACHE = { list: null, at: 0, loading: false };
+
+/** 迭代状态的中文标签（用于下拉展示） */
+function sprintStatusLabel(s) {
+  return s === 'active' ? '进行中' : s === 'future' ? '未开始' : s === 'complete' ? '已完成' : (s || '未知');
+}
+
+/** 构造某个迭代的下拉选项 HTML，含「当前已选但不在列表里」的兜底项。
+    keyword 非空时只保留名称匹配的项（前端过滤，用于 150+ 迭代时快速定位）。 */
+function sprintOptionsHtml(currentSid, keyword) {
+  const cur = String(currentSid || '').trim();
+  const kw = String(keyword || '').trim().toLowerCase();
+  const list = (TB_SPRINT_CACHE.list || []).filter(s => !kw || String(s.name || '').toLowerCase().indexOf(kw) >= 0);
+
+  let matchedCur = false;
+  let opts = `<option value="">— 请选择迭代 —</option>`;
+  list.forEach(s => {
+    const sel = s.id === cur ? ' selected' : '';
+    if (s.id === cur) matchedCur = true;
+    const d = String(s.startDate || s.dueDate || '').slice(0, 10);
+    const label = s.name + '（' + sprintStatusLabel(s.status) + (d ? ' · ' + d : '') + '）';
+    opts += `<option value="${esc(s.id)}"${sel}>${esc(label)}</option>`;
+  });
+  // 已配置的 sid 不在(过滤后)列表里：保留一项，避免静默丢配置
+  if (cur && !matchedCur) {
+    const inFull = (TB_SPRINT_CACHE.list || []).some(s => s.id === cur);
+    const suffix = inFull ? '（已被搜索过滤）' : '（不在列表中）';
+    opts += `<option value="${esc(cur)}" selected>${esc(cur + suffix)}</option>`;
+  }
+  return opts;
+}
+
 function boardSprints() {
   const b = state.tbBoardSprints;
   return {
@@ -821,28 +857,42 @@ function renderTbSyncCard() {
     ? distBody
     : `<tr><td colspan="4" class="txt tb-empty">该数据源暂无数据。点击「自动同步 TB」拉取，或下方「手动导入工时数据」上传。</td></tr>`;
 
-  /* 按看板渲染映射行。canDelete 仅 productLine 每个合并迭代提供删行。 */
+  /* 按看板渲染映射行。canDelete 仅 productLine 每个合并迭代提供删行。
+     sprintId 用下拉（数据来自 /api/tb/sprints）；迭代名输入框保留，切迭代后自动带出、也可手改。 */
   const bs = boardSprints();
+  const hasSprintList = !!(TB_SPRINT_CACHE.list && TB_SPRINT_CACHE.list.length);
   const mapRow = (bKey, r, ri, canDelete) => `
       <tr class="tb-map-row">
-        <td class="txt"><input class="tb-map-sid" data-board="${bKey}" data-ri="${ri}" value="${esc(r.sid)}" placeholder="24位sprintId"></td>
         <td class="txt">
-          <input class="tb-map-name" data-board="${bKey}" data-ri="${ri}" value="${esc(r.name)}" placeholder="迭代名（如 阳光云2026-8月C版本迭代）">
+          <select class="tb-map-sid" data-board="${bKey}" data-ri="${ri}">
+            ${sprintOptionsHtml(r.sid)}
+          </select>
+        </td>
+        <td class="txt">
+          <input class="tb-map-name" data-board="${bKey}" data-ri="${ri}" value="${esc(r.name)}" placeholder="迭代名（选迭代后自动带出）">
           ${canDelete ? `<button class="btn tb-map-row-del" data-board="${bKey}" data-ri="${ri}" title="删除这行">✕</button>` : ''}
         </td>
       </tr>`;
   const mapBlock = (bKey, bName, desc, canAdd) => {
     const rows = bs[bKey] && bs[bKey].length ? bs[bKey] : [{ sid: '', name: '' }];
     const rowsHtml = rows.map((r, ri) => mapRow(bKey, r, ri, canAdd)).join('');
+    const cacheTip = hasSprintList
+      ? `已加载 ${TB_SPRINT_CACHE.list.length} 个迭代，可直接下拉选择。`
+      : `尚未加载迭代列表，点「🔃 拉取迭代列表」后从下拉选择。`;
     return `<div class="tb-map-board" data-board="${bKey}">
       <div class="tb-map-board-head"><b>${esc(bName)}</b><span class="tb-map-board-desc">${desc}</span></div>
+      <div class="tb-sprint-search">
+        <input class="tb-sprint-search-input" data-board="${bKey}" placeholder="🔍 输入关键字过滤迭代名（如「8月」「2026年9月」）">
+      </div>
       <div class="scroll"><table class="tb-table tb-map-table">
-        <thead><tr><th class="txt">sprintId（TB迭代ID）</th><th class="txt">迭代名（可编辑）</th></tr></thead>
+        <thead><tr><th class="txt">迭代（TB）</th><th class="txt">迭代名（可编辑）</th></tr></thead>
         <tbody>${rowsHtml}</tbody>
       </table></div>
       <div class="tb-actions">
+        <button class="btn tb-sprint-fetch">🔃 拉取迭代列表</button>
         ${canAdd ? '<button class="btn tb-map-add">+ 新增迭代（合并）</button>' : ''}
         <button class="btn primary tb-map-save">保存映射</button>
+        <span class="tb-map-tip">${esc(cacheTip)}</span>
       </div>
     </div>`;
   };
@@ -862,8 +912,8 @@ function renderTbSyncCard() {
 
   return `
     <div class="card tb-sync-card">
-      <h2>🔗 TB 工时同步 <span class="tb-config-badge" title="Token 是否已配置">…</span></h2>
-      <p class="hint">从 Teambition 一次性拉取阳光云、中后台、产品线三个看板的任务故事点，按团队聚合并写入本期工时。Token 在服务端 data/tb/secret.json 配置，前端不接触明文；每个看板同步哪个迭代，在下方「迭代映射配置」里改 sprintId 即可，换月无需改动代码。</p>
+      <h2>🔗 TB 工时同步 <span class="tb-config-badge" title="TB 凭据是否已配置">…</span></h2>
+      <p class="hint">从 Teambition 一次性拉取阳光云、中后台、产品线三个看板的任务故事点，按团队聚合并写入本期工时。凭据在服务端 data/tb/secret.json 配置（应用凭据优先，User Token 兜底），前端不接触明文；每个看板同步哪个迭代，在下方「迭代映射配置」里从下拉选择即可，换月无需改动代码。</p>
 
       <div class="tb-scroll">
         <table class="tb-table tb-src-table">
@@ -1059,8 +1109,21 @@ RENDERERS.import = function () {
       .then(cfg => {
         const badge = view.querySelector('.tb-config-badge');
         if (badge) {
-          badge.textContent = cfg.tokenConfigured ? 'Token 已配置' : 'Token 未配置';
-          badge.className = 'tb-config-badge ' + (cfg.tokenConfigured ? 'ok' : 'warn');
+          const mode = cfg.authMode || (cfg.tokenConfigured ? 'user' : 'none');
+          const label = mode === 'app' ? '应用凭据已配置'
+            : mode === 'user' ? 'User Token 已配置'
+              : '凭据未配置';
+          badge.textContent = label;
+          badge.className = 'tb-config-badge ' + (mode === 'none' ? 'warn' : 'ok');
+          badge.title = mode === 'app'
+            ? '当前使用应用凭据（appId/appSecret + X-Operator-Id）'
+            : mode === 'user'
+              ? '当前使用 User Token（回退模式）。建议改用应用凭据。'
+              : '未配置任何 TB 凭据，无法同步';
+        }
+        // 首次进入时自动拉一次迭代列表，用户直接就能下拉选择
+        if (cfg.authMode !== 'none' && !TB_SPRINT_CACHE.list && !TB_SPRINT_CACHE.loading) {
+          loadTbSprints(view, true);
         }
         const seed = b => {
           const ids = (b && (b.sprintIds || (b.sprintId ? [b.sprintId] : null))) || [];
@@ -1099,6 +1162,41 @@ RENDERERS.import = function () {
     det.addEventListener('toggle', () => {
       if (!state.mapDetailsOpen) state.mapDetailsOpen = {};
       state.mapDetailsOpen[det.dataset.details] = det.open;
+    });
+  });
+
+  // 「拉取迭代列表」：把 TB 的迭代拉回来填进下拉框（结果只存内存，不落库）
+  view.querySelectorAll('.tb-sprint-fetch').forEach(fetchBtn => {
+    fetchBtn.addEventListener('click', () => loadTbSprints(view, false));
+  });
+
+  // 搜索框过滤迭代下拉：只改 option，不重渲染（避免输入框失焦）
+  view.querySelectorAll('.tb-sprint-search-input').forEach(inp => {
+    inp.addEventListener('input', () => {
+      if (!TB_SPRINT_CACHE.list || !TB_SPRINT_CACHE.list.length) {
+        toast('请先点「🔃 拉取迭代列表」');
+        return;
+      }
+      const boardEl = inp.closest('.tb-map-board');
+      if (!boardEl) return;
+      const kw = inp.value;
+      boardEl.querySelectorAll('.tb-map-row').forEach(rowEl => {
+        const sel = rowEl.querySelector('.tb-map-sid');
+        if (!sel) return;
+        const cur = sel.value; // 保留当前已选，避免过滤后选中项被清掉
+        sel.innerHTML = sprintOptionsHtml(cur, kw);
+      });
+    });
+  });
+
+  // 下拉选择迭代：自动把迭代名带进同行「迭代名」输入框（用户仍可手改）
+  view.querySelectorAll('.tb-map-sid').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const sid = sel.value;
+      const hit = (TB_SPRINT_CACHE.list || []).find(s => s.id === sid);
+      const rowEl = sel.closest('.tb-map-row');
+      const nameInput = rowEl ? rowEl.querySelector('.tb-map-name') : null;
+      if (hit && nameInput) nameInput.value = hit.name;
     });
   });
 
@@ -1157,6 +1255,39 @@ RENDERERS.import = function () {
     });
   });
 };
+
+/* ---------- 拉取 TB 迭代列表（供迭代映射下拉使用）----------
+   调后端 /api/tb/sprints（内部走 v3/project/{id}/sprint/search）。
+   结果只缓存在前端内存 TB_SPRINT_CACHE，不落库；silent=true 时用于首次自动加载，不弹 toast。 */
+function loadTbSprints(view, silent) {
+  if (Sync.mode !== 'server') {
+    if (!silent) toast('拉取迭代列表需在服务端模式下使用。');
+    return;
+  }
+  if (TB_SPRINT_CACHE.loading) return;
+  TB_SPRINT_CACHE.loading = true;
+
+  fetch('api/tb/sprints', { cache: 'no-store' })
+    .then(r => r.json().then(j => ({ status: r.status, body: j })))
+    .then(({ status, body }) => {
+      TB_SPRINT_CACHE.loading = false;
+      if (status !== 200 || !body.ok) {
+        TB_SPRINT_CACHE.error = (body && body.error) || ('HTTP ' + status);
+        if (!silent) toast('❌ ' + TB_SPRINT_CACHE.error);
+        return;
+      }
+      TB_SPRINT_CACHE.list = body.sprints || [];
+      TB_SPRINT_CACHE.at = Date.now();
+      TB_SPRINT_CACHE.error = '';
+      if (!silent) toast('✅ 已加载 ' + TB_SPRINT_CACHE.list.length + ' 个迭代，请在下拉框中选择');
+      RENDERERS.import();
+    })
+    .catch(e => {
+      TB_SPRINT_CACHE.loading = false;
+      TB_SPRINT_CACHE.error = String(e && e.message || e);
+      if (!silent) toast('❌ 拉取迭代列表失败：' + TB_SPRINT_CACHE.error);
+    });
+}
 
 /* ---------- TB 自动同步（阶段二）----------
    调用后端 /api/tb/sync，一次性拉取三个看板（阳光云/中后台/产品线）并写入 state。

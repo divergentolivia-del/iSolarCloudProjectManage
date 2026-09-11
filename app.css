@@ -449,7 +449,39 @@ body.archive-readonly .archive-btn { display: none; }
 .tb-map-table td:first-child { width: 260px; min-width: 260px; }
 .tb-map-table td:nth-child(2) { min-width: 240px; }
 .tb-map-table .tb-map-row td { padding: 4px 6px; }
-.tb-map-table .tb-map-sid { min-width: 230px; }
+.tb-map-table .tb-map-sid { min-width: 230px; width: 100%; }
+/* 迭代下拉：标签较长，给足宽度并支持溢出省略 */
+select.tb-map-sid {
+  max-width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg, #fff);
+}
+select.tb-map-sid:focus {
+  outline: 0;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+}
+/* 迭代搜索框：150+ 迭代时按关键字过滤 */
+.tb-sprint-search { padding: 0 0 8px; }
+.tb-sprint-search-input {
+  width: 100%;
+  max-width: 420px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text);
+}
+.tb-sprint-search-input:focus {
+  outline: 0;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+}
+.tb-map-tip { color: var(--muted); font-size: 12px; align-self: center; }
 .tb-map-name {
   width: 100%;
   padding: 6px 10px;

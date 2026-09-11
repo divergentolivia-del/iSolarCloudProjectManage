@@ -4,3 +4,11 @@
 .release-card.release-risk-high { border-left-color:var(--warn); }
 .release-card.release-risk-medium { border-left-color:var(--hold); }
 .release-card.release-risk-low { border-left-color:var(--ok); }
+
+/* Teambition 关联 */
+.tb-link-current { margin-top: 6px; color: var(--text); font-size: 13px; overflow-wrap: anywhere; }
+.tb-link-at { color: var(--muted); font-size: 12px; font-weight: 400; }
+.tb-link-results { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; max-height: 220px; overflow-y: auto; }
+.tb-link-option { justify-content: flex-start; text-align: left; overflow-wrap: anywhere; }
+.tb-link-archived { color: var(--muted); font-size: 12px; font-weight: 400; }
+.tb-link-section { padding: 16px; background: var(--panel-soft); border: 1px solid var(--line); border-left: 4px solid var(--blue); border-radius: var(--radius); }

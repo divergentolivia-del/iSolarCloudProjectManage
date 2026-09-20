@@ -85,6 +85,7 @@ function loadAll() {
     registered.push({
       id: mod.id,
       prefix: mod.prefix,
+      resource: mod.resource || mod.id,
       handle: mod.handle,
       module: mod
     });
@@ -125,8 +126,29 @@ function dispatch(req, res, url) {
 function list() {
   return registered.map(m => ({
     id: m.id,
-    prefix: m.prefix
+    prefix: m.prefix,
+    resource: m.resource
   }));
 }
 
-module.exports = { loadAll, dispatch, list };
+/**
+ * resourceOf(pathname) — 该路径属于哪个模块的权限资源名。
+ * 优先两段匹配（/api/plan/xxx → plan），再一段（/api/plan）。
+ * server.js 的权限门禁用这个查模块归属，不再维护平行映射表；
+ * 模块导出的 resource 字段缺省时默认取 id。
+ */
+function resourceOf(pathname) {
+  const parts = String(pathname || '').split('/').filter(Boolean);
+  if (parts[0] !== 'api') return '';
+  const two = '/' + parts.slice(0, 2).join('/');
+  const one = '/' + parts.slice(0, 1).join('/');
+  for (const m of registered) {
+    if (m.prefix === two) return m.resource;
+  }
+  for (const m of registered) {
+    if (m.prefix === one) return m.resource;
+  }
+  return '';
+}
+
+module.exports = { loadAll, dispatch, list, resourceOf };

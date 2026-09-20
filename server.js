@@ -204,20 +204,13 @@ if (process.platform === 'win32' && process.stdin.isTTY) {
 
 /* ---------- 身份与权限门禁 ---------- */
 
-/* 模块前缀 → 权限资源名。与 modules/<id>/routes.js 的 prefix 一一对应。
-   新增模块时这里要补一行，否则该模块会被「默认拒绝」。 */
-const PREFIX_RESOURCE = {
-  '/api/plan': 'plan',
-  '/api/iteration': 'iteration',
-  '/api/project': 'project',
-  '/api/csenergy': 'csenergy',
-  '/api/budget': 'budget',
-  '/api/token': 'token',
-  '/api/dashboard': 'dashboard',
-  '/api/tb': 'tb',
-  '/api/settings': 'settings',
-  '/api/archive': 'archive',
-  '/api/platform': 'platform'
+/* 非模块内置路由的权限资源名（由 server.js 直接处理，不走 module-loader）。
+   模块前缀 → 资源名的映射不再在这里维护：模块在 modules/<id>/routes.js
+   导出里声明 resource（缺省取 id），由 module-loader 注册表统一管理。
+   新增模块无需改这里；新增内置路由才需要在这里补一行。 */
+const BUILTIN_RESOURCE = {
+  '/api/platform': 'platform',
+  '/api/archive': 'archive'
 };
 
 /* 不需要登录的路径：登录接口本身、当前用户查询、登录页与静态样式脚本、
@@ -230,13 +223,15 @@ const AUTH_OPEN = [
   '/favicon.ico'
 ];
 
-/** 该路径属于哪个模块资源；单段路径（/api/plan）取第一段 */
+/** 该路径属于哪个模块资源；单段路径（/api/plan）取第一段。
+    先查内置路由，再查 module-loader 注册表（模块自声明）。 */
 function resourceOf(pathname) {
   const parts = String(pathname || '').split('/').filter(Boolean);
   if (parts[0] !== 'api') return '';
   const two = '/' + parts.slice(0, 2).join('/');
   const one = '/' + parts.slice(0, 1).join('/');
-  return PREFIX_RESOURCE[two] || PREFIX_RESOURCE[one] || '';
+  return BUILTIN_RESOURCE[two] || BUILTIN_RESOURCE[one]
+      || moduleLoader.resourceOf(pathname);
 }
 
 /** 请求是不是「取数据」——GET 只读，其余一律按写处理（保守） */

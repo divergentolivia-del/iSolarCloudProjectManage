@@ -28,3 +28,9 @@ tb-secret.json
 # 钉钉应用凭据（本机，绝不入库）
 data/dingtalk/secret.json
 data/dingtalk/state.json
+
+# 平台系统库（身份/权限/审计）
+data/platform.db
+data/platform.db-wal
+data/platform.db-shm
+data/platform.db.bak

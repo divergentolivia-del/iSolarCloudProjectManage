@@ -171,3 +171,64 @@ E:\PMWork\Project Materials\iSolarCloudProject\迭代版本\iSolarCloudProjectMa
 3. 等用户提供应用凭据 + 权限点名称 + 文档链接 + 网络连通性结论（2b）
 4. 凭据到手后**第一步只写最小连通性验证**（换 token → 解析 docUrl → 读区间打印），
    **跑通之前不写任何同步逻辑**（TB 那次的教训）
+
+---
+
+# 交接文档 v3 — 2026-09-20（M1 地基 · 第 1 步已落地）
+
+## A. 本轮做了什么
+
+平台从「个人看板」升级为「多人协同 + AI 驱动的 PMO 工作台」。设计文档在
+`docs/plan-ai-master.md`（**唯一权威主线**）、`docs/plan-ai-roadmap.md`（底稿）、
+`docs/plan-ai-m1-foundation.md`（M1 落地设计）。
+
+**M1 第 1 步（身份 / 权限 / 审计的地基）代码已完成**：
+
+| 文件 | 状态 | 说明 |
+|---|---|---|
+| `db.js` | 新增 | `node:sqlite` 连接 + users/sessions/audit_log/permissions/meta 五张表 |
+| `audit.js` | 改写 | 底层切到 SQLite；**`log()` / `getRecent()` 签名不变**，调用方零改动 |
+| `_db-test.js` | 新增 | 6 个用例，`node --test _db-test.js`，全绿 |
+| `server.js` | 小改 | 启动时开库 + 迁移旧审计 + 首次打印管理员口令 |
+| `.gitignore` | 小改 | 忽略 `data/platform.db*` |
+
+**未动**：模块业务数据仍写各自 `data/<模块>/state.json`（见下面第 4 条坑）。
+
+## B. 为什么是「混合存储」而不是全量换库
+
+实测数据：280 KB 的 `data/iteration/state.json` 全量「读→改→写」= **约 7 ms**。
+所以「JSON 慢」这个假设是错的，**性能不是换库的理由**。
+真正的缺口是 JSON 做不了的：按人/按条件查询、追加写、长期留痕。
+结论——**只有身份/权限/审计进库，业务状态继续用 JSON**。
+
+## C. 本轮踩过的坑
+
+8. **注释里的 `*/` 会提前闭合块注释**：`db.js` 开头写
+   `modules/*/routes.js` 当说明，其中的 `*/` 直接终止了 `/* ... */`，
+   后面整段中文被当成代码 → `SyntaxError: Unexpected identifier '的'`。
+   写路径通配符时改用 `各模块 routes.js`，别在块注释里出现 `*/`。
+9. **迁移「新在前」的旧文件必须倒序插入**：旧 `audit-log.json` 是倒序数组，
+   而 SQLite 的 `id` 是自增、查询按 `ORDER BY id DESC`。
+   若正序插入，**最新的记录会拿到最小的 id、排到列表最末**，看起来像日志错乱。
+   改成 `old.slice().reverse()` 后才对齐。**教训：迁移时要同时对齐「顺序语义」，不只是「内容」。**
+10. **`node:sqlite` 是 experimental**：启动会打 `ExperimentalWarning`，属正常噪声。
+    所有 SQL 已收敛在 `db.js` 内，将来换 `better-sqlite3` 只改这一个文件。
+11. **Git Bash 里 `curl -d '{"by":"中文"}'` 会把中文按 GBK 转码**，
+    存进库是 `Ǩ����֤` 这种乱码 —— **是测试方法的问题，不是代码问题**。
+    验中文写入要用 `node -e` 发 UTF-8 请求（同第 5 条）。
+
+## D. 安全铁律（新增一条）
+
+- `data/iteration/state.json` **已被 git 跟踪**且含真实工时数据 —— **绝不提交**。
+- **永远不要用 `git add .`**，只显式 add 具体文件。
+- 钉钉/TB 凭据一律放 `data/**/secret.json`（已 ignore），**绝不入库**。
+- **新增：`data/platform.db` 含口令哈希与审计记录 —— 已 ignore，绝不入库。**
+  首次启动打印的 admin 口令只出现一次，看到就记下来。
+
+## E. 下一步（M1 剩余）
+
+1. `modules/auth/routes.js`：登录/登出/`/api/auth/me` + session cookie
+2. 前端登录页；`platform.js:316` 的 `whoami()` 从读 localStorage 改成读 `/api/auth/me`
+3. 权限矩阵挂到 `module-loader.js` 的 `dispatch()` 上（按前缀判 resource）
+4. 部署脚本 + 备份 + 运行手册
+

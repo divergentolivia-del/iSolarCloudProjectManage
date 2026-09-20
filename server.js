@@ -466,6 +466,11 @@ ensureDirs();
 // 数据迁移检查（将旧版单目录结构迁移到多模块目录结构）
 migrate(DATA_DIR);
 
+// 打开系统库（身份/权限/审计），并迁移旧的 audit-log.json
+require('./db').open();
+const _auditMig = audit.migrateLegacy();
+const _bootAdmin = require('./db').takeInitialAdmin();
+
 // 加载动态模块
 moduleLoader.loadAll();
 
@@ -483,6 +488,13 @@ server.listen(PORT, () => {
   ips.forEach(ip => console.log('  同事访问：http://' + ip + ':' + PORT));
   console.log('  数据文件：' + STATE_FILE);
   console.log('  停止服务：在本窗口按 Ctrl+C（会先通知在线页面，不会丢数据）');
+  if (_auditMig.migrated > 0) {
+    console.log('  审计日志已迁入系统库：' + _auditMig.migrated + ' 条（旧文件改名留档为 audit-log.json.migrated）');
+  }
+  if (_bootAdmin) {
+    console.log('\n【首次启动】已创建默认管理员，请记下口令并尽快登录修改：');
+    console.log('  账号：' + _bootAdmin.id + '    口令：' + _bootAdmin.password);
+  }
   if (ACCESS_TOKEN) {
     console.log('\n已启用访问口令。分享给同事的链接需带参数：');
     ips.forEach(ip => console.log('  http://' + ip + ':' + PORT + '/?token=' + ACCESS_TOKEN));

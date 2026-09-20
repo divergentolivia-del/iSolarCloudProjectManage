@@ -306,14 +306,57 @@ const Platform = (() => {
      User Identity (whoami)
      ============================================================ */
 
+  /* 服务端返回的登录用户（见 refreshIdentity）。
+     whoami() 有十几处同步调用点，改签名会牵动一大片，
+     所以这里缓存一份，whoami() 保持「同步返回字符串」不变。 */
+  let _serverUser = null;
+  let _serverPermissions = [];
+
+  /**
+   * 向服务端确认「我是谁」。
+   * 登录未启用时服务端返回 { user: null }，此时退回原来的本地昵称逻辑。
+   * @returns {Promise<void>}
+   */
+  function refreshIdentity() {
+    return fetch('/api/auth/me', { credentials: 'same-origin' })
+      .then(r => r.ok ? r.json() : { user: null })
+      .then(d => {
+        if (d && d.user) {
+          _serverUser = d.user;
+          _serverPermissions = d.permissions || [];
+          /* 顺手清掉旧的假身份，避免它继续散落在 localStorage 里 */
+          try {
+            localStorage.removeItem(USER_KEY);
+            localStorage.removeItem('workbench-user');
+          } catch (e) { /* ignore */ }
+        } else {
+          _serverUser = null;
+        }
+      })
+      .catch(() => { _serverUser = null; });
+  }
+
+  /** 当前登录用户（未启用登录时为 null） */
+  function currentUser() { return _serverUser; }
+
+  /** 是否拥有某个权限，如 'plan:write'（未启用登录时不拦，返回 true） */
+  function can(resource) {
+    if (!_serverUser) return true;
+    if (_serverUser.role === 'admin') return true;
+    return _serverPermissions.indexOf(resource) >= 0;
+  }
+
   /**
    * Get current user name.
-   * 1. Try localStorage key 'wb_who'
-   * 2. Fall back to legacy key 'workbench-user'
-   * 3. If not found, prompt the user
+   * 1. 已登录 → 用服务端返回的姓名（唯一可信来源）
+   * 2. 未启用登录 → 退回 localStorage 键 'wb_who'
+   * 3. 再退回旧键 'workbench-user'
+   * 4. 都没有则询问
    * @returns {string} User name
    */
   function whoami() {
+    if (_serverUser && _serverUser.name) return _serverUser.name;
+
     let name = '';
     try {
       name = localStorage.getItem(USER_KEY) || '';
@@ -535,6 +578,12 @@ const Platform = (() => {
     // Load sidebar preference
     loadSidebarPreference();
 
+    /* 先问服务端「我是谁」，再决定导航栏显示谁。
+       拿不到就照旧走本地昵称，行为与从前一致。 */
+    refreshIdentity().then(() => {
+      renderNavbarUser();
+    });
+
     // Render sidebar navigation items
     renderSidebarNav();
 
@@ -663,6 +712,9 @@ const Platform = (() => {
     collapseSidebar,
     expandSidebar,
     whoami,
+    currentUser,
+    can,
+    refreshIdentity,
 
     // Internal helper exposed for Router to call
     _highlightNav: highlightNav

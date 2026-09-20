@@ -32,14 +32,23 @@ const Sync = (function () {
     try { return JSON.parse(JSON.stringify(o)); } catch (e) { return null; }
   }
 
-  /* 填报人署名，用于变更留痕 */
+  /* 填报人署名，用于变更留痕。
+     已登录时以服务端身份为准，未启用登录才退回本地昵称。
+     缓存一次：署名不该在同一次填报里变来变去。 */
+  let _who = null;
   function whoami() {
+    if (_who) return _who;
+    if (window.Platform && typeof window.Platform.whoami === 'function') {
+      const n = window.Platform.whoami();
+      if (n && n !== '未署名') { _who = n; return _who; }
+    }
     let n = localStorage.getItem('workbench-user') || '';
     if (!n) {
       n = (window.prompt('请输入你的姓名（用于记录填报人）') || '').trim();
       if (n) localStorage.setItem('workbench-user', n);
     }
-    return n || '未署名';
+    _who = n || '未署名';
+    return _who;
   }
 
   /* ---------- 本机暂存 ---------- */

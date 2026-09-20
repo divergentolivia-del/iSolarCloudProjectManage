@@ -16,6 +16,9 @@ const archiveMod = require('./archive');
 /* 审计日志 */
 const audit = require('./audit');
 
+/* 身份/权限模块（服务端登录的唯一来源） */
+const authMod = require('./modules/auth/routes');
+
 /* 数据迁移 & 模块加载器 */
 const migrate = require('./migrate');
 const moduleLoader = require('./module-loader');
@@ -37,6 +40,13 @@ const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
   : path.join(ROOT, 'data');
 const ACCESS_TOKEN = (process.env.ACCESS_TOKEN || '').trim();
+
+/* AUTH_REQUIRED=1 时启用真实登录（账号 + 口令 + 会话 Cookie）。
+   默认关闭 —— 这样升级到这版代码时，现有部署的行为一字不变，
+   不会因为「库里还没有用户」把所有人挡在门外。
+   启用前先确认能登录（首次启动会打印 admin 的随机口令），再打开这个开关。 */
+const AUTH_REQUIRED = /^(1|true|yes)$/i.test(String(process.env.AUTH_REQUIRED || '').trim());
+
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
 const HISTORY_DIR = path.join(DATA_DIR, 'history');
 const PLATFORM_FILE = path.join(DATA_DIR, 'platform.json');
@@ -192,6 +202,84 @@ if (process.platform === 'win32' && process.stdin.isTTY) {
   } catch (e) { /* 无 TTY 时忽略 */ }
 }
 
+/* ---------- 身份与权限门禁 ---------- */
+
+/* 模块前缀 → 权限资源名。与 modules/<id>/routes.js 的 prefix 一一对应。
+   新增模块时这里要补一行，否则该模块会被「默认拒绝」。 */
+const PREFIX_RESOURCE = {
+  '/api/plan': 'plan',
+  '/api/iteration': 'iteration',
+  '/api/project': 'project',
+  '/api/csenergy': 'csenergy',
+  '/api/budget': 'budget',
+  '/api/token': 'token',
+  '/api/dashboard': 'dashboard',
+  '/api/tb': 'tb',
+  '/api/settings': 'settings',
+  '/api/archive': 'archive',
+  '/api/platform': 'platform'
+};
+
+/* 不需要登录的路径：登录接口本身、当前用户查询、登录页与静态样式脚本、
+   事件流（EventSource 不能带自定义头，靠 Cookie，未登录时由门禁挡掉） */
+const AUTH_OPEN = [
+  '/api/auth/login',
+  '/api/auth/logout',
+  '/api/auth/me',
+  '/login.html',
+  '/favicon.ico'
+];
+
+/** 该路径属于哪个模块资源；单段路径（/api/plan）取第一段 */
+function resourceOf(pathname) {
+  const parts = String(pathname || '').split('/').filter(Boolean);
+  if (parts[0] !== 'api') return '';
+  const two = '/' + parts.slice(0, 2).join('/');
+  const one = '/' + parts.slice(0, 1).join('/');
+  return PREFIX_RESOURCE[two] || PREFIX_RESOURCE[one] || '';
+}
+
+/** 请求是不是「取数据」——GET 只读，其余一律按写处理（保守） */
+function isRead(req) {
+  return req.method === 'GET' || req.method === 'HEAD';
+}
+
+/**
+ * 登录与权限门禁。返回 true 表示请求已被挡下（调用方直接 return）。
+ * AUTH_REQUIRED 关闭时恒返回 false，不改变任何现有行为。
+ */
+function gate(req, res, url) {
+  if (!AUTH_REQUIRED) return false;
+
+  const p = url.pathname;
+  if (AUTH_OPEN.indexOf(p) >= 0) return false;
+
+  const me = authMod.currentUser(req);
+
+  if (!me) {
+    /* API 回 401 JSON，让前端能优雅处理；
+       页面请求 302 到登录页，并带上回跳地址（只允许站内相对路径）。 */
+    if (p.startsWith('/api/')) {
+      sendJson(res, 401, { error: '未登录', login: '/login.html' });
+    } else {
+      const next = encodeURIComponent(p + (url.search || ''));
+      res.writeHead(302, { Location: '/login.html?next=' + next });
+      res.end();
+    }
+    return true;
+  }
+
+  const resName = resourceOf(p);
+  if (!resName) return false;   /* 非模块路径（静态资源等）放行 */
+
+  const need = isRead(req) ? resName + ':read' : resName + ':write';
+  if (!authMod.can(me, need)) {
+    sendJson(res, 403, { error: '没有权限：' + need });
+    return true;
+  }
+  return false;
+}
+
 /* ---------- 请求处理 ---------- */
 function sendJson(res, code, obj) {
   const body = JSON.stringify(obj);
@@ -243,6 +331,9 @@ const server = http.createServer((req, res) => {
         'wb_token=' + encodeURIComponent(qs) + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000');
     }
   }
+
+  /* 登录与权限门禁（AUTH_REQUIRED 关闭时不生效） */
+  if (gate(req, res, u)) return;
 
   // SSE 订阅
   if (p === '/api/events') {
@@ -471,6 +562,9 @@ require('./db').open();
 const _auditMig = audit.migrateLegacy();
 const _bootAdmin = require('./db').takeInitialAdmin();
 
+// 清理过期会话（每次启动一次，避免表无限增长）
+try { require('./db').purgeExpiredSessions(); } catch (e) { /* 忽略 */ }
+
 // 加载动态模块
 moduleLoader.loadAll();
 
@@ -494,6 +588,19 @@ server.listen(PORT, () => {
   if (_bootAdmin) {
     console.log('\n【首次启动】已创建默认管理员，请记下口令并尽快登录修改：');
     console.log('  账号：' + _bootAdmin.id + '    口令：' + _bootAdmin.password);
+    console.log('  改口令：登录后调用 POST /api/auth/password，或联系管理员重置。');
+  }
+  if (AUTH_REQUIRED) {
+    const n = require('./db').listUsers().length;
+    console.log('\n已启用登录（AUTH_REQUIRED=1），当前账号数：' + n);
+    if (n === 0) {
+      console.log('  ⚠ 库里一个账号都没有，所有人都会进不来。请先去掉 AUTH_REQUIRED 启动，建好账号再启用。');
+    }
+    if (ACCESS_TOKEN) console.log('  访问口令与登录同时生效：先过口令，再登账号。');
+  } else {
+    console.log('\n未启用登录（AUTH_REQUIRED 未设置）。当前任何能访问端口的人都可以读写，');
+    console.log('且「谁改的」仍来自浏览器本地存储、可以随意伪造。');
+    console.log('确认能登录之后，用 AUTH_REQUIRED=1 启动即可开启真实身份。');
   }
   if (ACCESS_TOKEN) {
     console.log('\n已启用访问口令。分享给同事的链接需带参数：');

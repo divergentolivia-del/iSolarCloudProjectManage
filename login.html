@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>登录 · 人力产能工作台</title>
+<style>
+  :root { --ink:#1f2937; --sub:#6b7280; --line:#e5e7eb; --brand:#2f6fed; --danger:#dc2626; }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:#f3f5f9; color:var(--ink);
+    font:14px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+  .card {
+    width:360px; padding:32px; background:#fff; border-radius:14px;
+    box-shadow:0 6px 28px rgba(15,23,42,.10), 0 1px 3px rgba(15,23,42,.06);
+  }
+  h1 { margin:0 0 4px; font-size:19px; font-weight:650; }
+  .sub { margin:0 0 24px; color:var(--sub); font-size:13px; }
+  label { display:block; margin:16px 0 6px; font-size:13px; color:#374151; }
+  input {
+    width:100%; padding:10px 12px; font-size:14px; color:var(--ink);
+    border:1px solid var(--line); border-radius:8px; outline:none;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  input:focus { border-color:var(--brand); box-shadow:0 0 0 3px rgba(47,111,237,.13); }
+  button {
+    width:100%; margin-top:24px; padding:11px; font-size:14px; font-weight:600;
+    color:#fff; background:var(--brand); border:0; border-radius:8px; cursor:pointer;
+    transition:background .15s;
+  }
+  button:hover { background:#2559c9; }
+  button:disabled { background:#9db6e8; cursor:default; }
+  .err {
+    margin-top:16px; padding:9px 12px; font-size:13px;
+    color:var(--danger); background:#fef2f2; border-radius:7px;
+  }
+  .err:empty { display:none; }
+</style>
+</head>
+<body>
+<form class="card" id="f" autocomplete="on">
+  <h1>人力产能工作台</h1>
+  <p class="sub">请使用管理员分配的账号登录</p>
+
+  <label for="id">账号</label>
+  <input id="id" name="username" autocomplete="username" autofocus required>
+
+  <label for="pw">口令</label>
+  <input id="pw" name="password" type="password" autocomplete="current-password" required>
+
+  <button type="submit" id="btn">登录</button>
+  <div class="err" id="err"></div>
+</form>
+
+<script>
+(function () {
+  var f = document.getElementById('f');
+  var btn = document.getElementById('btn');
+  var err = document.getElementById('err');
+
+  function fail(msg) {
+    err.textContent = msg;
+    btn.disabled = false;
+    btn.textContent = '登录';
+  }
+
+  f.addEventListener('submit', function (e) {
+    e.preventDefault();
+    err.textContent = '';
+    btn.disabled = true;
+    btn.textContent = '登录中…';
+
+    fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: document.getElementById('id').value.trim(),
+        password: document.getElementById('pw').value
+      })
+    }).then(function (r) {
+      return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+    }).then(function (r) {
+      if (!r.ok) { fail(r.d.error || '登录失败'); return; }
+      /* 登录成功后清掉本机残留的旧昵称，避免旧的假身份继续被读出来 */
+      try {
+        localStorage.removeItem('wb_who');
+        localStorage.removeItem('workbench-user');
+      } catch (e2) { /* 忽略 */ }
+      /* 带上 next 参数时回原页面，否则回首页 */
+      var next = new URLSearchParams(location.search).get('next');
+      location.href = (next && next.charAt(0) === '/' && next.charAt(1) !== '/') ? next : '/';
+    }).catch(function () {
+      fail('网络异常，请确认服务是否已启动');
+    });
+  });
+})();
+</script>
+</body>
+</html>

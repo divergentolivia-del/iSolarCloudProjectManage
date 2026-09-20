@@ -34,3 +34,6 @@ data/platform.db
 data/platform.db-wal
 data/platform.db-shm
 data/platform.db.bak
+
+# 备份目录（含口令哈希与审计，不入 git）
+backups/

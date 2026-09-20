@@ -110,7 +110,7 @@ M1 就是把这个链条从根上打断。做完 M1，平台才算「系统」�
 
 ## 3. 你现在要做的（M1 剩余任务）
 
-### 步骤 3 · 权限矩阵接进模块加载器（**小**）
+### 步骤 3 · 权限矩阵接进模块加载器（**小**）【✅ 已完成 2026-09-20】
 
 **现状**：权限判定在 `server.js` 的 `gate()` 里，靠一张手维护的 `PREFIX_RESOURCE` 映射表
 （`server.js:209-221`）。新增模块时**必须记得在这张表里补一行，否则该模块默认拒绝**——
@@ -136,9 +136,16 @@ module.exports = {
 
 **验收**：删掉 `PREFIX_RESOURCE` 后，第 2 步那套端到端测试仍然全绿。
 
+【完成记录】与上面建议做法一致落地：module-loader 注册表收 resource（缺省取 id）+ 导出 resourceOf()；
+server.js 删掉 PREFIX_RESOURCE，仅保留 BUILTIN_RESOURCE（/api/platform、/api/archive 两个内置路由）。
+另新增 `_test-gate.js`（22 项断言：未登录 401/页面 302、dev 写 403、pm 写放行、伪造 Cookie 401、
+HttpOnly 校验、登录写入 SQLite 审计、10 模块资源注册），全量 npm test 无回归。
+踩坑：_test-gate.js 必须在任何 require 之前设 DATA_DIR 指向临时目录——ml.loadAll() 会连带加载
+auth 模块→db.js，db 模块顶层读 env，晚设就绑到项目真实 data/ 目录。
+
 ---
 
-### 步骤 4 · 部署 + 备份 + 运行手册（**中**）
+### 步骤 4 · 部署 + 备份 + 运行手册（**中**）【✅ 交付物已就位，备份验收待清理遗留目录】
 
 **目标**：从「本机 `node server.js`」变成「内网服务器上能长期跑、能备份、出问题能查」。
 
@@ -155,6 +162,15 @@ module.exports = {
    - `data/platform.db` 损坏了怎么办（重建 + 审计日志不可恢复，要写清楚）
    - 端口被占用怎么换
 4. **`ACCESS_TOKEN` 与 `AUTH_REQUIRED` 的关系写清楚**：两者同时开时是「先过口令，再登账号」双层。
+
+【完成记录 2026-09-20】交付物：`start.bat`/`start.sh`（启动）、`backup-data.bat`/`backup.sh`/`backup.js`
+（备份：先 `PRAGMA wal_checkpoint(TRUNCATE)` 合并 WAL 再整目录复制，自带日期、保留最近 30 份）、
+`docs/ops-manual.md`（手册，含口令重置/权限矩阵/备份恢复/库核查/FAQ/部署检查清单；工单里写的
+runbook.md 已合并进 ops-manual.md，避免两本手册）。
+备份脚本已实测（WAL 合并 + 复制成功），但验收有一个前置：data/ 下有一个嵌套遗留目录
+`data\backups\pre-m1-step34-20260920-2102`（2026-09-20 21:02 一次误操作的递归备份产物，
+约 31 层嵌套，路径超 Windows 260 限制会使备份统计报错）。删除需用户确认（安全门禁），
+清理后重跑 `backup-data.bat` 即完成验收。
 
 ---
 

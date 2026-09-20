@@ -227,8 +227,68 @@ E:\PMWork\Project Materials\iSolarCloudProject\迭代版本\iSolarCloudProjectMa
 
 ## E. 下一步（M1 剩余）
 
-1. `modules/auth/routes.js`：登录/登出/`/api/auth/me` + session cookie
-2. 前端登录页；`platform.js:316` 的 `whoami()` 从读 localStorage 改成读 `/api/auth/me`
-3. 权限矩阵挂到 `module-loader.js` 的 `dispatch()` 上（按前缀判 resource）
+> **执行口径已迁到 `docs/plan-ai-m1-tasks.md`**（SGAI+ 施工单），本节只留结论。
+> 那份文档里写了：给 SGAI+ 的修正意见、剩余任务、分支与提交规范、踩坑累计、安全铁律。
+
+1. ~~`modules/auth/routes.js`：登录/登出/`/api/auth/me` + session cookie~~ ✅ `18f0bd0`
+2. ~~前端登录页；`platform.js` 的 `whoami()` 改成读 `/api/auth/me`~~ ✅ `18f0bd0`
+3. 权限矩阵接进 `module-loader.js`（每模块自带 `resource`，干掉 `server.js` 里的 `PREFIX_RESOURCE` 平行表）
 4. 部署脚本 + 备份 + 运行手册
+
+---
+
+# 交接文档 v4 · M1 步骤2（真登录 + 权限门禁）
+
+## A. 本轮做了什么
+
+提交 `18f0bd0`（M1 步骤 2）+ `docs/plan-ai-m1-tasks.md`（SGAI+ 施工单）。
+
+**身份不再是浏览器里的一串字符。**
+
+新增两件：
+- `modules/auth/routes.js` —— 服务端身份的唯一来源。登录/登出/改口令/用户管理/查权限；
+  30 天 `HttpOnly; SameSite=Lax` 会话 Cookie；登录失败统一回「账号或口令不正确」，
+  不透露账号是否存在。导出 `currentUser()` / `can()` 给 `server.js` 复用。
+- `login.html` —— 独立登录页，登录成功后清掉 localStorage 里的旧假身份。
+
+`server.js` 加了一道 `gate()` 门禁：
+- `AUTH_REQUIRED` 开关，**默认关闭**——升级到这版代码时现有部署行为一字不变
+- 未登录：API 回 401 JSON、页面 302 到登录页带 `next` 回跳
+- 越权：403，错误信息带所需权限名
+- `GET`/`HEAD` 记读，其余一律按写（保守）
+- 启动时 `purgeExpiredSessions()`
+
+`platform.js`：`whoami()` 改为以服务端身份为准，新增 `refreshIdentity()` / `currentUser()` / `can()`。
+**`whoami()` 仍是同步返回**，十几处调用点零改动；未启用登录时行为与从前完全一致。
+`sync.js`：署名优先取平台身份并缓存一次，避免同一次填报里署名跳变。
+
+## B. 为什么门禁放在 `server.js` 而不是模块加载器
+
+原计划是「权限矩阵挂到 `module-loader.js` 的 `dispatch()`」，
+实际做下来发现放在 `server.js` 更干净：`gate()` 在请求进入路由之前统一判，
+**没有改任何模块的写路径**——原先估计的「第 3 步风险最高」因此降级。
+
+代价是 `server.js:209-221` 多了一张手维护的 `PREFIX_RESOURCE` 平行表，
+**新增模块忘了补行 = 该模块默认拒绝**。这个坑留给了下一步（步骤 3）。
+放到 `module-loader.js` 才能根治。
+
+## C. 本轮踩过的坑
+
+12. **起点测试脚本会占着端口。** 起服务端测完要 `child.kill()`，且杀完**要等约 600ms**
+    再起下一个，否则新服务抢不到端口——表现是「连不上」而不是报错，很容易误判成代码坏了。
+13. **测异步断言别只断言「成功」。** 我第一次写的断言是「重启后应重新打印 admin 口令」，
+    结果判定失败——但代码是对的：`takeInitialAdmin()` 取过就清空，口令只该出现一次。
+    是断言写反了。**写断言前先确认自己期望的行为是不是真的对。**
+14. **`node --check` 对 `.html` 无效。** 想验证 `login.html` 里的脚本语法，
+    得把 `<script>` 里的内容抠出来单独 check，或者干脆靠端到端跑。
+
+## D. 安全铁律（未变）
+
+15. **`git add .` 一次都不能用** —— `data/iteration/state.json` 被 git 跟踪着，会被带走。
+    提交前 `git diff --cached --name-only` 确认暂存区里没有 `data/`。
+16. `data/platform.db`（口令哈希 + 审计）已 ignore。首次启动打印的 admin 口令**只出现一次**。
+
+## E. 下一步
+
+见 `docs/plan-ai-m1-tasks.md` 第 3 节。核心是：**把权限判定从 `server.js` 挪到模块自己身上。**
 

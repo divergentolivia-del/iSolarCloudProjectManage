@@ -352,5 +352,6 @@
 
 - 钉钉打通待办清单：[`plan-dingtalk-checklist.md`](./plan-dingtalk-checklist.md)
 - 钉钉同步方案设计：[`plan-dingtalk-sync-design.md`](./plan-dingtalk-sync-design.md)
+- M1 施工单（**执行以它为准**）：[`plan-ai-m1-tasks.md`](./plan-ai-m1-tasks.md)
 - 地基改造清单（M1 具体动哪些文件）：[`plan-ai-m1-foundation.md`](./plan-ai-m1-foundation.md)
 - 项目计划模块设计：[`plan-module-design.md`](./plan-module-design.md)

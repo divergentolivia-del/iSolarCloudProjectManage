@@ -145,7 +145,7 @@ auth 模块→db.js，db 模块顶层读 env，晚设就绑到项目真实 data/
 
 ---
 
-### 步骤 4 · 部署 + 备份 + 运行手册（**中**）【✅ 交付物已就位，备份验收待清理遗留目录】
+### 步骤 4 · 部署 + 备份 + 运行手册（**中**）【✅ 已完成 2026-09-21】
 
 **目标**：从「本机 `node server.js`」变成「内网服务器上能长期跑、能备份、出问题能查」。
 
@@ -174,7 +174,7 @@ runbook.md 已合并进 ops-manual.md，避免两本手册）。
 
 ---
 
-### 步骤 4.5 · 收尾（**小，但别漏**）
+### 步骤 4.5 · 收尾（**小，但别漏**）【✅ 已完成 2026-09-21】
 
 - `platform.js` 的 `refreshIdentity()` 目前只在 `init()` 时拉一次 `/api/auth/me`。
   **登录态过期（30 天）后前端不会自知**，会以「未登录」状态继续渲染。
@@ -183,6 +183,11 @@ runbook.md 已合并进 ops-manual.md，避免两本手册）。
 - 前端权限（`Platform.can('plan:write')`）已经能用，但**没有任何地方在用它**。
   建议先只做一个：权限不足时把「保存」按钮置灰。
   **注意**：前端置灰只是体验，服务端 `gate()` 才是真正的拦截，两者都要有。
+
+【完成记录 2026-09-21】
+- platform.js：全局 fetch 包装——API 401 且 JSON 带 `login` 字段 → 跳登录页并带 `next` 回跳（防御：仅包一次、登录页不跳、非 JSON 不读 body）；refreshIdentity 完成后广播 `platform:identity` 事件
+- modules/plan/index.js：`plFormSave`/`plFormSave2` 按 `Platform.can('plan:write')` 置灰 + 提示 title，监听 `platform:identity` 刷新（覆盖登录态异步就绪的竞态）
+- 浏览器 e2e 实测：dev 保存按钮置灰可用、pm 可用、登出后 fetch 触发 401 自动跳 `login.html?next=%2F%23%2Fplan`
 
 ---
 
@@ -376,7 +381,7 @@ M1 不需要为它做任何额外的事。
 2. `git log --oneline -5` 确认基线是 `18f0bd0`
 3. 做**步骤 3**（权限矩阵接进模块加载器），跑通第 2 步那套验收
 4. 做**步骤 4**（部署 + 备份 + 运行手册）
-5. 做**步骤 4.5**（401 跳登录页 + 保存按钮置灰）
+5. 做**步骤 4.5**（401 跳登录页 + 保存按钮置灰）【✅ 已完成 @ f9ff9b1】
 6. 按第 2 节修正 `plan-ai-master.md` 和 `plan-ai-m1-foundation.md`
 7. 更新 `handoff.md`，把这轮新踩的坑追加进去
 

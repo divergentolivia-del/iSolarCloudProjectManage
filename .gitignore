@@ -26,6 +26,10 @@ data/tb/secret.json
 data/tb/state.json
 data/tb/history/
 tb-secret.json
+
+# AI Skill 运行时结果（含真实产能/偏差分析，不入库）
+data/skill/state.json
+data/skill/history/
 # 钉钉应用凭据（本机，绝不入库）
 data/dingtalk/secret.json
 data/dingtalk/state.json
@@ -48,3 +52,4 @@ backups/
 
 # PR adapter（本地仓库配置含机器路径，运行快照不入库）
 data/pradapter/
+data/skill/

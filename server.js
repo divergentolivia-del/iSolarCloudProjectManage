@@ -297,8 +297,13 @@ function serveStatic(req, res, pathname) {
   let rel = decodeURIComponent(pathname).replace(/^\/+/, '');
   if (!rel) rel = 'platform.html';
   // 阻断路径穿越，并禁止读取 data 目录
+  // 阻止路径穿越，并禁止读取 data 目录（按路径段比较，避免 data 前缀误伤 dataflow.html 等）
   const target = path.resolve(ROOT, rel);
-  if (!target.startsWith(ROOT) || target.startsWith(DATA_DIR)) {
+  if (target !== ROOT && !target.startsWith(ROOT + path.sep)) {
+    res.writeHead(403).end('Forbidden');
+    return;
+  }
+  if (target.startsWith(DATA_DIR + path.sep)) {
     res.writeHead(403).end('Forbidden');
     return;
   }

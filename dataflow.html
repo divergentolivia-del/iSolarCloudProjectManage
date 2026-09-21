@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>数据自动流入 · 人力产能工作台</title>
+<style>
+  :root { --ink:#1f2937; --sub:#6b7280; --line:#e5e7eb; --brand:#2f6fed; --ok:#16a34a; --warn:#d97706; --danger:#dc2626; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#f3f5f9; color:var(--ink); font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif; }
+  .wrap { max-width:1060px; margin:0 auto; padding:28px 20px 64px; }
+  h1 { font-size:20px; font-weight:650; margin:0 0 2px; }
+  .sub { color:var(--sub); font-size:13px; margin:0 0 22px; }
+  .card { background:#fff; border-radius:12px; padding:18px 20px; margin-bottom:18px; box-shadow:0 2px 10px rgba(15,23,42,.06); }
+  .card h2 { margin:0 0 12px; font-size:15px; font-weight:650; display:flex; align-items:center; gap:10px; }
+  .badge { font-size:12px; font-weight:600; padding:2px 9px; border-radius:99px; }
+  .b-green { background:#e7f6ec; color:var(--ok); } .b-orange { background:#fdf0dd; color:var(--warn); }
+  .b-red { background:#fdeaea; color:var(--danger); } .b-gray { background:#eef1f5; color:var(--sub); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:7px 10px; border-bottom:1px solid #f1f3f7; vertical-align:top; }
+  th { color:var(--sub); font-weight:600; font-size:12px; background:#fafbfd; }
+  tr:last-child td { border-bottom:0; }
+  .mono { font-family:Consolas,Monaco,monospace; font-size:12px; }
+  button { padding:6px 14px; font-size:13px; font-weight:600; color:#fff; background:var(--brand); border:0; border-radius:7px; cursor:pointer; transition:background .15s; }
+  button:hover { background:#2559c9; } button:disabled { background:#9db6e8; cursor:default; }
+  .sbtn { padding:4px 10px; font-size:12px; border-radius:6px; margin-right:6px; }
+  .sbtn.ok { background:var(--ok); } .sbtn.ok:hover { background:#12813a; }
+  .sbtn.no { background:#eef1f5; color:#4b5563; } .sbtn.no:hover { background:#e2e6ec; }
+  .risk { padding:10px 12px; border-radius:8px; margin-bottom:8px; border:1px solid var(--line); }
+  .risk .t { font-weight:600; margin-bottom:2px; }
+  .risk .d { color:var(--sub); font-size:13px; }
+  .sev { display:inline-block; font-size:11px; font-weight:700; padding:1px 8px; border-radius:99px; margin-right:8px; }
+  .sev-高 { background:#fdeaea; color:var(--danger); } .sev-中 { background:#fdf0dd; color:var(--warn); } .sev-低 { background:#eef1f5; color:var(--sub); }
+  pre.md { background:#f8fafc; border:1px solid var(--line); border-radius:8px; padding:14px; font-size:13px; white-space:pre-wrap; font-family:inherit; line-height:1.65; }
+  .stat { display:inline-flex; gap:16px; color:var(--sub); font-size:13px; margin-top:10px; }
+  .stat b { color:var(--ink); }
+  .empty { color:var(--sub); font-size:13px; padding:8px 2px; }
+  .err { color:var(--danger); font-size:13px; margin-top:8px; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>数据自动流入</h1>
+  <p class="sub">Git 仓库采集 · 四级映射 · 静默告警 · AI Skill（风险 / 周报 / 偏差）— 所有 AI 输出均为待确认项</p>
+
+  <div class="card">
+    <h2>📦 仓库状态 <span id="refreshBtn"><button onclick="refreshRepo()">重新采集</button></span></h2>
+    <div id="repoBox"><div class="empty">加载中…</div></div>
+    <div class="stat" id="levelStats"></div>
+  </div>
+
+  <div class="card">
+    <h2>🔔 静默告警</h2>
+    <div id="alertBox"><div class="empty">加载中…</div></div>
+  </div>
+
+  <div class="card">
+    <h2>🤖 AI Skill</h2>
+    <div class="row" id="skillBtns"></div>
+    <div id="skillStats" class="stat"></div>
+    <div id="skillOut" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+async function j(url, opt) {
+  const r = await fetch(url, opt);
+  if (r.status === 401) throw new Error('无权限（未登录或角色无权）');
+  if (r.status === 403) throw new Error('写权限不足（需 pm）');
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + r.status)); }
+  return r.json();
+}
+
+/* ---------- 仓库状态 ---------- */
+async function loadRepo() {
+  try {
+    const s = await j('/api/pradapter/state');
+    const repos = s.repos || [];
+    if (!repos.length) { $('#repoBox').innerHTML = '<div class="empty">暂无仓库配置 — 编辑 data/pradapter/config.json 后点「重新采集」</div>'; }
+    else {
+      $('#repoBox').innerHTML = '<table><tr><th>仓库</th><th>采集</th><th>分支</th><th>提交</th><th>最近提交</th></tr>' +
+        repos.map(r => '<tr><td>' + esc(r.name) + '<br><span class="mono" style="color:var(--sub)">' + esc(r.id || '') + '</span></td>' +
+          '<td>' + (r.ok ? '<span class="badge b-green">正常</span>' : '<span class="badge b-red">异常</span>') + '<br><span class="mono" style="color:var(--sub)">' + esc(r.error || '') + '</span></td>' +
+          '<td>' + (r.branchCount || 0) + '</td><td>' + (r.commitCount || 0) + '</td>' +
+          '<td>' + (r.lastCommitAt ? esc(String(r.lastCommitAt).slice(0, 10)) : '<span style="color:var(--warn)">从未</span>') + '</td></tr>').join('') + '</table>';
+    }
+    const st = s.stats || {};
+    const by = st.byLevel || {};
+    $('#levelStats').innerHTML =
+      '<span>仓库 <b>' + (st.repoCount || 0) + '</b></span>' +
+      '<span>提交 <b>' + (st.commitCount || 0) + '</b></span>' +
+      '<span>L1 显式 <b>' + (by.L1 || 0) + '</b></span>' +
+      '<span>L2 语义 <b>' + (by.L2 || 0) + '</b></span>' +
+      '<span>L3 仓库 <b>' + (by.L3 || 0) + '</b></span>' +
+      '<span>L4 待关联 <b>' + (by.L4 || 0) + '</b></span>' +
+      '<span>告警 <b>' + (st.alertCount || 0) + '</b></span>';
+    loadAlerts();
+  } catch (e) { $('#repoBox').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; }
+}
+async function refreshRepo() {
+  const b = $('#refreshBtn');
+  b.innerHTML = '<button disabled>采集中…</button>';
+  try { await j('/api/pradapter/refresh', { method: 'POST' }); await loadRepo(); }
+  catch (e) { $('#repoBox').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; }
+  b.innerHTML = '<button onclick="refreshRepo()">重新采集</button>';
+}
+
+/* ---------- 告警 ---------- */
+async function loadAlerts() {
+  try {
+    const a = await j('/api/pradapter/alerts');
+    const list = a.alerts || [];
+    $('#alertBox').innerHTML = list.length
+      ? list.map(x => '<div class="risk"><span class="badge ' + (x.level === 'warn' ? 'b-orange' : 'b-gray') + '">' + esc(x.level || 'info') + '</span> ' + esc(x.message) + '</div>').join('')
+      : '<div class="empty">无告警 — 所有采集源活跃 ✓</div>';
+  } catch (e) { $('#alertBox').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; }
+}
+
+/* ---------- Skill ---------- */
+let SKILLS = [];
+let CURRENT = '';
+async function loadSkills() {
+  try {
+    const s = await j('/api/skill');
+    SKILLS = s.skills || [];
+    $('#skillBtns').innerHTML = SKILLS.map(x =>
+      '<button onclick="runSkill(\'' + x.id + '\')">▶ ' + esc(x.name) + '</button>').join('');
+    renderSkillStats();
+    if (SKILLS.length) showLatest(SKILLS[0].id);
+  } catch (e) { $('#skillBtns').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; }
+}
+function renderSkillStats() {
+  $('#skillStats').innerHTML = SKILLS.map(x => {
+    const st = x.stats || {};
+    return '<span>' + esc(x.name) + '：运行 <b>' + (st.runCount || 0) + '</b> · 采纳率 <b>' + (st.adoptRate != null ? st.adoptRate + '%' : '—') + '</b> · 待确认 <b>' + (st.pendingCount || 0) + '</b></span>';
+  }).join(' ');
+}
+async function runSkill(id) {
+  try {
+    const r = await j('/api/skill/' + id + '/run', { method: 'POST' });
+    await loadSkills();
+    await showLatest(id);
+  } catch (e) { $('#skillOut').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; }
+}
+async function showLatest(id) {
+  CURRENT = id;
+  try {
+    const d = await j('/api/skill/' + id + '/latest');
+    const r = d.result;
+    if (!r) { $('#skillOut').innerHTML = '<div class="empty">该 Skill 尚未运行</div>'; return; }
+    let html = '<div class="row"><span class="badge b-gray">' + esc(id) + '</span><span class="mono" style="color:var(--sub)">' + esc(r.at || '') + '</span></div>';
+
+    if (id === 'risk') {
+      const items = r.items || [];
+      html += items.length
+        ? items.map(i => riskCard(i)).join('')
+        : '<div class="empty">无风险 ✓</div>';
+    } else if (id === 'variance') {
+      const t = (r.output && r.output.table) || [];
+      html += '<table><tr><th>团队</th><th>工作量</th><th>人头</th><th>产能</th><th>偏差</th><th>判定</th><th>佐证</th></tr>' +
+        t.map(x => '<tr><td>' + esc(x.team) + '</td><td>' + x.workload + '</td><td>' + x.head + '</td><td>' + x.capacity + '</td>' +
+          '<td>' + (x.over > 0 ? '+' : '') + x.over + '（' + x.ratio + '%）</td>' +
+          '<td>' + verdictBadge(x.verdict) + '</td><td>' + esc(x.evidence || '') + '</td></tr>').join('') + '</table>';
+      html += '<div style="margin-top:12px">' + ((r.items || []).map(i => confirmRow(i)).join('')) + '</div>';
+    } else if (id === 'report') {
+      html += '<pre class="md">' + esc((r.output && r.output.markdown) || '') + '</pre>';
+      const items = r.items || [];
+      if (items.length) html += '<div style="margin-top:10px"><b>发报前确认：</b></div>' + items.map(i => confirmRow(i)).join('');
+    }
+    $('#skillOut').innerHTML = html;
+  } catch (e) { $('#skillOut').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; }
+}
+function riskCard(i) {
+  return '<div class="risk"><span class="sev sev-' + esc(i.severity || '低') + '">' + esc(i.severity || '低') + '</span>' +
+    '<span class="t">' + esc(i.title) + '</span>' +
+    '<div class="d">依据：' + esc(i.detail) + '。建议：' + esc(i.action) + '</div>' +
+    '<div style="margin-top:6px">' + confirmRow(i) + '</div></div>';
+}
+function confirmRow(i) {
+  if (i.status !== 'pending') {
+    const tag = i.status === 'adopted' ? '<span class="badge b-green">已采纳</span>' : '<span class="badge b-gray">已驳回</span>';
+    return tag + '<span class="mono" style="color:var(--sub);font-size:12px"> ' + esc(i.title || i.itemId) + '</span>';
+  }
+  return '<span class="mono" style="color:var(--sub);font-size:12px">' + esc(i.title || '') + '</span> ' +
+    '<button class="sbtn ok" onclick="confirmItem(\'' + esc(i.resultId) + '\',\'' + esc(i.itemId) + '\',true)">采纳</button>' +
+    '<button class="sbtn no" onclick="confirmItem(\'' + esc(i.resultId) + '\',\'' + esc(i.itemId) + '\',false)">驳回</button>';
+}
+async function confirmItem(resultId, itemId, yes) {
+  try {
+    await j('/api/skill/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ resultId, itemId, yes }) });
+    await loadSkills();
+    await showLatest(CURRENT || (SKILLS[0] && SKILLS[0].id));
+  } catch (e) { alert(e.message); }
+}
+function verdictBadge(v) {
+  const map = { '正常': 'b-green', '产能不足': 'b-red', '产能富余': 'b-orange', '缺人头数': 'b-red' };
+  return '<span class="badge ' + (map[v] || 'b-gray') + '">' + esc(v || '') + '</span>';
+}
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+loadRepo();
+loadSkills();
+</script>
+</body>
+</html>

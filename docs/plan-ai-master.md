@@ -338,10 +338,10 @@ TB OpenAPI 拉取 + Webhook 订阅 + 每日全量对账。迭代工时与偏差�
 | 2 | Git PR adapter | 接 1-2 个真实仓库，跑通 L1/L2/L3 映射 + 置信度 | ✅ MVP 完成（`modules/pradapter/`，本地 git 采集 + L1-L4 映射 + confirm 固化；真实仓库接入 = M2-C 待用户提供） |
 | 3 | 统一数据契约 | 《团队工作台对接规范》给各团队，不接的走标准模板导出兜底 | ✅ 完成（`plan-ai-m2-contract.md` v1） |
 | 4 | 静默告警 | 任务关联仓库 N 周无 PR 但临近交付 → 告警 | ✅ MVP 完成（repo-stale 已生效；task-stale 待任务数据到位自动生效） |
-| 5 | 首批 3 个 Skill 上线 | 风险识别 / 周报 / 偏差分析（含定时任务 + 评测集） | ⬜ M2-B 待做 |
+| 5 | 首批 3 个 Skill 上线 | 风险识别 / 周报 / 偏差分析（含定时任务 + 评测集） | ✅ MVP 完成（`modules/skill/` + `dataflow.html`，规则引擎版 + 评测集 37 项；接真实仓库/外部模型 = M2-C） |
 
-> 进度：M2-A（契约 + PR adapter MVP + 告警 + 单测 23 项全绿）已完成，见 `plan-ai-m2-tasks.md`。
-> 权限：`pradapter:read`（pm/dev/viewer）、`pradapter:write`（pm）。
+> 进度：M2-A（契约 + PR adapter MVP + 告警）与 M2-B（3 个 Skill + 面板）均已完成，见 `plan-ai-m2-tasks.md`。
+> 权限：`pradapter:read`（pm/dev/viewer）、`pradapter:write`（pm）；`skill:read`（pm/dev/viewer）、`skill:write`（pm）。
 
 **验收：** 一周不手动录数据，平台进度仍在更新。
 

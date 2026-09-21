@@ -55,8 +55,9 @@ function testResourceOf() {
   const ml = require('./module-loader');
   ml.loadAll();
   const mods = ml.list();
-  ck('11 个模块全部注册（含 iteration 与 pradapter，未再出现 TEAMS 加载失败）',
-    mods.length === 11 && mods.some(m => m.id === 'iteration') && mods.some(m => m.id === 'pradapter'),
+  ck('12 个模块全部注册（含 iteration/pradapter/skill，未再出现 TEAMS 加载失败）',
+    mods.length === 12 && mods.some(m => m.id === 'iteration') && mods.some(m => m.id === 'pradapter')
+    && mods.some(m => m.id === 'skill'),
     mods.map(m => m.id).join(','));
   ck('pradapter 模块 resource 归属', ml.resourceOf('/api/pradapter/state') === 'pradapter', ml.resourceOf('/api/pradapter/state'));
   ck('两段路径 → 模块 resource', ml.resourceOf('/api/plan/xxx') === 'plan', ml.resourceOf('/api/plan/xxx'));

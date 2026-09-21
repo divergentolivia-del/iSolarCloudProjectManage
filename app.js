@@ -279,6 +279,7 @@ function switchView(name) {
     v.classList.toggle('hidden', v.id !== 'view-' + name));
   RENDERERS[name]();
   swingGuard = false; // 切换视图后重新按内容判断是否拥挤
+  swingCount = 0;     // 新视图重新给两次自动收/展额度
   requestParentSpace();
 }
 
@@ -287,6 +288,7 @@ function renderAll() {
   updateModeBadge();
   RENDERERS[currentView]();
   swingGuard = false;
+  swingCount = 0;     // 重渲染视为一次新的判断，额度重置
   requestParentSpace();
 }
 
@@ -308,6 +310,14 @@ let parentAutoCollapsed = false;  // 父页本次收起是否为自动发起
 let swingGuard = false;           // 恢复后立即又拥挤 → 本视图不再反复
 let lastSidebarState = '';
 let settleTimer = null;
+/* 切视图后「自动收起/自动恢复」最多各做一次。
+   没有这个上限时，点一次「专项锁定」这类宽表 Tab 会看到整页抖动：
+   侧栏收起是 0.25s 的宽度过渡，过渡期间 iframe 宽度一直在变，
+   resize 监听被反复触发，于是收起→恢复→收起…来回晃。
+   swingGuard 只在「请求恢复后仍拥挤」时才生效，而这条路径里
+   侧栏展开后表格不再拥挤，swingGuard 永远等不到，兜不住。
+   上限一到就停下来交给用户手动决定，不再自动折腾。 */
+let swingCount = 0;
 
 function requestParentSpace() {
   const scrollers = document.querySelectorAll('.scroll');
@@ -319,9 +329,11 @@ function requestParentSpace() {
   const wantCollapse = overflowX && !parentCollapsed;
   const wantRestore = !overflowX && parentCollapsed && parentAutoCollapsed;
   if (!wantCollapse && !wantRestore) { lastSidebarState = ''; return; }
+  if (swingCount >= 2) return;          // 本次切视图已经自动收/展过，别再晃
   const need = wantCollapse ? 'collapse' : 'restore';
   if (lastSidebarState === need) return; // 已请求过，父页未回执前不重复发
   lastSidebarState = need;
+  swingCount++;
   try {
     if (window.parent && window.parent !== window) {
       window.parent.postMessage({

@@ -6,6 +6,7 @@ data/iteration/history/
 data/state.json
 data/archive/*.json
 data/audit-log.json
+data/audit-log.json.migrated
 data/budget/state.json
 data/budget/history/
 data/project/state.json

@@ -264,6 +264,13 @@ function gate(req, res, url) {
     return true;
   }
 
+  /* auth 模块不走资源门禁：它每个接口内部都做了自身的权限判断
+     （登录/登出/改自己口令只认「当前登录者」，用户管理只认 admin）。
+     再叠一层资源门禁反而会拦死正常操作：没有哪个角色持有 auth:write，
+     于是 pm/dev/viewer 连「改自己的口令」都会被这里 403 掉。
+     登录门禁（上面 me 为空那一段）对 auth 同样生效。 */
+  if (p === '/api/auth' || p.startsWith('/api/auth/')) return false;
+
   const resName = resourceOf(p);
   if (!resName) return false;   /* 非模块路径（静态资源等）放行 */
 

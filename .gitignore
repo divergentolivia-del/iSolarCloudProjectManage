@@ -29,6 +29,13 @@ tb-secret.json
 # 钉钉应用凭据（本机，绝不入库）
 data/dingtalk/secret.json
 data/dingtalk/state.json
+data/dingtalk/token.json
+
+# 登录配置（含初始口令规则，不入库）
+data/auth-config.json
+
+# 员工名单（含工号/姓名，不入库）
+docs/samples/员工名单.csv
 
 # 平台系统库（身份/权限/审计）
 data/platform.db

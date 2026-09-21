@@ -278,8 +278,6 @@ function switchView(name) {
   document.querySelectorAll('.view').forEach(v =>
     v.classList.toggle('hidden', v.id !== 'view-' + name));
   RENDERERS[name]();
-  swingGuard = false; // 切换视图后重新按内容判断是否拥挤
-  swingCount = 0;     // 新视图重新给两次自动收/展额度
   requestParentSpace();
 }
 
@@ -287,53 +285,98 @@ function renderAll() {
   document.getElementById('cycleLabel').textContent = cycleLabelText();
   updateModeBadge();
   RENDERERS[currentView]();
-  swingGuard = false;
-  swingCount = 0;     // 重渲染视为一次新的判断，额度重置
   requestParentSpace();
 }
-
 /* 窗口尺寸变化（侧栏收起/展开引起 iframe 变宽变窄）也重新测量，
-   否则收起后子页不再重渲染，无法感知「拥挤已消失」从而发起恢复 */
+   否则收起后子页不再重渲染，无法感知「拥挤已消失」从而发起恢复。
+   但侧栏是 0.25s 的宽度过渡，过渡期间这里每帧都会被触发一次；
+   所以下面用几何判断而不是「此刻有没有滚动条」。 */
 window.addEventListener('resize', function () {
   requestParentSpace();
 });
 
 /* 当前视图在 iframe 内是否横向溢出（拥挤）。若溢出且外层侧栏未展开，向父页申请收起侧栏，
    为宽表腾出空间；父页只响应一次，用户手动展开后失效。
-   宽表本身包在 .scroll 容器里（独立出横向滚动条），因此要看容器内部是否可滚动，
-   而不是浏览器是否整体横滚。
-   双向协议：拥挤→发「收起」，不再拥挤→发「恢复展开」；父页广播侧栏状态回传，
-   以确认父页已按请求动作。恢复后若又被挤到（单页宽表恰好卡在临界宽度），
-   触发一次 swingGuard 保持收起语义，避免收起↔展开来回闪。 */
+   双向协议：拥挤→发「收起」，不再拥挤→发「恢复展开」；父页广播侧栏状态回传。 */
 let parentCollapsed = false;      // 父页侧栏当前是否收起（由 sidebarState 回传维护）
 let parentAutoCollapsed = false;  // 父页本次收起是否为自动发起
-let swingGuard = false;           // 恢复后立即又拥挤 → 本视图不再反复
+let noAutoCollapse = false;       // 用户手动展开过 → 本视图不再自动收侧栏
 let lastSidebarState = '';
 let settleTimer = null;
-/* 切视图后「自动收起/自动恢复」最多各做一次。
-   没有这个上限时，点一次「专项锁定」这类宽表 Tab 会看到整页抖动：
-   侧栏收起是 0.25s 的宽度过渡，过渡期间 iframe 宽度一直在变，
-   resize 监听被反复触发，于是收起→恢复→收起…来回晃。
-   swingGuard 只在「请求恢复后仍拥挤」时才生效，而这条路径里
-   侧栏展开后表格不再拥挤，swingGuard 永远等不到，兜不住。
-   上限一到就停下来交给用户手动决定，不再自动折腾。 */
-let swingCount = 0;
+
+/* 布局常量（与 platform.css / app.css 对齐）。
+   侧栏展开 220px、收起 60px；iframe 内 main 左右各 24px padding；
+   再留 16px 给竖直滚动条与取整误差。 */
+const SIDEBAR_EXPANDED = 220;
+const SIDEBAR_COLLAPSED = 60;
+const FRAME_PADDING = 24 * 2 + 16;
+const MOBILE_BREAKPOINT = 767;    // platform.css @media (max-width: 767px)
+const HYSTERESIS = 24;            // 迟滞带：防止恰好卡在临界宽度时来回切
+
+/** 宽表固有宽度：取所有 .scroll 容器里 scrollWidth 最大的那个。
+    scrollWidth 只取决于内容，与侧栏动画进行到哪一帧无关 —— 这是关键。 */
+function contentWidth() {
+  const scrollers = document.querySelectorAll('.scroll');
+  let w = 0;
+  for (let i = 0; i < scrollers.length; i++) {
+    const sc = scrollers[i];
+    if (sc.scrollWidth > w) w = sc.scrollWidth;
+  }
+  return w;
+}
+
+/** 侧栏处于某个状态时，内容实际可用的宽度。 */
+function availableWidth(viewportWidth, collapsed) {
+  if (viewportWidth <= MOBILE_BREAKPOINT) return viewportWidth - FRAME_PADDING;
+  return viewportWidth - (collapsed ? SIDEBAR_COLLAPSED : SIDEBAR_EXPANDED) - FRAME_PADDING;
+}
+
+/* 为什么不再用「容器此刻有没有横向滚动条」判断拥挤：
+   容器宽度随侧栏动画每一帧都在变，于是同一张表在动画期间会先被判「挤」后判「不挤」，
+   点一次 Tab 就能让侧栏收起又弹回，看起来就是抽屉抖一下。
+   改成比较「宽表固有宽度」和「侧栏展开时的可用宽度」，结果与动画无关，一次定论。
+   迟滞带 24px 让两个方向的判定错开，避免恰卡临界值时反复切。 */
+/* 判定规则（两个门限都与动画无关，只取决于内容固有宽度和视口宽度）：
+
+   1. 要收起：内容宽度 > 「侧栏展开时的可用宽度 + 迟滞带」。
+      此刻容器确实出现横向滚动条，需要那 160px。
+   2. 要恢复：内容宽度 <= 「侧栏展开时的可用宽度 + 迟滞带」，
+      也就是回到「当初触发收起的那条线以下」，才会有来回切。
+
+   注意恢复门限**不能**写成「放得下收起后的宽度」，否则对一张真正超宽的表
+   （例如 1240px：放得下收起后的 1316px，但放不下展开时的 1156px）两个判定会同时成立，
+   收起 → 恢复 → 又收起，永远不收敛。实测：1440 视口下 1181~1316px 区间就是这种死循环。
+   恢复的意义是「当初让我收起的那条理由已经不存在了」，所以必须以同一把尺子衡量。
+   迟滞带随之失效也无妨 —— 同一份内容在同一视口下判定结果恒定，本就不会自己反复。
+   收起后再也不恢复的情形（内容真的超宽）由父页的 autoCollapseFired 兜住，
+   不会每次渲染都打断用户。 */
+function shouldRequestCollapse(viewportWidth, contentW, ctx) {
+  if (contentW <= 0) return false;
+  if (ctx.collapsed) return false;      // 已收起，没有再收的余地
+  if (ctx.manualExpand) return false;   // 用户手动展开过，尊重其选择
+  return contentW > availableWidth(viewportWidth, false) + HYSTERESIS;
+}
+
+function shouldRequestRestore(viewportWidth, contentW, ctx) {
+  if (contentW <= 0) return false;
+  if (!ctx.collapsed || !ctx.auto) return false;  // 非自动收起的不打扰
+  return contentW <= availableWidth(viewportWidth, false) + HYSTERESIS;
+}
 
 function requestParentSpace() {
-  const scrollers = document.querySelectorAll('.scroll');
-  let overflowX = false;
-  for (let i = 0; i < scrollers.length; i++) {
-    if (scrollers[i].scrollWidth > scrollers[i].clientWidth + 4) { overflowX = true; break; }
-  }
-  if (swingGuard) return;               // 已闪避过，交给用户手动展开
-  const wantCollapse = overflowX && !parentCollapsed;
-  const wantRestore = !overflowX && parentCollapsed && parentAutoCollapsed;
+  const ctx = {
+    collapsed: parentCollapsed,
+    auto: parentAutoCollapsed,
+    manualExpand: noAutoCollapse     // 用户手动展开过 → 不再自动收回
+  };
+  const vw = document.documentElement.clientWidth;
+  const cw = contentWidth();
+  const wantCollapse = shouldRequestCollapse(vw, cw, ctx);
+  const wantRestore = shouldRequestRestore(vw, cw, ctx);
   if (!wantCollapse && !wantRestore) { lastSidebarState = ''; return; }
-  if (swingCount >= 2) return;          // 本次切视图已经自动收/展过，别再晃
   const need = wantCollapse ? 'collapse' : 'restore';
   if (lastSidebarState === need) return; // 已请求过，父页未回执前不重复发
   lastSidebarState = need;
-  swingCount++;
   try {
     if (window.parent && window.parent !== window) {
       window.parent.postMessage({
@@ -344,30 +387,31 @@ function requestParentSpace() {
   } catch (e) { /* 跨源或已卸载，忽略 */ }
 }
 
-/* 父页回传侧栏状态：更新本地判断依据；恢复后重新测量，若仍拥挤则触发一次性避闪 */
+/* 父页回传侧栏状态：更新本地判断依据；状态变化后重新判定一次 */
 function handleSidebarState(e) {
   const d = e.data;
   if (!d || d.source !== 'platform' || d.type !== 'sidebarState') return;
   if (e.origin && e.origin !== window.location.origin) return;
   const wasCollapsed = parentCollapsed;
-  const wasRestoreRequest = lastSidebarState === 'restore'; // 刚向父页申请过恢复
   parentCollapsed = !!d.collapsed;
   parentAutoCollapsed = !!d.auto;
-  if (d.manual && !parentCollapsed) swingGuard = false; // 用户手动展开 → 解除避闪，重新允许自动收起
+  /* 父页侧栏当前是否展开。用户手动展开（manual 且展开）→ 重新允许自动收起；
+     用户手动收起（manual 且收起）→ 父页本就不会再自动展开，这里也必须一并避让，
+     否则本视图每渲染一次就再发一次 autoCollapseSidebar，与用户的收起意图互相拉扯。 */
+  const manualExpandNow = !!d.manual && !parentCollapsed;
+  noAutoCollapse = manualExpandNow;
   lastSidebarState = '';
-  if (wasCollapsed !== parentCollapsed) {
-    // 等过渡动画（platform.css 0.25s）结束再测量
+  if (manualExpandNow) {
+    /* 用户刚手动展开：取消可能还在排队的「过渡结束再判定」，
+       否则那次判定会在用户态下重跑一遍，可能立刻把侧栏又收回去。 */
     clearTimeout(settleTimer);
-    settleTimer = setTimeout(function () {
-      const scrollers = document.querySelectorAll('.scroll');
-      let overflowX = false;
-      for (let i = 0; i < scrollers.length; i++) {
-        if (scrollers[i].scrollWidth > scrollers[i].clientWidth + 4) { overflowX = true; break; }
-      }
-      // 恢复展开后仍被挤到（宽表恰卡在临界宽度）：本次会话不再自动折腾，交给用户手动展开
-      if (wasRestoreRequest && overflowX) swingGuard = true;
-      requestParentSpace();
-    }, 320);
+    return;
+  }
+  if (wasCollapsed !== parentCollapsed) {
+    /* 等过渡动画（platform.css 0.25s）走完再判定。
+       动画期间 resize 会连发很多次，真正的结论要等稳定后那一次 —— 提前判定就会抖。 */
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(requestParentSpace, 320);
     return;
   }
   requestParentSpace();
@@ -518,6 +562,33 @@ RENDERERS.headcount = function () {
   });
 };
 
+/* ③ 专项锁定人力：输入变更后只刷新合计列，不做全量重绘。
+   全量 renderAll() 会在每次输入时重建整个 DOM（失焦、滚动复位、
+   并重置防抖额度重新触发父页侧栏收展），表现为页面抖动。 */
+function refreshLockedTotals() {
+  const view = document.getElementById('view-locked');
+  if (!view) return;
+  const rows = view.querySelectorAll('tbody tr');
+  (state.locked || []).forEach((item, i) => {
+    const tr = rows[i];
+    if (!tr) return;
+    const total = LOCK_ROLES.reduce((s, r) => s + num((item.roles || {})[r]), 0);
+    const td = tr.children[1 + LOCK_ROLES.length];
+    if (td) td.textContent = fmt(total);
+  });
+  const totals = lockedTotals(state);
+  const sum = view.querySelector('tfoot tr.sum');
+  if (sum) {
+    LOCK_ROLES.forEach((r, i) => {
+      const td = sum.children[1 + i];
+      if (td) td.textContent = fmt(totals[LOCK_ROLE_TO_TEAM[r]]);
+    });
+    const grand = LOCK_ROLES.reduce((s, r) => s + num(totals[LOCK_ROLE_TO_TEAM[r]]), 0);
+    const gtd = sum.children[1 + LOCK_ROLES.length];
+    if (gtd) gtd.textContent = fmt(grand);
+  }
+}
+
 /* ---------- ③ 专项锁定人力 ---------- */
 RENDERERS.locked = function () {
   const roleTh = LOCK_ROLES.map(r => `<th>${esc(r)}</th>`).join('');
@@ -575,14 +646,14 @@ RENDERERS.locked = function () {
       const item = state.locked[+el.dataset.i];
       if (!item.roles) item.roles = {};
       item.roles[el.dataset.r] = el.value === '' ? null : num(el.value);
-      save(true); renderAll();
+      save(true); refreshLockedTotals();
     });
   });
   view.querySelectorAll('[data-f]').forEach(el => {
     el.addEventListener('change', () => {
       const item = state.locked[+el.dataset.i], f = el.dataset.f;
       item[f] = (f === 'confirmed') ? el.checked : el.value;
-      save(true); renderAll();
+      save(true); refreshLockedTotals();
     });
   });
   view.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {

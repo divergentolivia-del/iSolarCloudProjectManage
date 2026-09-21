@@ -60,10 +60,27 @@ function gracefulStop(p) {
   try { p.send({ cmd: 'sigint' }); } catch (e) { p.kill(); }
 }
 
+/** 轮询等待服务就绪（替代固定 sleep：node --test 并发时启动可能 >1.2s） */
+async function waitReady(timeoutMs) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    try {
+      const r = await req('GET', '/api/state');
+      if (r.code === 200) return true;
+    } catch (e) { /* 未就绪，继续等 */ }
+    await sleep(200);
+  }
+  return false;
+}
+
 (async () => {
   writeWrapper();
   let srv = start();
-  await sleep(1200);
+  const ready = await waitReady(15000);
+  if (!ready) {
+    console.log('\nFAIL 服务未在 15s 内就绪：' + srv.getOut().slice(-500));
+    process.exit(1);
+  }
 
   {
     console.log('\n[0] 归档不可变性');

@@ -38,3 +38,6 @@ data/platform.db.bak
 
 # 备份目录（含口令哈希与审计，不入 git）
 backups/
+
+# PR adapter（本地仓库配置含机器路径，运行快照不入库）
+data/pradapter/

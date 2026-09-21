@@ -55,9 +55,10 @@ function testResourceOf() {
   const ml = require('./module-loader');
   ml.loadAll();
   const mods = ml.list();
-  ck('10 个模块全部注册（含 iteration，未再出现 TEAMS 加载失败）',
-    mods.length === 10 && mods.some(m => m.id === 'iteration'),
+  ck('11 个模块全部注册（含 iteration 与 pradapter，未再出现 TEAMS 加载失败）',
+    mods.length === 11 && mods.some(m => m.id === 'iteration') && mods.some(m => m.id === 'pradapter'),
     mods.map(m => m.id).join(','));
+  ck('pradapter 模块 resource 归属', ml.resourceOf('/api/pradapter/state') === 'pradapter', ml.resourceOf('/api/pradapter/state'));
   ck('两段路径 → 模块 resource', ml.resourceOf('/api/plan/xxx') === 'plan', ml.resourceOf('/api/plan/xxx'));
   ck('单段路径 → 模块 resource', ml.resourceOf('/api/iteration') === 'iteration');
   ck('tb 模块自动注册', ml.resourceOf('/api/tb/abc') === 'tb');

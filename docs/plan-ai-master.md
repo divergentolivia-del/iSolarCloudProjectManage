@@ -332,13 +332,16 @@ TB OpenAPI 拉取 + Webhook 订阅 + 每日全量对账。迭代工时与偏差�
 
 ### M2 · 数据自动流入（1-2 个月）
 
-| # | 任务 | 说明 |
-|---|---|---|
-| 1 | 钉钉打通 | 等凭据（见 `plan-dingtalk-checklist.md`） |
-| 2 | Git PR adapter | 接 1-2 个真实仓库，跑通 L1/L2/L3 映射 + 置信度 |
-| 3 | 统一数据契约 | 《团队工作台对接规范》给各团队，不接的走标准模板导出兜底 |
-| 4 | 静默告警 | 任务关联仓库 N 周无 PR 但临近交付 → 告警 |
-| 5 | 首批 3 个 Skill 上线 | 风险识别 / 周报 / 偏差分析（含定时任务 + 评测集） |
+| # | 任务 | 说明 | 状态 |
+|---|---|---|---|
+| 1 | 钉钉打通 | 等凭据（见 `plan-dingtalk-checklist.md`） | 🧊 冻结（等凭据） |
+| 2 | Git PR adapter | 接 1-2 个真实仓库，跑通 L1/L2/L3 映射 + 置信度 | ✅ MVP 完成（`modules/pradapter/`，本地 git 采集 + L1-L4 映射 + confirm 固化；真实仓库接入 = M2-C 待用户提供） |
+| 3 | 统一数据契约 | 《团队工作台对接规范》给各团队，不接的走标准模板导出兜底 | ✅ 完成（`plan-ai-m2-contract.md` v1） |
+| 4 | 静默告警 | 任务关联仓库 N 周无 PR 但临近交付 → 告警 | ✅ MVP 完成（repo-stale 已生效；task-stale 待任务数据到位自动生效） |
+| 5 | 首批 3 个 Skill 上线 | 风险识别 / 周报 / 偏差分析（含定时任务 + 评测集） | ⬜ M2-B 待做 |
+
+> 进度：M2-A（契约 + PR adapter MVP + 告警 + 单测 23 项全绿）已完成，见 `plan-ai-m2-tasks.md`。
+> 权限：`pradapter:read`（pm/dev/viewer）、`pradapter:write`（pm）。
 
 **验收：** 一周不手动录数据，平台进度仍在更新。
 
@@ -382,6 +385,9 @@ TB OpenAPI 拉取 + Webhook 订阅 + 每日全量对账。迭代工时与偏差�
 | 文档 | 角色 |
 |---|---|
 | **`plan-ai-m1-tasks.md`** | **M1 执行口径（SGAI+ 施工单）**。含已完成进度、剩余任务、踩坑清单、安全铁律。**M1 阶段与本文冲突时以它为准** |
+| `plan-ai-m1-data-masking.md` | **数据脱敏规范 v1**：L1/L2/L3 + 字段级规则 + AI 边界 + M2 接入卡点 |
+| `plan-ai-m2-tasks.md` | **M2 施工单**：A（契约 + PR adapter + 告警，已完成）/ B（3 个 Skill）/ C（待真实仓库） |
+| `plan-ai-m2-contract.md` | **统一数据契约 v1**：《团队工作台对接规范》，团队接入填表即可 |
 | `plan-ai-roadmap.md` | 路线图底稿（§4.3 PR 映射、§5 知识库、§6.2 风险识别器范例已被本文吸收）。**仅作历史参考，不要照它执行** |
 | `plan-ai-m1-foundation.md` | M1 落地设计（混合存储实测 + 四步施工清单 + 验收标准） |
 | `plan-dingtalk-checklist.md` | 钉钉打通凭据清单与检查项（**当前冻结**） |

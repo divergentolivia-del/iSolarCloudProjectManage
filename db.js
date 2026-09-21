@@ -88,17 +88,18 @@ const DEFAULT_PERMISSIONS = {
     'plan:read', 'plan:write', 'iteration:read', 'iteration:write',
     'project:read', 'project:write', 'csenergy:read', 'csenergy:write',
     'budget:read', 'token:read', 'dashboard:read', 'archive:read', 'archive:write',
+    'pradapter:read', 'pradapter:write',   // Git PR adapter：采集/确认映射/看告警
     'ai:doc', 'ai:risk', 'ai:report'          // 可调用文档/风险/周报 Agent
     // 刻意不含 'budget:write' 与 'ai:finance'：PM 不能改预算基准、不能调财务 Agent
   ],
   dev: [
     'plan:read', 'iteration:read', 'project:read', 'csenergy:read',
-    'dashboard:read', 'token:read'
+    'dashboard:read', 'token:read', 'pradapter:read'
     // 无 write：研发改自己的任务状态走单独的 'task:write' 通道（后续用行级权限补齐）
   ],
   viewer: [
     'plan:read', 'iteration:read', 'project:read', 'csenergy:read',
-    'budget:read', 'token:read', 'dashboard:read'
+    'budget:read', 'token:read', 'dashboard:read', 'pradapter:read'
   ]
 };
 

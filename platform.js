@@ -9,6 +9,39 @@
 const Platform = (() => {
   'use strict';
 
+  /* ============================================================
+     统一 401 处理（M1 Step 4.5）
+     登录态失效时，任何 API 返回 401 且带 login 字段 → 跳登录页并带回跳地址。
+     防御：只包一次；登录页自身不跳；非 JSON 响应不读 body。
+     服务端行为（见 server.js gate）：API → 401 {error, login:'/login.html'}；
+     页面请求 → 302 login.html?next=。这里只接管 API 的 401。
+     ============================================================ */
+  if (typeof window !== 'undefined' && !window.__wbFetchWrapped) {
+    window.__wbFetchWrapped = true;
+    const _origFetch = window.fetch.bind(window);
+    window.fetch = function (input, init) {
+      return _origFetch(input, init).then(resp => {
+        if (resp && resp.status === 401) {
+          try {
+            const ct = resp.headers.get('content-type') || '';
+            if (ct.indexOf('application/json') >= 0) {
+              resp.clone().json().then(j => {
+                if (j && typeof j.login === 'string' && j.login &&
+                    !/login\.html/.test(window.location.pathname)) {
+                  const next = encodeURIComponent(
+                    window.location.pathname + window.location.search + window.location.hash
+                  );
+                  window.location.href = j.login + (next ? '?next=' + next : '');
+                }
+              }).catch(() => { /* 读取失败不影响原响应 */ });
+            }
+          } catch (e) { /* 异常不影响原响应 */ }
+        }
+        return resp;
+      });
+    };
+  }
+
   const SIDEBAR_KEY = 'sidebar_collapsed';
   const USER_KEY = 'wb_who';
 
@@ -331,6 +364,10 @@ const Platform = (() => {
           } catch (e) { /* ignore */ }
         } else {
           _serverUser = null;
+        }
+        /* 身份（或权限）可能已变化：广播给各模块，让保存按钮等按权限刷新 */
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('platform:identity'));
         }
       })
       .catch(() => { _serverUser = null; });

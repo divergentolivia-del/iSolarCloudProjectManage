@@ -3094,6 +3094,8 @@ const PlanModule = (() => {
       el.querySelector('#plFormCancel2')?.addEventListener('click', () => { dirtyForm = null; currentView = currentPlanId ? 'detail' : 'list'; render(); });
       el.querySelector('#plFormSave')?.addEventListener('click', submitPlan);
       el.querySelector('#plFormSave2')?.addEventListener('click', submitPlan);
+      // M1 Step 4.5：按权限置灰保存按钮（服务端 gate 才是真正拦截，这里只是前端体验）
+      applySaveButtonPermission();
       // 暂存本页：把当前 tab 的 DOM 值收回 dirtyForm（不落库），给出反馈
       el.querySelector('#plStashTab')?.addEventListener('click', () => {
         syncFormFromDom();
@@ -3291,6 +3293,30 @@ const PlanModule = (() => {
   }
 
   // 暴露内部 debug 钩子
+  /* M1 Step 4.5：无 plan:write 权限时置灰「保存计划」按钮。
+     登录未启用（AUTH_REQUIRED=0）时 Platform.can() 恒 true，不影响旧行为。 */
+  function applySaveButtonPermission() {
+    let canWrite = true;
+    try { canWrite = typeof Platform !== 'undefined' ? Platform.can('plan:write') : true; } catch (e) { canWrite = true; }
+    ['plFormSave', 'plFormSave2'].forEach(id => {
+      const b = el && el.querySelector('#' + id);
+      if (!b) return;
+      b.disabled = !canWrite;
+      if (!canWrite) {
+        b.title = '无 plan:write 权限（服务端已拒绝写入）';
+        b.classList.add('btn-disabled');
+      } else {
+        b.title = '';
+        b.classList.remove('btn-disabled');
+      }
+    });
+  }
+
+  /* 身份/权限变化时（登录、登出、管理员改权限）刷新按钮状态 */
+  if (typeof window !== 'undefined') {
+    window.addEventListener('platform:identity', applySaveButtonPermission);
+  }
+
   const api = {
     moduleId: 'plan',
     refresh: async () => { await Promise.all([fetchState(), fetchSummary()]); render(); },

@@ -55,7 +55,8 @@ M2 的目标是**数据不再靠人手工录**：Git 仓库、团队工作台、
 | B1 | 风险识别 Skill | 输入：仓库活跃度 + 计划偏差 + 里程碑临近 → 输出风险清单（含评测集） | ✅ `modules/skill/skills/risk.js`（4 规则，TOP3 排序，真实数据 8 条风险） |
 | B2 | 周报 Skill | 周报 Prompt 模板（master §6.3）+ 数据自动注入 + 评测集 | ✅ `report.js`（四节式 Markdown 草稿 + 脱敏 + 待确认） |
 | B3 | 偏差分析 Skill | 基于迭代工时偏差 + PR 佐证，输出"可信度"而非硬算完成度 | ✅ `variance.js`（偏差表 + 趋势 + 归因 + 建议，PR 佐证可信度） |
-| B4 | 前端面板 | 平台内「数据自动流入」页：仓库状态 / 映射确认 / 告警列表 / Skill 运行与确认 | ✅ `dataflow.html` |
+| B4 | 前端面板 | 平台内「数据自动流入」页：仓库状态 / 映射确认 / 告警列表 / Skill 运行与确认 | ✅ `dataflow.html`（2026-09-22 加入平台侧栏入口，此前无任何入站链接） |
+| B5 | 今日待确认 | 跨 Skill 聚合所有待办到一处，按严重度排序，逐条采纳/驳回；侧栏红点 | ✅ `modules/inbox/`（`_test-inbox.js` 21 项） |
 
 **实现要点**：
 - 运行时 `modules/skill/lib/engine.js`：数据注入（iteration calc / pradapter / plan，全部脱敏口径）→ 规则执行 → 输出统一落成「待确认项」→ 人工确认回灌采纳率（决策 3/7）。
@@ -71,6 +72,15 @@ M2 的目标是**数据不再靠人手工录**：Git 仓库、团队工作台、
 5. 重跑 Skill 自动失效旧 pending 项（`expired`），采纳率分母/待确认数不虚高
 6. `_test-gate.js` 写死模块数 → 改存在性断言
 7. 小项：`results` 裁剪窗口 50→500；readBody 超 64KB 返 413 而非断连；dataflow.html 401/403 提示精确化
+
+**2026-09-22 修复（外部 review 发现，均已回归测试，第二批）**：
+8. **严重度值中英混用** → risk.js 发「高/中/低」，report/variance 的待确认项不带 severity、被兜底成 `'medium'`；
+   下游按英文排序，5 条真正的高风险被当成未知值排到最后、高风险计数恒为 0。
+   已在 `engine.normalizeItems` 收敛为 canonical `high|medium|low`（中文别名照收）。
+9. **collectInputs 失败时静默产出空结果** → 裸 node 里跑 `engine.run()` 时全局 `TEAMS` 未注入，
+   `calc.js` 抛 ReferenceError 被 catch 吞掉，`deviations=[]`，三个 Skill「运行成功」却把 82 条待办全标 expired。
+   改为显式 `console.warn` 并提示常见原因。
+10. `dataflow.html` 无任何入站链接（等于不存在）→ 加入平台侧栏 footer，`target="_blank"`。
 
 ## 4. M2-C（待用户输入）
 

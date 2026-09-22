@@ -360,6 +360,34 @@ body.dark-theme .sidebar-nav-item.active:hover {
 .module-view.hidden { display: none; }
 @keyframes viewEnter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
+/* ══════════ 初始口令提示条 ══════════ */
+/* 批量建号（user-import.js）发出的口令是「姓名缩写 + 固定后缀」，同批次规则相同，
+   知道规则的人能猜出别人的口令。所以在用户改掉之前提示一句 —— 不强制，
+   点「×」关掉即可，本次会话不再出现。 */
+.pwd-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--hold);
+  border-radius: var(--radius-sm);
+  background: var(--hold-soft);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.pwd-notice.hidden { display: none; }
+.pwd-notice-icon { flex: 0 0 auto; }
+.pwd-notice-text { flex: 1 1 auto; }
+.pwd-notice-action { flex: 0 0 auto; color: var(--blue); text-decoration: none; font-weight: 600; white-space: nowrap; }
+.pwd-notice-action:hover { text-decoration: underline; }
+.pwd-notice-close {
+  flex: 0 0 auto; border: none; background: transparent; color: var(--muted);
+  font-size: 18px; line-height: 1; padding: 0 4px; cursor: pointer;
+}
+.pwd-notice-close:hover { color: var(--text); }
+
 /* ══════════ Breadcrumb ══════════ */
 .breadcrumb-bar { margin-bottom: 18px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; min-height: 20px; }
 .breadcrumb-item { color: var(--muted); text-decoration: none; transition: color 0.15s; }

@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT,                      -- scrypt 加盐哈希；纯钉钉登录的用户可为空
   role          TEXT NOT NULL DEFAULT 'viewer',
   enabled       INTEGER NOT NULL DEFAULT 1,
+  pwd_is_initial INTEGER NOT NULL DEFAULT 0, -- 1 = 还在用批量建号发的初始口令（前端提示可改，不强制）
   created_at    TEXT,
   updated_at    TEXT
 );
@@ -106,6 +107,17 @@ const DEFAULT_PERMISSIONS = {
 
 /* ---------- 打开与初始化 ---------- */
 
+/* 轻量迁移：给已存在的旧库补列。
+   CREATE TABLE IF NOT EXISTS 只在建表时生效，旧库不会自动多出新列，所以必须单独 ALTER。
+   加列是幂等的（已存在会抛错），按列名存在性判断，避免每次启动都 catch 异常。 */
+function migrate() {
+  const cols = get().prepare('PRAGMA table_info(users)').all().map(c => c.name);
+  if (!cols.includes('pwd_is_initial')) {
+    get().exec('ALTER TABLE users ADD COLUMN pwd_is_initial INTEGER NOT NULL DEFAULT 0');
+    console.log('[db] 已为 users 表补列 pwd_is_initial（初始口令标记）');
+  }
+}
+
 function open() {
   if (db) return db;
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -113,6 +125,7 @@ function open() {
   db.exec('PRAGMA journal_mode = WAL');   // 并发读不被写阻塞
   db.exec('PRAGMA foreign_keys = ON');
   db.exec(SCHEMA);
+  migrate();
   seedPermissions();
   seedDefaults();
   return db;
@@ -186,20 +199,22 @@ function listUsers() {
   ).all();
 }
 
-function createUser({ id, name, password, role, dingtalkId }) {
+function createUser({ id, name, password, role, dingtalkId, initialPassword }) {
   if (!id || !name) throw new Error('账号和姓名不能为空');
   if (findUser(id)) throw new Error('账号已存在：' + id);
   const now = new Date().toISOString();
   get().prepare(
-    'INSERT INTO users(id, name, password_hash, role, dingtalk_id, enabled, created_at, updated_at) VALUES(?,?,?,?,?,1,?,?)'
+    'INSERT INTO users(id, name, password_hash, role, dingtalk_id, enabled, pwd_is_initial, created_at, updated_at) VALUES(?,?,?,?,?,1,?,?,?)'
   ).run(String(id), String(name), password ? hashPassword(password) : null,
-        String(role || 'viewer'), dingtalkId || null, now, now);
+        String(role || 'viewer'), dingtalkId || null, initialPassword ? 1 : 0, now, now);
   return findUser(id);
 }
 
-function setPassword(id, plain) {
-  get().prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?')
-    .run(hashPassword(plain), new Date().toISOString(), String(id));
+/** 改口令。默认清掉「初始口令」标记——用户自己改过就不该再提示。 */
+function setPassword(id, plain, opts) {
+  const keepInitial = !!(opts && opts.keepInitial);
+  get().prepare('UPDATE users SET password_hash = ?, pwd_is_initial = ?, updated_at = ? WHERE id = ?')
+    .run(hashPassword(plain), keepInitial ? 1 : 0, new Date().toISOString(), String(id));
 }
 
 function setRole(id, role) {

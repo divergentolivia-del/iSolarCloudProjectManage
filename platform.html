@@ -56,6 +56,16 @@
 
   <!-- Main Content Area -->
   <main class="main-content" id="mainContent">
+    <!-- 初始口令提示条：批量建号发下去的口令还没改过时显示，点「知道了」可关掉 -->
+    <div class="pwd-notice hidden" id="pwdNotice">
+      <span class="pwd-notice-icon">🔑</span>
+      <span class="pwd-notice-text">
+        你还在使用初始口令，同批次同事的口令规则相同，建议尽快改掉。
+      </span>
+      <a class="pwd-notice-action" href="#/dashboard/settings">去修改口令</a>
+      <button class="pwd-notice-close" id="pwdNoticeClose" title="知道了" aria-label="关闭">&times;</button>
+    </div>
+
     <!-- Breadcrumb -->
     <div class="breadcrumb-bar" id="breadcrumbBar"></div>
 

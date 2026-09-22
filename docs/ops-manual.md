@@ -97,7 +97,38 @@ node user-import.js docs/samples/员工名单.csv
 
 **初始口令提示**：用初始口令登录后，页面顶部会出现可关闭的提醒横幅（不强制改密，见方案 D3）。用户改密后自动消失。
 
-### 2.4 权限矩阵（默认值）
+### 2.4 初始口令规则与提示
+
+**口令从哪来**：批量建号时按「姓名缩写 + 固定后缀」拼出来（如 `zs2026`）。
+
+**规则配在哪**：`data/auth-config.json`（**已 gitignore，不进 git**）。改完**重启服务**生效；批量建号脚本 `user-import.js` 也读这个文件，所以**先改配置再导名单**。
+
+```json
+{
+  "defaultPasswordSuffix": "2026",
+  "defaultPasswordMode": "initials+suffix",
+  "forceChangeOnFirstLogin": false
+}
+```
+
+| 字段 | 说明 |
+|---|---|
+| `defaultPasswordSuffix` | 后缀。**每年换一次**，避免跨年入职的人撞口令 |
+| `defaultPasswordMode` | 目前只实现了 `initials+suffix`，填别的会直接报错退出 |
+| `forceChangeOnFirstLogin` | 当前只做「提示不强制」。置 `true` 也不会拦登录，别指望它当强制手段 |
+
+**文件丢了会怎样**：脚本会打印一行提示并退回内置默认后缀 `2026`，导入照常进行，不会中断。
+
+**提示条逻辑**（用户视角）：
+
+- 登录时服务端返回 `isInitialPwd`，为真则顶部出现横幅「你还在使用初始口令」
+- 点「×」关闭后，**本次登录会话不再出现**（存 `sessionStorage`）；下次登录还会提醒
+- 用户改过口令后 `pwd_is_initial` 置 0，横幅**永久消失**
+- 未启用登录（不设 `AUTH_REQUIRED`）时不显示 —— 那种模式没有账号概念
+
+**为什么值得提示**：同批次口令规则相同，知道规则的人能猜出同事的口令。横幅的目的是把人烦到去改，不是拦人。
+
+### 2.5 权限矩阵（默认值）
 
 | 角色 | 能干什么 | 刻意不给 |
 |---|---|---|

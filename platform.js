@@ -344,6 +344,34 @@ const Platform = (() => {
      所以这里缓存一份，whoami() 保持「同步返回字符串」不变。 */
   let _serverUser = null;
   let _serverPermissions = [];
+  let _serverIsInitialPwd = false;
+
+  /* 「初始口令」提示条的关闭状态。
+     存 sessionStorage 而不是 localStorage：本次登录会话不再打扰，
+     但下次再登录还会提醒一次 —— 目的就是把人烦到去改口令。 */
+  const PWD_NOTICE_KEY = 'wb_pwd_notice_closed';
+
+  /**
+   * 初始口令提示条：还挂着批量建号发的口令时显示，否则隐藏。
+   * 未启用登录（_serverUser 为空）时不显示 —— 那种模式下根本没有账号概念。
+   */
+  function renderPwdNotice() {
+    const el = document.getElementById('pwdNotice');
+    if (!el) return;
+    let closed = false;
+    try { closed = sessionStorage.getItem(PWD_NOTICE_KEY) === '1'; } catch (e) { /* 隐私模式下取不到，当作没关过 */ }
+    el.classList.toggle('hidden', !(_serverUser && _serverIsInitialPwd) || closed);
+  }
+
+  /** 绑定「×」：关掉并记住，本次会话不再出现 */
+  function bindPwdNotice() {
+    const btn = document.getElementById('pwdNoticeClose');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      try { sessionStorage.setItem(PWD_NOTICE_KEY, '1'); } catch (e) { /* ignore */ }
+      renderPwdNotice();
+    });
+  }
 
   /**
    * 向服务端确认「我是谁」。
@@ -357,6 +385,7 @@ const Platform = (() => {
         if (d && d.user) {
           _serverUser = d.user;
           _serverPermissions = d.permissions || [];
+          _serverIsInitialPwd = !!d.isInitialPwd;
           /* 顺手清掉旧的假身份，避免它继续散落在 localStorage 里 */
           try {
             localStorage.removeItem(USER_KEY);
@@ -364,7 +393,9 @@ const Platform = (() => {
           } catch (e) { /* ignore */ }
         } else {
           _serverUser = null;
+          _serverIsInitialPwd = false;
         }
+        renderPwdNotice();
         /* 身份（或权限）可能已变化：广播给各模块，让保存按钮等按权限刷新 */
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('platform:identity'));
@@ -629,6 +660,9 @@ const Platform = (() => {
 
     // Render user name in navbar
     renderNavbarUser();
+
+    // Bind 初始口令提示条的关闭按钮（显示与否由 refreshIdentity 决定）
+    bindPwdNotice();
 
     // Pre-create module containers
     ensureModuleContainers();

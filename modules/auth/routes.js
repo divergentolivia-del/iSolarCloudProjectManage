@@ -112,6 +112,7 @@ async function handle(req, res, url) {
     return sendJson(res, 200, {
       ok: true,
       user: { id: u.id, name: u.name, role: u.role },
+      isInitialPwd: !!u.pwd_is_initial,   // 还在用批量建号发的初始口令 → 前端给可关闭的提示条
       permissions: db.listPermissions(u.role)
     });
   }
@@ -129,8 +130,10 @@ async function handle(req, res, url) {
   if (p === '/api/auth/me' && method === 'GET') {
     const me = currentUser(req);
     if (!me) return sendJson(res, 200, { user: null });
+    const u = db.findUser(me.id);
     return sendJson(res, 200, {
       user: me,
+      isInitialPwd: !!(u && u.pwd_is_initial),
       permissions: db.listPermissions(me.role),
       isAdmin: me.role === 'admin'
     });

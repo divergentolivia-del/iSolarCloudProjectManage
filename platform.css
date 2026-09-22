@@ -316,9 +316,16 @@ body.dark-theme .sidebar-nav-item.active:hover {
 
 /* Collapsed */
 .sidebar.collapsed { width: var(--sidebar-collapsed-width); }
+/* 折叠时文字与徽标必须【脱离文档流】，不能只写 width:0 + visibility:hidden。
+   原因（2026-09-22 实测踩坑）：.nav-icon 是 flex-shrink:0 的 26px 方块，而
+   .nav-badge 即使 width:0，padding:1px 8px 仍占 16px、min-width:18px 还会撑住，
+   加上 gap:10px —— 60px 侧栏里可用宽度只有 36px，却要塞 66px 的内容，
+   于是图标被挤扁。侧栏折叠又有 0.25s 宽度过渡，动画期间每帧都在重排，
+   挤压过程会被完整看见。
+   display:none 把宽度彻底摘出 flex 计算，图标因此始终居中不被挤。 */
 .sidebar.collapsed .sidebar-title,
 .sidebar.collapsed .nav-label,
-.sidebar.collapsed .nav-badge { opacity: 0; visibility: hidden; width: 0; }
+.sidebar.collapsed .nav-badge { display: none; }
 .sidebar.collapsed .sidebar-nav-item { justify-content: center; padding: 10px 0; margin: 3px 4px; }
 .sidebar.collapsed .sidebar-nav-item .nav-icon { margin: 0; }
 .sidebar.collapsed .sidebar-nav-item[data-tooltip]:hover::after {
@@ -1010,7 +1017,8 @@ body.readonly-mode .btn.primary, body.readonly-mode .btn.danger { pointer-events
 @media (max-width: 1199px) and (min-width: 768px) {
   .hamburger-btn { display: none; }
   .sidebar { width: var(--sidebar-collapsed-width); }
-  .sidebar .sidebar-title, .sidebar .nav-label, .sidebar .nav-badge { opacity: 0; visibility: hidden; width: 0; }
+  /* 同 .sidebar.collapsed：必须 display:none 脱离文档流，否则图标被徽标挤扁 */
+  .sidebar .sidebar-title, .sidebar .nav-label, .sidebar .nav-badge { display: none; }
   .sidebar .sidebar-nav-item { justify-content: center; padding: 10px 0; margin: 3px 4px; }
   .sidebar .sidebar-nav-item .nav-icon { margin: 0; }
   .main-content { margin-left: var(--sidebar-collapsed-width); }

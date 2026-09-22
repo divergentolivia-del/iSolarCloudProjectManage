@@ -409,3 +409,137 @@ E:\PMWork\Project Materials\iSolarCloudProject\迭代版本\iSolarCloudProjectMa
 
 **等公司侧**：开发者权限 → 企业内部应用凭据 → 最小连通验证脚本 → 才动 P1。
 **Teambition 教训：拿到凭据后第一件事是写最小连通脚本跑通，跑通之前同步逻辑一行都不写。**
+
+---
+
+# 交接文档 v6 · 批3（P0 收口 + 「今日待确认」入口 + 三处静默 bug）
+
+> 日期：2026-09-22　分支：`dev/sgai`（提交 `1981116` 之前）
+> 本轮起点是用户的一句反馈：**「我目前还没看到任何可验收可视化的产物」**。
+> 这句话定义了这一轮的全部工作。
+
+## A. 本轮做了什么
+
+### A1. P0 六项（已推送 `889a97d`）
+`user-import.js`（含 `--dry-run`）、`data/auth-config.json`、`users.pwd_is_initial`
++ 首登横幅、`ops-manual.md` §2.4、`start.bat` 注释、全链路验收。
+实测：干跑 → 真导入（新建 5 / 跳过 0 / 失败 0）→ 重跑全跳过 → 初始口令登录
+返回 `isInitialPwd:true` → 改口令后 `false` → 新口令复登成功。
+
+### A2. 修掉「看不见」的四条根因
+用户的抱怨不是错觉，是四件事叠加：
+1. `auth` / `pradapter` / `skill` / `tb` 四个模块**只有服务端没有 UI**；
+2. `Platform.init()` 只注册了 5 个模块；
+3. **`dataflow.html` 没有任何入站链接** —— 页面存在，但等于不存在；
+4. 权限播种 bug（见 C-26），`dataflow.html` 上每个接口都返回「没有权限」。
+
+修了 3、4，并顺势补上 1、2 里最该有的那个入口（A4）。
+
+### A3. `seedPermissions()` 从「按角色跳过」改为「按权限点逐条补齐」（`45cfe48`）
+见 C-26。这是本轮最大的一处发现。
+
+### A4. 新增 `modules/inbox/` ——「今日待确认」（`4dc54a6`）
+路线图把 AI PMO 的落地形态定为**「一个需要人点确认的待办」，不是「一堆需要人去读的报告」**。
+此前 `skill` 模块只能按 Skill 逐个点进去看，跨 Skill 有没有事、今天要不要动手，用户无从得知。
+
+- `GET /api/inbox`：跨 Skill 聚合所有 `pending` 项，按严重度排序（high → medium → low，同级按时间倒序）
+- `POST /api/inbox/confirm`：采纳/驳回，**写入口径一律走 `skill` 引擎的 `confirm()`** ——
+  采纳率是唯一诚实指标，分母只能有一处维护，不另起一套状态机
+- 页面：顶部数字条（待确认 / 其中高风险 / 累计采纳率）、各 Skill 状态行、待确认卡片、**侧栏红点**
+- 权限：`inbox:read` / `inbox:write`（pm 读写，dev/viewer 只读）
+- 自检 `_test-inbox.js`：21 项通过
+
+## B. 为什么「今日待确认」要单独做一个模块，而不是塞进 dataflow.html
+
+`dataflow.html` 是**运维视角**：仓库采集正不正常、告警有没有、Skill 跑没跑。
+它回答的是"这套东西活着吗"。
+
+用户（PM）每天要回答的是另一个问题：**"今天要你拍板的 N 件事是什么？"**
+
+两者受众、频率、心智都不同：运维页一周看一次，待确认页一天开一次。
+更关键的是 —— 待确认项要**能一级入口直达**、要有**红点提醒**、要**排在业务模块之前**，
+这些都是 `dataflow.html` 这种独立整页给不了的（它进了 SPA 就破坏"自带脚本"的设计）。
+
+所以：`dataflow.html` 保留为运维/调试页（侧栏 footer，新标签打开）；
+`inbox` 做成正式模块（侧栏正区、order=1、带红点）。
+
+## C. 本轮踩过的坑（含新发现的静默 bug）
+
+26. ⭐⭐ **`seedPermissions()` 原来是按「角色」整体跳过，新增权限点永远进不了旧库 —— 而且全程不报错。**
+    原写法 `if (has.get(role).n > 0) return;` 的意思是「该角色一行都没有才播种」。
+    这个库建于 2026-09-20，那时 `skill:*` / `pradapter:*` 还不存在；等它们加进
+    `DEFAULT_PERMISSIONS` 时，pm/dev/viewer 早就"已有行"，于是**整批跳过**，
+    新权限点一条都没落库。
+    **表现**：`permissions` 表看着完全正常（29 行），但 `dataflow.html` 上每个接口都返回
+    `{"error":"没有权限：skill:read"}`，症状与"功能没做"完全一样，极难排查。
+    **正解**：逐条 `INSERT OR IGNORE`。
+    - 新库：行为与从前一致
+    - 旧库：只补缺失的权限点，已存在的行不被动
+    - 管理员手动改成 `allowed=0` 的行**也不会被重置**（`OR IGNORE` 不覆盖已存在行）
+    实测：权限行 29 → 37，`/api/skill` 恢复返回真实数据。
+    **教训：凡是「只在首次初始化时写一次」的种子逻辑，都要问一句「以后新增的条目怎么办」。**
+
+27. ⭐ **严重度值中英混用，导致 5 条高风险全部沉底、高风险计数恒为 0。**
+    `risk.js` 发的是中文 `'高'/'中'/'低'`；`report.js` / `variance.js` 的待确认项
+    **压根不带 severity**，引擎 `normalizeItems` 用 `o.severity || ''` 兜底，再被下游
+    当成 `medium`。下游排序表只认英文 `high/medium/low`，于是中文「高」被当作**未知值**
+    排到最后 —— 页面看上去「一条严重的都没有」，而那 5 条恰恰是最该先看的。
+    **正解**：在引擎 `normalizeItems` 里收敛成唯一一套 canonical 值，中文别名照收。
+    **引擎是唯一的生产者，严重度就该由一处定义，不能由各 Skill 各自发挥。**
+    改完 `_test-skill.js` 47 项全量复跑通过，未打破既有断言。
+
+28. ⭐ **输入采集失败时静默产出空结果 —— 比报错危险得多。**
+    我在裸 node 里跑 `engine.run()` 想让存量项套用新的归一化，结果三个 Skill 全部产出 0 项，
+    把 **82 条待办一次性全标成了 `expired`**。
+    根因：`calc.js` 依赖由 `server.js` 注入的全局 `TEAMS`，裸 node 里没注入 →
+    `ReferenceError` 被 `collectInputs` 的 `catch (e) { /* 偏差为空 */ }` 吞掉 →
+    `deviations=[]` → 所有偏差类结论为空，但 Skill 报告的是 **"运行成功"**。
+    用户看到的是「今天没风险」，真相是「输入压根没采集到」。
+    **已改为显式 `console.warn` 并提示常见原因。**
+    **教训：`catch` 里写注释而不是写日志，等于把故障藏起来。降级可以，沉默不可以。**
+    **恢复办法**：注入 globals 后重跑，`deviations` 回到 18，三个 Skill 恢复正常产出。
+
+29. **`platform.js` 已经有 `setBadge()`，别在模块里自己写一套徽标逻辑。**
+    我第一版在 `inbox/index.js` 里手写了 `updateBadge()` 直接操作 DOM，
+    而 `Platform.setBadge` 本来就是公开 API（`return { ..., setBadge, ... }`）。
+    徽标的显示/隐藏规则只该有一处实现，已改回调用平台 API。
+
+30. **headless Chrome 截图这条路在这台机器上走不通**（`--screenshot` 挂住，120s 超时被挪到后台，
+    最终无产物）。**别再花时间在这上面**：用户本来就能自己打开页面看，
+    "让用户能自己打开看"比"我截图给用户看"更根本 —— 这也是本轮把力气花在**入口可见性**
+    而不是截图上的原因。
+
+## D. 安全铁律（未变，重申）
+
+**沿用（一条都没放松）**：
+- **`git add .` 一次都不能用** —— `data/iteration/state.json` 被 git 跟踪且含真实工时
+- 提交前 `git diff --cached --name-only` 确认暂存区没有 `data/`
+- `data/platform.db`（口令哈希+审计）、`data/dingtalk/secret.json`、`data/auth-config.json`、
+  `data/skill/state.json` 一律不入库
+- 新增任何模块后，第一件事是确认 `data/<模块>/state.json` 进了 `.gitignore`
+
+## E. 现状与下一步
+
+**已推送**：`889a97d`（P0 六项）→ `45cfe48`（权限播种 + dataflow 入口）→
+`4dc54a6`（inbox）→ `1981116`（施工单）。均推在 `dev/sgai`，等用户验收。
+
+**用户可以现在就验收的**（无需任何部署）：
+1. `AUTH_REQUIRED=1 node server.js 8770`（PowerShell 见 `start.bat` 注释）
+2. 登录 → 侧栏**「📥 今日待确认」**（带红点，显示待办数）
+3. 侧栏 footer **「🔄 数据自动流入」**（新标签，运维/调试页）
+
+**已知缺口（未解决）**：
+1. **`data/pradapter/config.json` 里 `teams: []` 为空** → 偏差表的「佐证」列会显示 `—`。
+   这是 SGAI+ 的设计（未配置映射时不产生"无佐证"噪音），**不是 bug**，
+   但要填真实仓库→团队映射后才有内容。
+2. **M2-C 等用户输入**：C1 真实仓库路径；C2 团队工作台对接契约。
+3. **`data/iteration/state.json` 的 `deviations` 依赖全局 `TEAMS`** ——
+   任何脱离 `server.js` 的入口（CLI、定时任务、测试）都必须自己先注入 `config.js`，
+   否则会静默产出空结果（见 C-28）。这是当前最容易被再踩一次的坑。
+
+**待用户手动删除**（我的 `rm` 被权限系统拒绝）：
+`.tmp-adv*.js`、`.tmp-adv2dir/`、`.tmp-adv3dir/`、`.tmp-adversarial/`、
+`.tmp-import-test/`、`_dbg-*.js`
+
+**未跟踪且按用户指示保持不跟踪**：`钉钉开发/`（含应用信息，仅供我参考）、
+`AI项目管理新范式思路.txt`

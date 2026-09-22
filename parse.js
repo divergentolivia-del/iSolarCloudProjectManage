@@ -120,7 +120,7 @@ function parseFile(file, onDone, onError) {
       try {
         const aoa = csvToAoa(text);
         const res = parseAoa(aoa);
-        res.fileName = file.name;
+        res.fileName = String(file.name).replace(/\uFFFD/g, '');
         onDone(res);
       } catch (e) { onError(e); }
     });
@@ -133,7 +133,7 @@ function parseFile(file, onDone, onError) {
         const name = wb.SheetNames.find(n => /工时|工作量|看板/.test(n)) || wb.SheetNames[0];
         const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true });
         const res = parseAoa(aoa);
-        res.fileName = file.name;
+        res.fileName = String(file.name).replace(/\uFFFD/g, '');
         onDone(res);
       } catch (err) { onError(err); }
     };

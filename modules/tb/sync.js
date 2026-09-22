@@ -111,7 +111,7 @@ function normalizeTeam(name, knownTeams) {
   for (const t of knownTeams) {
     if (clean === t) return t;
   }
-  // 前缀匹配：如「后端开���-阳光云」清污后是「后端开发-阳光云」，命中白名单
+  // 前缀匹配：如「后端开发-阳光云」清污后是「后端开发-阳光云」，命中白名单
   for (const t of knownTeams) {
     if (clean.replace(/[-\s]/g, '').startsWith(t.replace(/[-\s]/g, '').slice(0, 4))) return t;
   }
@@ -250,7 +250,7 @@ async function syncBoard(board, token, overrides) {
   }
 
   // ▍产品线模式：收集「干净层级1」集合，供脏层级1归一（截图③按层级1聚合）。
-  // 层级1 = 完整产品线串「/」前的部分；脏字符可能出现在层级1（如「户用及���布式监控」）。
+  // 层级1 = 完整产品线串「/」前的部分；脏字符可能出现在层级1（如「户用及分布式监控」）。
   const cleanPl1Set = [];
   if (board.dimension === 'productLine') {
     for (const task of tasks) {

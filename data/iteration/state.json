@@ -1,70 +1,77 @@
 {
   "cycles": [
     {
-      "name": "方案一",
-      "seal": "8.10",
-      "online": "8.13",
-      "workdays": 25,
+      "name": "八月迭代",
+      "seal": "9.18",
+      "online": "9.22",
+      "workdays": 21,
       "saturdays": 3,
+      "active": false,
+      "note": "月中版本放9.8"
+    },
+    {
+      "name": "9月迭代-月末",
+      "seal": "10.26",
+      "online": "10.29",
+      "workdays": 22,
+      "saturdays": 2,
       "active": true,
-      "note": ""
-    },
-    {
-      "name": "方案2",
-      "seal": "",
-      "online": "",
-      "workdays": 0,
-      "saturdays": 0,
-      "active": false,
-      "note": ""
-    },
-    {
-      "name": "方案3",
-      "seal": "",
-      "online": "",
-      "workdays": 0,
-      "saturdays": 0,
-      "active": false,
       "note": ""
     }
   ],
   "headcount": {
     "APP开发-阳光云": {
-      "regular": 6,
-      "outsource": 2
+      "regular": 6.3,
+      "outsource": 3,
+      "owner": "王亚-2026-08-17 14:24"
     },
     "后端开发-阳光云": {
-      "regular": 6,
-      "outsource": 2.5
+      "regular": 5.3,
+      "outsource": 3.1,
+      "owner": "金海鑫-2026-08-15 21:14:53"
     },
     "Web开发-阳光云": {
-      "regular": 4.7,
-      "outsource": 1
+      "regular": 5.8,
+      "outsource": 1.5
     },
     "测试部-应用软件测试-云服务": {
-      "regular": 5.5,
-      "outsource": 2.5
+      "regular": 6,
+      "outsource": 13,
+      "owner": "方德财"
     },
     "测试部-应用软件测试-中后台": {
-      "regular": 11,
-      "outsource": 1
+      "regular": 4,
+      "outsource": 1,
+      "owner": "樊小雨"
+    },
+    "后端开发-平台": {
+      "regular": 3.4,
+      "outsource": 0,
+      "owner": "金海鑫-2026-08-14 13:41:31"
+    },
+    "中台开发-IoT中台": {
+      "regular": 9
+    },
+    "中台开发-技术中台": {
+      "regular": 5
+    },
+    "中台开发-数据中台": {
+      "regular": 11
+    },
+    "中台开发-平台运维": {
+      "regular": 6
+    },
+    "APP开发-平台": {
+      "owner": ""
     }
   },
   "locked": [
     {
-      "name": "AI助手",
+      "name": "iHM Mini",
       "roles": {
-        "后端": 0.5
-      },
-      "line": "",
-      "confirmer": "",
-      "confirmed": false,
-      "note": ""
-    },
-    {
-      "name": "新iHM",
-      "roles": {
-        "APP": 2
+        "APP": 3,
+        "后端": 0.5,
+        "测试-中台": null
       },
       "line": "",
       "confirmer": "",
@@ -74,9 +81,9 @@
     {
       "name": "阳光云多场景融合1.0",
       "roles": {
-        "APP": 10,
-        "WEB": 1,
-        "后端": 4
+        "APP": 13,
+        "WEB": null,
+        "后端": 4.5
       },
       "line": "",
       "confirmer": "",
@@ -86,26 +93,22 @@
     {
       "name": "iSolarDesign",
       "roles": {
-        "WEB": 1,
-        "后端": 2
+        "WEB": 2.5,
+        "后端": 2.5,
+        "APP": null
       },
       "line": "",
       "confirmer": "",
       "confirmed": false,
-      "note": ""
+      "note": "钱元浩，2026/08/13：4.1项目0.5人 + 综合能源项目2人"
     },
     {
-      "name": "亚非拉离网项目",
-      "roles": {},
-      "line": "",
-      "confirmer": "",
-      "confirmed": false,
-      "note": ""
-    },
-    {
-      "name": "微电网上云",
+      "name": "智能体2.0项目",
       "roles": {
-        "WEB": 1
+        "后端": 2.5,
+        "WEB": 0.5,
+        "后端-平台": 1.8,
+        "APP": 4
       },
       "line": "",
       "confirmer": "",
@@ -113,10 +116,10 @@
       "note": ""
     },
     {
-      "name": "iHM3.0 AI进阶收益提升项目",
+      "name": "安装商运营平台",
       "roles": {
-        "APP": 2,
-        "后端": 1
+        "后端": 1,
+        "APP": 1
       },
       "line": "",
       "confirmer": "",
@@ -124,7 +127,7 @@
       "note": ""
     },
     {
-      "name": "泽塔电池",
+      "name": "插储监控",
       "roles": {
         "APP": 2
       },
@@ -132,18 +135,8354 @@
       "confirmer": "",
       "confirmed": false,
       "note": ""
+    },
+    {
+      "name": "",
+      "roles": {},
+      "line": "",
+      "confirmer": "",
+      "confirmed": false,
+      "note": ""
     }
   ],
-  "totals": [],
-  "board": [],
-  "iterations": [],
-  "sources": {},
-  "rev": 53,
-  "updatedAt": "2026/8/17 20:00:00",
-  "updatedBy": "系统(清空工时数据)",
+  "totals": [
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 15.5,
+      "est": 15.5
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 22,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.25,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 5
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 3
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 1.5
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 1
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 1
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0.5
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 1
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0.5
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 5
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 1
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 9,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 21,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 21,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 30,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 6,
+      "est": 4
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 25,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1.5,
+      "est": 1.5
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1.5,
+      "est": 1.5
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 3
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 4
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 3
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 9
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 9,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 15,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 15,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 12,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 15,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 13,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 15,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 4
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 4
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 4
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 4
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 13,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 13,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 15,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 9,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 3
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 2
+    }
+  ],
+  "_totalsCloud": [
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 15.5,
+      "est": 15.5
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 22,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.25,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 5
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 3
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 1.5
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 1
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 1
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0.5
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 1
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0.5
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 5
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 1
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 9,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 21,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 21,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 30,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 6,
+      "est": 4
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 25,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C���本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1.5,
+      "est": 1.5
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1.5,
+      "est": 1.5
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 3
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 4
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 3
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 9
+    },
+    {
+      "productLine": "",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 9,
+      "est": 0
+    }
+  ],
+  "_totalsMiddle": [
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 15,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 15,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 12,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 15,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 13,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 15,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台���发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 4
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 4
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 4
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 4
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 13,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 13,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 15,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 9,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 3
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 2
+    }
+  ],
+  "board": [
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 15.5,
+      "est": 15.5
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 1
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 1
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0.5
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 3
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 1.5
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 1
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0.5
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 22,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2.5,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-ECO",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 29,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 5
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.25,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2.5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 1
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "工具项目",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 5
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2.5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 9,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 21,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2.5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1.5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 21,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "69e0d208170fe44fc6e25b77",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 30,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 6,
+      "est": 4
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "欧洲办公室-APP",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 20,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 25,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "欧洲办公室-APP",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1.5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "AI开发-交互智能",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "AI开发-交互智能",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "AI开发-交互智能",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "AI开发-交互智能",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "AI开发-交互智能",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "AI开发-交互智能",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "WEB开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1.5,
+      "est": 1.5
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1.5,
+      "est": 1.5
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 3
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 3
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 4
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 2
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "WEB开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "APP开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "未立项",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "测试部-应用软件测试-中后台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "未立项",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-阳光云",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 0,
+      "est": 9
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "测试部-应用软件测试-云服务",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "后端开发-平台",
+      "iteration": "阳光云2026-9月C版本迭代",
+      "story": 9,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "工商业场景监控（临时）",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "工具项目",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "工具项目",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "工具项目",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "工具项目",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "工具项目",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "工具项目",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 15,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 15,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "ECO",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 12,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 15,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 13,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 15,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "ECO",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "ECO",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "ECO",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "ECO",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 4
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 4
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 4
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 4
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 13,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 13,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "ECO",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "中后台开发部-IOT",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 0.5,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 15,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 7,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "工具项目",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 6,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "ECO",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 4,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 10,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 9,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 8,
+      "est": 0
+    },
+    {
+      "productLine": "户用及分布式监控",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 3
+    },
+    {
+      "productLine": "储能及地面监控",
+      "team": "中台开发-平台运维",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "ECO",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 1,
+      "est": 0
+    },
+    {
+      "productLine": "工具项目",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-数据中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 5,
+      "est": 0
+    },
+    {
+      "productLine": "ECO",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "工具项目",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 0
+    },
+    {
+      "productLine": "智慧能源产品中心",
+      "team": "中台开发-技术中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 3,
+      "est": 0
+    },
+    {
+      "productLine": "ECO",
+      "team": "中台开发-IoT中台",
+      "iteration": "中后台-2026年9月迭代",
+      "story": 2,
+      "est": 2
+    }
+  ],
+  "sources": {
+    "totals": {
+      "fileName": "TB自动同步·阳光云迭代工作量",
+      "at": "2026/9/22 14:30:29",
+      "rows": 240,
+      "tb": true
+    },
+    "board": {
+      "fileName": "TB自动同步·月度版本项目人力（产品线维度）",
+      "at": "2026/9/22 14:30:29",
+      "rows": 398,
+      "tb": true
+    },
+    "totalsMiddle": {
+      "fileName": "TB自动同步·中后台工作量",
+      "at": "2026/9/22 14:30:29",
+      "rows": 150,
+      "tb": true
+    }
+  },
+  "iterations": [
+    {
+      "name": "中后台-2026年9月迭代",
+      "weight": 1588.5,
+      "selected": true
+    },
+    {
+      "name": "阳光云2026-9月C版本迭代",
+      "weight": 1217.5,
+      "selected": true
+    }
+  ],
   "iterDirty": false,
-  "_totalsCloud": [],
-  "_totalsMiddle": [],
-  "sourceOverrides": {},
-  "deviationOverrides": {}
+  "showAllIterations": true,
+  "deviationOverrides": {
+    "后端开发-阳光云": {
+      "workload": 323.5
+    },
+    "后端开发-平台": {
+      "workload": 98.5
+    },
+    "测试部-应用软件测试-云服务": {
+      "workload": 608
+    },
+    "Web开发-阳光云": {
+      "workload": 232.5
+    }
+  },
+  "tbBoardSprints": {
+    "cloud": [
+      {
+        "sid": "6a703f1290660db8e7309f3d",
+        "name": "阳光云2026-9月C版本迭代"
+      }
+    ],
+    "middle": [
+      {
+        "sid": "6a930c1b7fa49c3bde2f857b",
+        "name": "中后台-2026年9月迭代"
+      }
+    ],
+    "productLine": [
+      {
+        "sid": "6a703f1290660db8e7309f3d",
+        "name": "阳光云2026-9月C版本迭代"
+      },
+      {
+        "sid": "6a930c1b7fa49c3bde2f857b",
+        "name": "中后台-2026年9月迭代"
+      }
+    ]
+  },
+  "tbSprintMap": {
+    "6a54cad1565616b581fcb14b": "阳光云+中后台 8月全量",
+    "6a6b1f08249c49d80744bbfe": "阳光云+中后台 8月全量",
+    "6a703f1290660db8e7309f3d": "阳光云2026-9月C版本迭代",
+    "6a930c1b7fa49c3bde2f857b": "中后台-2026年9月迭代"
+  },
+  "rev": 416,
+  "updatedAt": "2026/9/22 14:59:31",
+  "updatedBy": "陈丹萍",
+  "mapDetailsOpen": {
+    "cloud": true,
+    "middle": true,
+    "productLine": true
+  }
 }

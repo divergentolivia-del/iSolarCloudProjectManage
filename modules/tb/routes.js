@@ -143,9 +143,9 @@ function applySyncToState(result, by, sprintMap, boardSprints) {
   s.totals = (s._totalsCloud || []).concat(s._totalsMiddle || []);
 
   s.sources = s.sources || {};
-  s.sources.totals = { fileName: 'TB自动同步·' + result.stats.cloud.name, at: now, rows: result.cloudRows.length, tb: true };
-  s.sources.totalsMiddle = { fileName: 'TB自动同步·' + result.stats.middle.name, at: now, rows: result.middleRows.length, tb: true };
-  s.sources.board = { fileName: 'TB自动同步·' + result.stats.productLine.name, at: now, rows: result.boardRows.length, tb: true };
+  s.sources.totals = { fileName: 'TB自动同步·' + String(result.stats.cloud.name).replace(/\uFFFD/g, ''), at: now, rows: result.cloudRows.length, tb: true };
+  s.sources.totalsMiddle = { fileName: 'TB自动同步·' + String(result.stats.middle.name).replace(/\uFFFD/g, ''), at: now, rows: result.middleRows.length, tb: true };
+  s.sources.board = { fileName: 'TB自动同步·' + String(result.stats.productLine.name).replace(/\uFFFD/g, ''), at: now, rows: result.boardRows.length, tb: true };
 
   rebuildIterations(s);
 

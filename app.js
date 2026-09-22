@@ -831,7 +831,13 @@ function comboDisplay(sid) {
 function positionComboDrop(combo, drop) {
   const trig = combo.querySelector('.tb-sprint-combo-input');
   if (!trig) return drop;
-  const r = trig.getBoundingClientRect();
+  let r = trig.getBoundingClientRect();
+  /* 触发框不在可见区（程序化点击/页面未滚到该行）时先滚入视口，
+     否则 fixed 定位会算出负坐标、面板错乱 */
+  if (r.top > window.innerHeight - 40 || r.bottom < 40) {
+    trig.scrollIntoView({ block: 'center' });
+    r = trig.getBoundingClientRect();
+  }
   const GAP = 4, PAD = 8, MIN_H = 180;
 
   /* 宽度：面板要比触发框宽（里面是「迭代名（进行中 · 2026-09-01）」这种长文本），

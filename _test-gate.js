@@ -137,6 +137,32 @@ async function testGate() {
   ck('登录/登出已写入 SQLite 审计', rows.indexOf('登录') >= 0, rows);
 }
 
+/* ---------- 子进程：登录节流 ---------- */
+
+async function testThrottle() {
+  console.log('\n[2] 登录节流（连错锁定）');
+
+  /* 用一个独立账号，别污染上面 pm/dev 的会话 */
+  /* 第 1~4 次错：普通 401，和平时一样 */
+  let last = null;
+  for (let i = 1; i <= 4; i++) {
+    last = await req('POST', '/api/auth/login', { id: 'lockme', password: 'nope-' + i });
+  }
+  ck('连错 4 次仍是普通 401（还没到阈值）', last.code === 401 && /账号或口令不正确/.test(last.body.error || ''), last);
+
+  /* 第 5 次错：触发锁定，必须换文案 */
+  last = await req('POST', '/api/auth/login', { id: 'lockme', password: 'nope-5' });
+  ck('第 5 次错 → 429 且明说「临时锁定」', last.code === 429 && /锁定/.test(last.body.error || ''), last);
+
+  /* 锁定期内，即使口令正确也进不来 —— 否则锁形同虚设 */
+  const afterLock = await req('POST', '/api/auth/login', { id: 'lockme', password: 'lock-pass-123' });
+  ck('锁定期内正确口令也进不来（429）', afterLock.code === 429, afterLock.code);
+
+  /* 换个没试过的账号不受影响 —— 锁的粒度是账号，不是一刀切 */
+  const other = await req('POST', '/api/auth/login', { id: 'dev', password: 'dev-pass-123' });
+  ck('锁定期内别的账号照常登录（不是全局封锁）', other.code === 200, other.code);
+}
+
 (async () => {
   testResourceOf();
 
@@ -144,6 +170,7 @@ async function testGate() {
   const db = require('./db');
   db.createUser({ id: 'pm', name: '测试项目经理', role: 'pm', password: 'pm-pass-123' });
   db.createUser({ id: 'dev', name: '测试研发', role: 'dev', password: 'dev-pass-123' });
+  db.createUser({ id: 'lockme', name: '节流测试号', role: 'viewer', password: 'lock-pass-123' });
 
   const srv = startServer();
   let srvOut = '';
@@ -152,6 +179,7 @@ async function testGate() {
   try {
     await waitReady(15000);
     await testGate();
+    await testThrottle();
   } finally {
     try { srv.kill(); } catch (e) { /* ignore */ }
     await sleep(300);

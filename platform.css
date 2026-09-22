@@ -158,7 +158,10 @@ body.dark-theme .platform-navbar {
 
 .navbar-right { display: flex; align-items: center; gap: 10px; }
 
-.navbar-user {
+.navbar-user-wrap { position: relative; }
+
+.navbar-user-btn {
+  font: inherit;
   font-size: 13px;
   color: var(--muted);
   padding: 5px 12px;
@@ -166,7 +169,42 @@ body.dark-theme .platform-navbar {
   background: var(--panel-soft);
   border: 1px solid var(--line);
   font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
 }
+.navbar-user-btn:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.navbar-user-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 160px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+  z-index: 400;
+}
+.navbar-user-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.navbar-user-item:hover { background: var(--panel-soft); }
+.navbar-user-item.danger { color: var(--warn); }
 
 .navbar-icon {
   width: 34px; height: 34px;

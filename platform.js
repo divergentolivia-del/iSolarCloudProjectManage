@@ -327,14 +327,56 @@ const Platform = (() => {
      Navbar User Display
      ============================================================ */
 
+  /* ============================================================
+     账号下拉（改口令 / 退出登录）
+     ============================================================ */
+
+  /**
+   * 绑定导航栏右下角的账号按钮。
+   * 点按钮开合下拉；点别处关闭；「退出登录」调服务端销毁会话。
+   * 退出必须走服务端：会话是 SQLite 里的一行，Cookie 是 HttpOnly，
+   * 前端删不掉它 —— 只清本地等于没退。
+   */
+  function bindUserMenu() {
+    const btn = document.getElementById('navbarUser');
+    const menu = document.getElementById('navbarUserMenu');
+    const logout = document.getElementById('navbarLogout');
+    if (!btn || !menu) return;
+
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      menu.classList.toggle('hidden');
+    });
+
+    /* 点下拉里的链接（账号与口令）时让它自己跳，别被外面那层 click 提前关掉；
+       点其他地方一律收起。 */
+    menu.addEventListener('click', e => e.stopPropagation());
+    document.addEventListener('click', () => menu.classList.add('hidden'));
+
+    if (logout) {
+      logout.addEventListener('click', () => {
+        if (!window.confirm('确定退出登录？')) return;
+        fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+          .catch(() => { /* 请求失败也照常回登录页：本地没有可清的东西 */ })
+          .then(() => { window.location.href = '/login.html'; });
+      });
+    }
+  }
+
   /**
    * Render the current user name in the navbar.
    */
   function renderNavbarUser() {
     const el = document.getElementById('navbarUser');
     if (!el) return;
-    const name = whoami();
-    el.textContent = name;
+    /* 优先用服务端身份；没有就退回本地昵称（老模式）。
+       用 _labelOrNull 而不是 whoami()：登录已启用但身份还没回来时，
+       whoami() 会弹「请输入你的姓名」，而这里只是想填个名字。 */
+    const name = _labelOrNull();
+    el.textContent = name || whoami();
+    /* 没启用登录时没有账号概念，下拉里的「退出登录」也就没有意义 */
+    const wrap = document.getElementById('navbarUserWrap');
+    if (wrap) wrap.style.display = _serverUser ? '' : 'none';
   }
 
   /* ============================================================
@@ -424,9 +466,19 @@ const Platform = (() => {
    * 4. 都没有则询问
    * @returns {string} User name
    */
+  /**
+   * 只剩「服务端已知身份」这一条路，拿不到就返回 null。
+   * whoami() 在拿不到身份时会 window.prompt 问姓名 —— 那是给「未启用登录」
+   * 的老模式留的。渲染导航栏时调 whoami() 会突然弹框，所以这里单开一个
+   * 无副作用的版本，专供导航栏/下拉用。
+   * @returns {string|null}
+   */
+  function _labelOrNull() {
+    return (_serverUser && _serverUser.name) ? _serverUser.name : null;
+  }
+
   function whoami() {
     if (_serverUser && _serverUser.name) return _serverUser.name;
-
     let name = '';
     try {
       name = localStorage.getItem(USER_KEY) || '';
@@ -707,6 +759,9 @@ const Platform = (() => {
       });
     }
 
+    // Bind 账号下拉（改口令 / 退出登录）
+    bindUserMenu();
+
     // Bind sidebar help link — show toast instead of navigating
     const helpLink = document.getElementById('sidebarHelp');
     if (helpLink) {
@@ -788,6 +843,10 @@ const Platform = (() => {
     currentUser,
     can,
     refreshIdentity,
+
+    /* 给「账号」下拉用。未启用登录或还没拿到身份时返回 null。
+       刻意不发请求、不弹 prompt —— 渲染导航栏时会调用它，不能有副作用。 */
+    _labelOrNull,
 
     // Internal helper exposed for Router to call
     _highlightNav: highlightNav

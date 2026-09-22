@@ -21,7 +21,16 @@
     <span class="navbar-brand">云平台管理工作台</span>
   </div>
   <div class="navbar-right">
-    <span class="navbar-user" id="navbarUser">用户</span>
+    <!-- 账号：点姓名出下拉，里面是改口令 / 退出登录。
+         2026-09-22 之前全平台没有退出登录入口，而会话 Cookie 有 30 天，
+         共用电脑上前一个人登完不登出，后一个人打开就是他的身份。 -->
+    <div class="navbar-user-wrap" id="navbarUserWrap">
+      <button class="navbar-user-btn" id="navbarUser" title="账号">用户</button>
+      <div class="navbar-user-menu hidden" id="navbarUserMenu">
+        <a class="navbar-user-item" href="#/dashboard/settings" id="navbarUserAcct">账号与口令</a>
+        <button class="navbar-user-item danger" id="navbarLogout">退出登录</button>
+      </div>
+    </div>
     <button class="navbar-icon" id="navbarNotify" title="通知">🔔</button>
     <button class="navbar-icon" id="navbarSettings" title="设置">⚙</button>
   </div>

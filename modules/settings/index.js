@@ -33,6 +33,55 @@ const SettingsModule = (() => {
         <h2 class="page-title">系统设置</h2>
 
         <div class="settings-section">
+          <!-- 账号：口令改这里、退出登录也在这里。
+               2026-09-22 之前全平台没有任何改口令界面，而顶部提示条的
+               「去修改口令」正是指向本页 —— 点了没反应，于是所有人都停在
+               批量建号的初始口令上（同批次规则相同，可被同事猜中）。 -->
+          <div class="form-group">
+            <label class="form-label">当前账号</label>
+            <div class="form-control">
+              <span class="settings-readonly" id="acctWho">—</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">口令</label>
+            <div class="form-control">
+              <button class="btn" id="acctChangePwd">修改口令</button>
+              <button class="btn danger" id="acctLogout">退出登录</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 改口令表单：默认收起，点「修改口令」才展开 -->
+        <div class="settings-section" id="acctPwdForm" style="display:none">
+          <div class="form-group">
+            <label class="form-label">原口令</label>
+            <div class="form-control">
+              <input type="password" id="acctOldPwd" class="settings-input" autocomplete="current-password" style="text-align:left">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">新口令</label>
+            <div class="form-control">
+              <input type="password" id="acctNewPwd" class="settings-input" autocomplete="new-password" style="text-align:left">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">再输一次</label>
+            <div class="form-control">
+              <input type="password" id="acctNewPwd2" class="settings-input" autocomplete="new-password" style="text-align:left">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label"></label>
+            <div class="form-control">
+              <span id="acctPwdMsg" style="font-size:13px"></span>
+              <button class="btn primary" id="acctPwdSubmit">确认修改</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-section">
           <div class="form-group">
             <label class="form-label">主题切换</label>
             <div class="form-control">
@@ -94,6 +143,9 @@ const SettingsModule = (() => {
 
     // 绑定事件
     bindEvents(container);
+
+    // 加载账号区（当前账号名）
+    loadAccountSection();
 
     // 加载白名单配置
     loadWhitelistSection();
@@ -161,6 +213,89 @@ const SettingsModule = (() => {
         }
       });
     }
+  }
+
+  /* ---------- 账号：改口令 / 退出登录 ---------- */
+
+  /** 账号区：填当前账号名、绑「修改口令」「退出登录」 */
+  function loadAccountSection() {
+    const who = document.getElementById('acctWho');
+    const u = (typeof Platform !== 'undefined' && Platform.currentUser) ? Platform.currentUser() : null;
+    if (who) who.textContent = u ? (u.name + '（' + u.id + ' · ' + u.role + '）') : '未启用登录';
+
+    const openBtn = document.getElementById('acctChangePwd');
+    const form = document.getElementById('acctPwdForm');
+    if (openBtn && form) {
+      openBtn.addEventListener('click', function () {
+        form.style.display = form.style.display === 'none' ? '' : 'none';
+        const first = document.getElementById('acctOldPwd');
+        if (form.style.display !== 'none' && first) first.focus();
+      });
+    }
+
+    const submit = document.getElementById('acctPwdSubmit');
+    if (submit) submit.addEventListener('click', submitPasswordChange);
+
+    const logout = document.getElementById('acctLogout');
+    if (logout) logout.addEventListener('click', doLogout);
+  }
+
+  function pwdMsg(text, kind) {
+    const el = document.getElementById('acctPwdMsg');
+    if (!el) return;
+    el.textContent = text || '';
+    el.style.color = kind === 'ok' ? 'var(--ok)' : 'var(--danger)';
+  }
+
+  /**
+   * 提交改口令。
+   * 前端只做「两次输入是否一致」这类能立刻判断的校验；
+   * 原口令对不对、新口令够不够长，一律以服务端返回为准 —— 规则只有一处，不在这边复刻。
+   */
+  function submitPasswordChange() {
+    const oldPwd = (document.getElementById('acctOldPwd') || {}).value || '';
+    const np = (document.getElementById('acctNewPwd') || {}).value || '';
+    const np2 = (document.getElementById('acctNewPwd2') || {}).value || '';
+
+    if (!oldPwd) return pwdMsg('请填写原口令');
+    if (!np) return pwdMsg('请填写新口令');
+    if (np !== np2) return pwdMsg('两次输入的新口令不一致');
+
+    pwdMsg('提交中…', 'ok');
+    fetch('/api/auth/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ oldPassword: oldPwd, newPassword: np })
+    })
+      .then(r => r.json().then(d => ({ ok: r.ok, d: d })))
+      .then(r => {
+        if (!r.ok) { pwdMsg((r.d && r.d.error) || '修改失败'); return; }
+        ['acctOldPwd', 'acctNewPwd', 'acctNewPwd2'].forEach(function (id) {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+        });
+        const form = document.getElementById('acctPwdForm');
+        if (form) form.style.display = 'none';
+        /* 改完立刻刷新身份：服务端已经把「初始口令」标记清掉了，
+           顶部那条提示条应该当场消失，而不是等下次刷新。 */
+        if (typeof Platform !== 'undefined' && Platform.refreshIdentity) {
+          Platform.refreshIdentity().then(function () {
+            SharedUI.toast('口令已修改', 'success');
+          });
+        } else {
+          SharedUI.toast('口令已修改', 'success');
+        }
+      })
+      .catch(function () { pwdMsg('网络异常，口令未修改'); });
+  }
+
+  /** 退出登录：服务端销毁会话并清 Cookie，然后回登录页 */
+  function doLogout() {
+    if (!window.confirm('确定退出登录？')) return;
+    fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+      .catch(function () { /* 就算请求失败也照常回登录页，本地没有可清的东西（Cookie 是 HttpOnly） */ })
+      .then(function () { window.location.href = '/login.html'; });
   }
 
   /* ---------- 工具函数 ---------- */

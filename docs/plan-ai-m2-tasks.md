@@ -57,11 +57,13 @@ M2 的目标是**数据不再靠人手工录**：Git 仓库、团队工作台、
 | B3 | 偏差分析 Skill | 基于迭代工时偏差 + PR 佐证，输出"可信度"而非硬算完成度 | ✅ `variance.js`（偏差表 + 趋势 + 归因 + 建议，PR 佐证可信度） |
 | B4 | 前端面板 | 平台内「数据自动流入」页：仓库状态 / 映射确认 / 告警列表 / Skill 运行与确认 | ✅ `dataflow.html`（2026-09-22 加入平台侧栏入口，此前无任何入站链接） |
 | B5 | 今日待确认 | 跨 Skill 聚合所有待办到一处，按严重度排序，逐条采纳/驳回；侧栏红点 | ✅ `modules/inbox/`（`_test-inbox.js` 21 项） |
+| B6 | 健康度评估 Skill（master §7 Skill 4） | 四维得分卡（进度/人力/代码/风险）+ 红黄绿灯 + 异常摘要；非绿灯维度落待确认项 | ✅ `modules/skill/skills/health.js`（真实数据实测：综合 15 分红灯，进度 0/人力 0/代码 100/风险 0，3 条待确认） |
+| B7 | Git/PR 信号分析 Skill（master §7 Skill 5） | 任务-代码关联表（L1-L4）+ 仓库停滞/采集异常/关联缺口/确认积压信号 | ✅ `modules/skill/skills/gitsignals.js`（诚实声明：评审阻塞/CI 信号依赖 PR 系统数据，M2-C 接真实仓库时补） |
 
 **实现要点**：
 - 运行时 `modules/skill/lib/engine.js`：数据注入（iteration calc / pradapter / plan，全部脱敏口径）→ 规则执行 → 输出统一落成「待确认项」→ 人工确认回灌采纳率（决策 3/7）。
 - 权限：`skill:read`（pm/dev/viewer）、`skill:write`（pm）。
-- 评测集 `_test-skill.js`：37 项断言（risk 11 / variance 9 / report 9 / engine 8）。
+- 评测集 `_test-skill.js`：现 73 项断言（risk / variance / report / engine 运行时 / health 9 / gitsignals 9 / 新 Skill 待确认接通 2）。
 - 模型可插拔：当前为**规则引擎版**（确定性、可测、内网可用）；接外部模型时只需给每个 Skill 加一个 AI 后处理层（master 决策 6）。
 
 **2026-09-22 修复（外部 review 发现，均已回归测试）**：
@@ -81,6 +83,13 @@ M2 的目标是**数据不再靠人手工录**：Git 仓库、团队工作台、
    `calc.js` 抛 ReferenceError 被 catch 吞掉，`deviations=[]`，三个 Skill「运行成功」却把 82 条待办全标 expired。
    改为显式 `console.warn` 并提示常见原因。
 10. `dataflow.html` 无任何入站链接（等于不存在）→ 加入平台侧栏 footer，`target="_blank"`。
+
+**2026-09-22 第三批（B6/B7 新 Skill 落地 + 回归发现）**：
+11. **`engine.normalizeItems` 写死 3 个 skillId** → 新 Skill（health/gitsignals）的 items 不进待确认队列（运行成功但 0 待确认，静默丢数据）。
+    已注册 + 加运行时回归用例（`run('health')`/`run('gitsignals')` 必须进队列）。
+12. `_test-inbox.js` 写死“三个 Skill”总数 → 新增 Skill 直接打红测试（与第 6 条 _test-gate 同类反模式）→ 改存在性断言。
+13. health 代码维度比例误判：只有 1 个仓库时静默=100% 直接红灯 → 改绝对数阈值（静默 ≥1 黄、≥3 红）。
+14. 迭代组合框搜索框 placeholder 过长溢出输入框 → 改「🔍 输入关键字」（app.js）。
 
 ## 4. M2-C（待用户输入）
 

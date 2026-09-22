@@ -260,5 +260,90 @@ console.log('\n[运行时 · 引用性条目不进待确认，但仍在周报风
     rr.result.output && rr.result.output.sections.risks);
 }
 
+console.log('\n[Skill4 健康度评估器 · 四维记分卡]');
+{
+  const health = require('./modules/skill/skills/health');
+
+  const h1 = health.assess({ now, deviations: [], repos: [], risks: [] });
+  ck('全正常 → 综合绿灯 100 分，4 维全绿，无待确认项',
+    h1.card.overall.light === 'green' && h1.card.overall.score === 100 &&
+    h1.card.dimensions.every(d => d.light === 'green') && h1.items.length === 0, h1.card);
+
+  const h2 = health.assess({ now, repos: [], risks: [],
+    deviations: [{ team: 'A', head: 2, ratio: 0.6, over: 40 }] });
+  ck('最大偏差 60% → 进度维度红灯', h2.card.dimensions[0].light === 'red' && h2.card.dimensions[0].score <= 30, h2.card.dimensions[0]);
+
+  const h3 = health.assess({ now, repos: [], risks: [],
+    deviations: [{ team: 'A', head: 2, ratio: 0.3, over: 10 }] });
+  ck('最大偏差 30% → 进度维度黄灯', h3.card.dimensions[0].light === 'yellow', h3.card.dimensions[0]);
+
+  const h4 = health.assess({ now, repos: [], risks: [],
+    deviations: [{ team: 'A', head: 0, ratio: 0 }, { team: 'B', head: 0, ratio: 0 }] });
+  ck('2 队缺人头 → 人力维度黄灯', h4.card.dimensions[1].light === 'yellow', h4.card.dimensions[1]);
+
+  const h5 = health.assess({ now, repos: [], risks: [],
+    deviations: [{ team: 'A', head: 0, ratio: 0 }, { team: 'B', head: 0, ratio: 0 }, { team: 'C', head: 0, ratio: 0 }] });
+  ck('3 队缺人头 → 人力维度红灯', h5.card.dimensions[1].light === 'red', h5.card.dimensions[1]);
+
+  const h6 = health.assess({ now, risks: [],
+    repos: [{ id: 'r1', name: '仓A', ok: true, lastCommitAt: new Date(now - 20 * DAY).toISOString() }] });
+  ck('1 仓静默 20 天 → 代码维度黄灯', h6.card.dimensions[2].light === 'yellow', h6.card.dimensions[2]);
+
+  const h7 = health.assess({ now, deviations: [], repos: [],
+    risks: [{ severity: '中' }, { severity: '中' }] });
+  ck('加权分：仅 2 条中风险 → 综合 96 分绿灯',
+    h7.card.overall.score === 96 && h7.card.overall.light === 'green', h7.card.overall);
+
+  const h8 = health.assess({ now, repos: [],
+    deviations: [{ team: 'A', head: 1, ratio: 0.51, over: 10 }],
+    risks: [{ severity: '高' }, { severity: '高' }, { severity: '高' }] });
+  ck('进度红 + 风险红（双红）→ 综合强制红灯', h8.card.overall.light === 'red', h8.card);
+
+  const h9 = health.assess({ now, repos: [],
+    deviations: [{ team: 'A', head: 0, ratio: 0.51, over: 10 }], risks: [] });
+  ck('非绿灯维度落待确认项（severity 随灯色）',
+    h9.items.length === 2 && h9.items.some(i => i.severity === '高' && i.id === 'health-schedule') && h9.items.some(i => i.severity === '中' && i.id === 'health-capacity'), h9.items);
+}
+
+console.log('\n[Skill5 Git/PR 信号分析器 · 关联表 + 信号]');
+{
+  const gitsig = require('./modules/skill/skills/gitsignals');
+  const activeRepo = { id: 'r1', name: '仓A', ok: true, lastCommitAt: new Date(now - 3 * DAY).toISOString() };
+
+  const g1 = gitsig.analyze({ now, repos: [activeRepo], git: { stats: { byLevel: { L1: 5, L2: 0, L3: 3, L4: 0 }, commitCount: 8 }, l2Pending: 0 } });
+  ck('全正常 → 0 信号 0 待确认项', g1.signals.length === 0 && g1.items.length === 0, g1.signals);
+
+  const g2 = gitsig.analyze({ now, repos: [{ id: 'r1', name: '仓A', ok: true, lastCommitAt: new Date(now - 20 * DAY).toISOString() }], git: {} });
+  ck('20 天无提交 → repo-stale 中', g2.signals.some(s => s.type === 'repo-stale' && s.severity === '中'), g2.signals);
+
+  const g3 = gitsig.analyze({ now, repos: [{ id: 'r1', name: '仓A', ok: true, lastCommitAt: new Date(now - 25 * DAY).toISOString() }], git: {} });
+  ck('25 天无提交 → repo-stale 高', g3.signals.some(s => s.type === 'repo-stale' && s.severity === '高'), g3.signals);
+
+  const g4 = gitsig.analyze({ now, repos: [{ id: 'r1', name: '仓A', ok: false, error: 'ENOENT' }], git: {} });
+  ck('采集失败 → repo-fail（不叠 repo-stale）', g4.signals.length === 1 && g4.signals[0].type === 'repo-fail', g4.signals);
+
+  const g5 = gitsig.analyze({ now, repos: [activeRepo], git: { stats: { byLevel: { L4: 6 }, commitCount: 10 }, l2Pending: 0 } });
+  ck('L4 占 60%（样本≥10）→ unmapped-pileup 关联缺口', g5.signals.some(s => s.type === 'unmapped-pileup'), g5.signals);
+
+  const g6 = gitsig.analyze({ now, repos: [activeRepo], git: { stats: { byLevel: { L4: 4 }, commitCount: 5 }, l2Pending: 0 } });
+  ck('样本 <10 不评关联率（小仓不报错）', !g6.signals.some(s => s.type === 'unmapped-pileup'), g6.signals);
+
+  const g7 = gitsig.analyze({ now, repos: [activeRepo], git: { stats: { byLevel: {}, commitCount: 0 }, l2Pending: 2 } });
+  ck('L2 待确认 2 条 → l2-stagnant 低', g7.signals.some(s => s.type === 'l2-stagnant' && s.severity === '低'), g7.signals);
+
+  const g8 = gitsig.analyze({ now, repos: [activeRepo], git: { stats: { byLevel: { L1: 5, L2: 1, L3: 3, L4: 2 }, commitCount: 11 }, l2Pending: 0 } });
+  ck('关联表四级分布合计 = commitCount', g8.mappingTable.reduce((a, x) => a + x.count, 0) === 11, g8.mappingTable);
+  ck('诚实声明：PR/CI 未接入写入 notes', (g8.notes || []).some(n => n.indexOf('M2-C') >= 0), g8.notes);
+}
+
+console.log('\n[运行时 · 新 Skill（health/gitsignals）待确认接通]');
+{
+  const hIn = { now, repos: [], deviations: [{ team: 'A', head: 0, ratio: 0.6, over: 10 }], reconcile: [], history: [], plans: [], evidence: {} };
+  const rh = engine.run('health', hIn);
+  ck('run(health) 非绿灯维度进待确认队列（normalizeItems 已注册）', rh.ok && rh.result.items.length >= 2, rh.result.items);
+  const rg = engine.run('gitsignals', { now, repos: [{ id: 'r1', name: '仓A', ok: true, lastCommitAt: new Date(now - 20 * DAY).toISOString() }], git: { stats: { byLevel: { L4: 6 }, commitCount: 10 }, l2Pending: 0 } });
+  ck('run(gitsignals) 信号进待确认队列', rg.ok && rg.result.items.length >= 2, rg.result.items);
+}
+
 console.log('\n结果：' + pass + ' 通过，' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

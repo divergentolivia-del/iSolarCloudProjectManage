@@ -32,6 +32,11 @@
   .sev { display:inline-block; font-size:11px; font-weight:700; padding:1px 8px; border-radius:99px; margin-right:8px; }
   .sev-高 { background:#fdeaea; color:var(--danger); } .sev-中 { background:#fdf0dd; color:var(--warn); } .sev-低 { background:#eef1f5; color:var(--sub); }
   pre.md { background:#f8fafc; border:1px solid var(--line); border-radius:8px; padding:14px; font-size:13px; white-space:pre-wrap; font-family:inherit; line-height:1.65; }
+  /* 健康度记分卡 */
+  .scorecard { border:1px solid var(--line); border-radius:8px; padding:12px 14px; background:#f8fafc; }
+  .scorecard .sc-overall { font-size:15px; font-weight:650; margin-bottom:10px; }
+  .scorecard .sc-dim { display:flex; align-items:baseline; gap:8px; padding:5px 0; border-top:1px dashed var(--line); font-size:13px; }
+  .scorecard .sc-detail { color:var(--sub); font-size:12px; margin-left:auto; text-align:right; }
   .stat { display:inline-flex; gap:16px; color:var(--sub); font-size:13px; margin-top:10px; }
   .stat b { color:var(--ink); }
   .empty { color:var(--sub); font-size:13px; padding:8px 2px; }
@@ -204,6 +209,27 @@ async function showLatest(id) {
       html += '<pre class="md">' + esc((r.output && r.output.markdown) || '') + '</pre>';
       const items = r.items || [];
       if (items.length) html += '<div style="margin-top:10px"><b>发报前确认：</b></div>' + items.map(i => confirmRow(i)).join('');
+    } else if (id === 'health') {
+      const card = r.output && r.output.card;
+      if (card) {
+        const lightCls = { green: 'b-green', yellow: 'b-orange', red: 'b-red' };
+        const lightText = { green: '绿灯', yellow: '黄灯', red: '红灯' };
+        html += '<div class="scorecard"><div class="sc-overall">' + esc(card.overall.label) + ' 综合 <b>' + card.overall.score + '</b> 分</div>' +
+          card.dimensions.map(d => '<div class="sc-dim"><span class="badge ' + (lightCls[d.light] || 'b-gray') + '">' + lightText[d.light] + '</span> ' + esc(d.name) + ' <b>' + d.score + '</b> 分<span class="sc-detail">' + esc(d.detail) + '</span></div>').join('') + '</div>';
+        if (r.output.anomalies && r.output.anomalies.length) {
+          html += '<div style="margin-top:10px"><b>异常摘要：</b></div>' + r.output.anomalies.map(a => '<div class="risk">' + esc(a.text) + '</div>').join('');
+        }
+      }
+      html += '<div style="margin-top:10px">' + (r.items || []).map(i => confirmRow(i)).join('') + '</div>';
+    } else if (id === 'gitsignals') {
+      const out = r.output || {};
+      html += '<table><tr><th>级别</th><th>名称</th><th>提交数</th><th>说明</th></tr>' +
+        ((out.mappingTable || []).map(x => '<tr><td>' + esc(x.level) + '</td><td>' + esc(x.name) + '</td><td>' + x.count + '</td><td style="color:var(--sub)">' + esc(x.desc) + '</td></tr>').join('')) + '</table>';
+      html += '<div style="margin-top:10px">' + ((out.signals || []).map(s =>
+        '<div class="risk"><span class="sev sev-' + esc(s.severity) + '">' + esc(s.severity) + '</span><span class="t">' + esc(s.title) + '</span><div class="d">' + esc(s.detail) + '</div></div>').join('') ||
+        '<div class="empty">无信号 — 各仓库状态正常 ✓</div>') + '</div>';
+      if ((out.notes || []).length) html += '<div style="margin-top:8px;color:var(--sub);font-size:12px">' + out.notes.map(esc).join('<br>') + '</div>';
+      html += '<div style="margin-top:10px">' + (r.items || []).map(i => confirmRow(i)).join('') + '</div>';
     }
     $('#skillOut').innerHTML = html;
   } catch (e) { $('#skillOut').innerHTML = '<div class="err">' + esc(e.message) + '</div>'; }

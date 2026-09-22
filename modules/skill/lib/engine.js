@@ -12,6 +12,8 @@ const path = require('path');
 const riskSkill = require('../skills/risk');
 const varianceSkill = require('../skills/variance');
 const reportSkill = require('../skills/report');
+const healthSkill = require('../skills/health');
+const gitsignalsSkill = require('../skills/gitsignals');
 
 const DATA_DIR = process.env.SKILL_DATA_DIR || path.join(__dirname, '..', '..', '..', 'data', 'skill');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
@@ -66,6 +68,13 @@ function collectInputs() {
         else inputs.evidence[t].l2++;
       }
     }
+    /* git 信号块（Skill 5 用）：L1-L4 分布 + L2 待确认数（confirmed yes 的 hash 不计） */
+    const confirmedHashes = new Set((pr.confirms || []).filter(c => c && c.yes).map(c => c.hash));
+    inputs.git = {
+      stats: pr.stats || {},
+      lastRefreshAt: pr.lastRefreshAt || null,
+      l2Pending: (pr.commits || []).filter(c => c.level === 'L2' && !confirmedHashes.has(c.hash)).length
+    };
   }
 
   /* iteration：calc.compute 偏差（与平台核算同源） */
@@ -122,7 +131,9 @@ function collectInputs() {
 const SKILLS = {
   risk: { meta: { id: 'risk', name: riskSkill.name, desc: riskSkill.desc }, run: riskSkill.identify },
   variance: { meta: { id: 'variance', name: varianceSkill.name, desc: varianceSkill.desc }, run: varianceSkill.analyze },
-  report: { meta: { id: 'report', name: reportSkill.name, desc: reportSkill.desc }, run: reportSkill.generate }
+  report: { meta: { id: 'report', name: reportSkill.name, desc: reportSkill.desc }, run: reportSkill.generate },
+  health: { meta: { id: 'health', name: healthSkill.name, desc: healthSkill.desc }, run: healthSkill.assess },
+  gitsignals: { meta: { id: 'gitsignals', name: gitsignalsSkill.name, desc: gitsignalsSkill.desc }, run: gitsignalsSkill.analyze }
 };
 
 function listSkills() {
@@ -153,8 +164,9 @@ function run(id, overrideInputs) {
   const s = SKILLS[id];
   if (!s) return { ok: false, error: '未知 Skill：' + id };
   const inputs = overrideInputs || collectInputs();
-  /* 周报的「风险」节与风险识别 Skill 同源：先跑一遍 risk，避免永远落到兑底文案 */
-  if (id === 'report') inputs.risks = riskSkill.identify(inputs).items;
+  /* 周报的「风险」节与风险识别 Skill 同源：先跑一遍 risk，避免永远落到兑底文案；
+     健康度的风险维同理由同源注入 */
+  if (id === 'report' || id === 'health') inputs.risks = riskSkill.identify(inputs).items;
   let output;
   try { output = s.run(inputs); } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 
@@ -262,6 +274,8 @@ function normalizeItems(skillId, output, resultId) {
   if (skillId === 'risk') (output.items || []).forEach(o => push(o));
   if (skillId === 'variance') (output.suggestions || []).forEach(o => push(o));
   if (skillId === 'report') (output.pendingConfirm || []).forEach(o => push(o));
+  /* health / gitsignals 直接输出 items 字段（新增 Skill 时记得在这里注册） */
+  if (skillId === 'health' || skillId === 'gitsignals') (output.items || []).forEach(o => push(o));
   return items;
 }
 

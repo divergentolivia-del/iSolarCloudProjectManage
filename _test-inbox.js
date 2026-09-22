@@ -59,7 +59,9 @@ function post(pathname, obj) {
   ck('HTTP 200', r.code === 200, r.code);
   const d = r.body || {};
   ck('total 与 items 长度一致', d.total === (d.items || []).length, { total: d.total, len: (d.items || []).length });
-  ck('三个 Skill 都在 bySkill 里', (d.bySkill || []).length === 3, (d.bySkill || []).map(x => x.id));
+  ck('基础三个 Skill 都在 bySkill 里（存在性断言，不写死总数——新增 Skill 不应破坏本测试）',
+  ['risk', 'variance', 'report'].every(id => (d.bySkill || []).some(x => x.id === id)),
+  (d.bySkill || []).map(x => x.id));
   ck('bySkill 的 pendingCount 之和 == total',
     (d.bySkill || []).reduce((a, s) => a + s.pendingCount, 0) === d.total,
     { sum: (d.bySkill || []).reduce((a, s) => a + s.pendingCount, 0), total: d.total });

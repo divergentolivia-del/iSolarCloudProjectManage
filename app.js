@@ -1000,7 +1000,7 @@ function renderTbSyncCard() {
             <input type="hidden" class="tb-map-sid" data-board="${bKey}" data-ri="${ri}" value="${esc(r.sid)}">
             <input type="text" class="tb-sprint-combo-input" data-board="${bKey}" data-ri="${ri}" readonly value="${esc(comboDisplay(r.sid))}" placeholder="${hasSprintList ? '点击选择迭代（可模糊搜索）' : '先点「🔃 拉取迭代列表」'}">
             <div class="tb-sprint-combo-drop" hidden>
-              <input type="text" class="tb-sprint-combo-filter" placeholder="🔍 输入关键字模糊定位迭代名（如「9月」「2026」）" autocomplete="off">
+              <input type="text" class="tb-sprint-combo-filter" placeholder="🔍 输入关键字" autocomplete="off">
               <div class="tb-sprint-combo-list"></div>
             </div>
           </div>

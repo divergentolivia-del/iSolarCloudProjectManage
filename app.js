@@ -701,6 +701,11 @@ function handleImport(file, kind) {
   }, err => toast('导入失败：' + err.message));
 }
 
+/* 文件名防御：磁盘文件名里可能含 U+FFFD 替换字符（下载/复制时字符丢失），渲染时去掉，避免页面出现方块乱码 */
+function cleanName(n) {
+  return String(n || '').replace(/\uFFFD/g, '').trim();
+}
+
 function sourceCard(kind, title, hint) {
   const s = state.sources[kind];
   const imported = !!s;
@@ -710,7 +715,7 @@ function sourceCard(kind, title, hint) {
       <p class="hint">${hint}</p>
       ${imported ? `
         <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:12px;margin:12px 0">
-          <div style="font-weight:500;margin-bottom:4px">📄 ${esc(s.fileName)}</div>
+          <div style="font-weight:500;margin-bottom:4px">📄 ${esc(cleanName(s.fileName))}</div>
           <div style="font-size:13px;color:#16a34a">${s.rows} 行有效数据 · 导入于 ${esc(s.at)}</div>
         </div>
         <div class="drop" data-kind="${kind}" style="background:#fafafa;border-style:dashed">
@@ -809,30 +814,68 @@ function sprintStatusLabel(s) {
   return s === 'active' ? '进行中' : s === 'future' ? '未开始' : s === 'complete' ? '已完成' : (s || '未知');
 }
 
-/** 构造某个迭代的下拉选项 HTML，含「当前已选但不在列表里」的兜底项。
-    keyword 非空时只保留名称匹配的项（前端过滤，用于 150+ 迭代时快速定位）。 */
-function sprintOptionsHtml(currentSid, keyword) {
-  const cur = String(currentSid || '').trim();
-  const kw = String(keyword || '').trim().toLowerCase();
-  const list = (TB_SPRINT_CACHE.list || []).filter(s => !kw || String(s.name || '').toLowerCase().indexOf(kw) >= 0);
-
-  let matchedCur = false;
-  let opts = `<option value="">— 请选择迭代 —</option>`;
-  list.forEach(s => {
-    const sel = s.id === cur ? ' selected' : '';
-    if (s.id === cur) matchedCur = true;
-    const d = String(s.startDate || s.dueDate || '').slice(0, 10);
-    const label = s.name + '（' + sprintStatusLabel(s.status) + (d ? ' · ' + d : '') + '）';
-    opts += `<option value="${esc(s.id)}"${sel}>${esc(label)}</option>`;
-  });
-  // 已配置的 sid 不在(过滤后)列表里：保留一项，避免静默丢配置
-  if (cur && !matchedCur) {
-    const inFull = (TB_SPRINT_CACHE.list || []).some(s => s.id === cur);
-    const suffix = inFull ? '（已被搜索过滤）' : '（不在列表中）';
-    opts += `<option value="${esc(cur)}" selected>${esc(cur + suffix)}</option>`;
-  }
-  return opts;
+/** 组合框输入框里显示的文本。
+    已选 sid 在缓存里 → 显示迭代名；不在 → 显示 "sid（不在列表中）"，避免静默丢配置；
+    没选 → 空串，靠 placeholder 提示。 */
+function comboDisplay(sid) {
+  const id = String(sid || '').trim();
+  if (!id) return '';
+  const hit = (TB_SPRINT_CACHE.list || []).find(s => s.id === id);
+  return hit ? hit.name : id + '（不在列表中）';
 }
+
+/* 迭代组合框：把下拉面板摆到触发框下面。
+   面板是 position:fixed（见 app.css 注释），所以要按视口坐标手动算：
+   默认往下方开，下面空间不够就翻到上方；宽度至少和触发框一样，窄屏时收进视口内。
+   返回值就是面板元素，方便调用方继续用。 */
+function positionComboDrop(combo, drop) {
+  const trig = combo.querySelector('.tb-sprint-combo-input');
+  if (!trig) return drop;
+  const r = trig.getBoundingClientRect();
+  const GAP = 4, PAD = 8, MIN_H = 180;
+
+  /* 宽度：面板要比触发框宽（里面是「迭代名（进行中 · 2026-09-01）」这种长文本），
+     但不超过 340、也不能溢出视口。所以是「先取大，再用视口卡住」——
+     两个方向的错误都踩过：
+       · Math.max(r.width, Math.min(340,...)) → 触发框 900px 时面板也 900px，封顶失效
+       · Math.min(r.width, 340, ...)          → 触发框 230px 时面板只有 230px，文字被挤成一坨 */
+  const width = Math.min(Math.max(r.width, 340), window.innerWidth - 2 * PAD);
+  const left = Math.min(Math.max(r.left, PAD), Math.max(PAD, window.innerWidth - width - PAD));
+  const below = window.innerHeight - r.bottom - GAP - PAD;   // 下方可用高度
+  const above = r.top - GAP - PAD;                            // 上方可用高度
+  const openUp = below < MIN_H && above > below;
+
+  drop.style.width = width + 'px';
+  drop.style.left = left + 'px';
+  if (openUp) {
+    drop.style.top = 'auto';
+    drop.style.bottom = (window.innerHeight - r.top + GAP) + 'px';
+    drop.style.maxHeight = Math.max(120, above) + 'px';
+  } else {
+    drop.style.bottom = 'auto';
+    drop.style.top = (r.bottom + GAP) + 'px';
+    drop.style.maxHeight = Math.max(120, below) + 'px';
+  }
+  return drop;
+}
+
+/* 打开状态下跟着滚动/缩放走，否则面板会留在原地（fixed 的通病） */
+function repositionOpenCombos() {
+  document.querySelectorAll('.tb-sprint-combo-drop:not([hidden])').forEach(drop => {
+    const combo = drop.closest('.tb-sprint-combo');
+    if (combo) positionComboDrop(combo, drop);
+  });
+}
+window.addEventListener('scroll', repositionOpenCombos, true);   // capture：容器内滚动也能收到
+window.addEventListener('resize', repositionOpenCombos);
+
+/* 迭代组合框：点击面板外关闭所有展开的下拉（模块级只绑一次） */
+document.addEventListener('click', e => {
+  document.querySelectorAll('.tb-sprint-combo-drop:not([hidden])').forEach(drop => {
+    const combo = drop.closest('.tb-sprint-combo');
+    if (combo && !combo.contains(e.target)) drop.hidden = true;
+  });
+});
 
 function boardSprints() {
   const b = state.tbBoardSprints;
@@ -947,9 +990,14 @@ function renderTbSyncCard() {
   const mapRow = (bKey, r, ri, canDelete) => `
       <tr class="tb-map-row">
         <td class="txt">
-          <select class="tb-map-sid" data-board="${bKey}" data-ri="${ri}">
-            ${sprintOptionsHtml(r.sid)}
-          </select>
+          <div class="tb-sprint-combo" data-board="${bKey}" data-ri="${ri}">
+            <input type="hidden" class="tb-map-sid" data-board="${bKey}" data-ri="${ri}" value="${esc(r.sid)}">
+            <input type="text" class="tb-sprint-combo-input" data-board="${bKey}" data-ri="${ri}" readonly value="${esc(comboDisplay(r.sid))}" placeholder="${hasSprintList ? '点击选择迭代（可模糊搜索）' : '先点「🔃 拉取迭代列表」'}">
+            <div class="tb-sprint-combo-drop" hidden>
+              <input type="text" class="tb-sprint-combo-filter" placeholder="🔍 输入关键字模糊定位迭代名（如「9月」「2026」）" autocomplete="off">
+              <div class="tb-sprint-combo-list"></div>
+            </div>
+          </div>
         </td>
         <td class="txt">
           <input class="tb-map-name" data-board="${bKey}" data-ri="${ri}" value="${esc(r.name)}" placeholder="迭代名（选迭代后自动带出）">
@@ -964,9 +1012,6 @@ function renderTbSyncCard() {
       : `尚未加载迭代列表，点「🔃 拉取迭代列表」后从下拉选择。`;
     return `<div class="tb-map-board" data-board="${bKey}">
       <div class="tb-map-board-head"><b>${esc(bName)}</b><span class="tb-map-board-desc">${desc}</span></div>
-      <div class="tb-sprint-search">
-        <input class="tb-sprint-search-input" data-board="${bKey}" placeholder="🔍 输入关键字过滤迭代名（如「8月」「2026年9月」）">
-      </div>
       <div class="scroll"><table class="tb-table tb-map-table">
         <thead><tr><th class="txt">迭代（TB）</th><th class="txt">迭代名（可编辑）</th></tr></thead>
         <tbody>${rowsHtml}</tbody>
@@ -1253,33 +1298,49 @@ RENDERERS.import = function () {
     fetchBtn.addEventListener('click', () => loadTbSprints(view, false));
   });
 
-  // 搜索框过滤迭代下拉：只改 option，不重渲染（避免输入框失焦）
-  view.querySelectorAll('.tb-sprint-search-input').forEach(inp => {
-    inp.addEventListener('input', () => {
-      if (!TB_SPRINT_CACHE.list || !TB_SPRINT_CACHE.list.length) {
-        toast('请先点「🔃 拉取迭代列表」');
-        return;
+  // 迭代组合框：点击展开下拉面板，面板内置搜索框支持模糊定位（替代原外框过滤 + 原生 select）
+  view.querySelectorAll('.tb-sprint-combo').forEach(combo => {
+    const hid = combo.querySelector('.tb-map-sid');
+    const inp = combo.querySelector('.tb-sprint-combo-input');
+    const drop = combo.querySelector('.tb-sprint-combo-drop');
+    const filter = combo.querySelector('.tb-sprint-combo-filter');
+    const listEl = combo.querySelector('.tb-sprint-combo-list');
+    const close = () => { drop.hidden = true; };
+    const renderList = kw => {
+      kw = String(kw || '').trim().toLowerCase();
+      const items = (TB_SPRINT_CACHE.list || []).filter(s => !kw || String(s.name || '').toLowerCase().indexOf(kw) >= 0);
+      listEl.innerHTML = items.length
+        ? items.map(s => {
+            const d = String(s.startDate || s.dueDate || '').slice(0, 10);
+            const label = s.name + '（' + sprintStatusLabel(s.status) + (d ? ' · ' + d : '') + '）';
+            return `<div class="tb-sprint-combo-opt${s.id === hid.value ? ' on' : ''}" data-sid="${esc(s.id)}" data-name="${esc(s.name)}">${esc(label)}</div>`;
+          }).join('')
+        : `<div class="tb-sprint-combo-empty">没有匹配的迭代${kw ? '（试试更短的关键字）' : ''}</div>`;
+    };
+    inp.addEventListener('click', e => {
+      e.stopPropagation();
+      if (drop.hidden) {
+        if (!TB_SPRINT_CACHE.list || !TB_SPRINT_CACHE.list.length) { toast('请先点「🔃 拉取迭代列表」'); return; }
+        drop.hidden = false;
+        positionComboDrop(combo, drop);   // 先定位再显示，避免面板先在错位置闪一下
+        filter.value = '';
+        renderList('');
+        setTimeout(() => filter.focus(), 0);
+      } else {
+        close();
       }
-      const boardEl = inp.closest('.tb-map-board');
-      if (!boardEl) return;
-      const kw = inp.value;
-      boardEl.querySelectorAll('.tb-map-row').forEach(rowEl => {
-        const sel = rowEl.querySelector('.tb-map-sid');
-        if (!sel) return;
-        const cur = sel.value; // 保留当前已选，避免过滤后选中项被清掉
-        sel.innerHTML = sprintOptionsHtml(cur, kw);
-      });
     });
-  });
-
-  // 下拉选择迭代：自动把迭代名带进同行「迭代名」输入框（用户仍可手改）
-  view.querySelectorAll('.tb-map-sid').forEach(sel => {
-    sel.addEventListener('change', () => {
-      const sid = sel.value;
-      const hit = (TB_SPRINT_CACHE.list || []).find(s => s.id === sid);
-      const rowEl = sel.closest('.tb-map-row');
+    filter.addEventListener('input', () => renderList(filter.value));
+    filter.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+    listEl.addEventListener('click', e => {
+      const opt = e.target.closest('.tb-sprint-combo-opt');
+      if (!opt) return;
+      hid.value = opt.dataset.sid;
+      inp.value = opt.dataset.name;
+      const rowEl = combo.closest('.tb-map-row');
       const nameInput = rowEl ? rowEl.querySelector('.tb-map-name') : null;
-      if (hit && nameInput) nameInput.value = hit.name;
+      if (nameInput) nameInput.value = opt.dataset.name;
+      close();
     });
   });
 
@@ -1294,8 +1355,14 @@ RENDERERS.import = function () {
       state.tbBoardSprints[bKey] = b.concat([{ sid: '', name: '' }]);
       // 保持细节展开（details 的 open 已由 toggle 事件写入 state.mapDetailsOpen）
       RENDERERS.import();
-      const inp = view.querySelector('.tb-map-board[data-board="' + bKey + '"] .tb-map-row:last-of-type .tb-map-sid');
-      if (inp) { inp.focus(); inp.select(); }
+      /* 聚焦新行。注意不能聚焦 .tb-map-sid —— 改成组合框之后它是 <input type="hidden">，
+         hidden 输入框不可聚焦，focus() 是空操作，用户点完「+ 新增迭代」光标会不知所踪。
+         改为直接展开新行的组合框，比让人再点一次输入框更顺。 */
+      const combo = view.querySelector('.tb-map-board[data-board="' + bKey + '"] .tb-map-row:last-of-type .tb-sprint-combo');
+      if (combo) {
+        const trig = combo.querySelector('.tb-sprint-combo-input');
+        if (trig) trig.click();
+      }
     });
   });
 

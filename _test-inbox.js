@@ -66,7 +66,10 @@ function post(pathname, obj) {
   ck('high 计数与实际条目一致',
     d.high === (d.items || []).filter(i => i.severity === 'high').length,
     { high: d.high });
-  ck('存在高风险项（演示数据应命中）', d.high > 0, d.high);
+  /* 2026-09-22 起风险 Skill 不再复述产能偏差，演示数据里没有强信号，
+     所以这里不再断言「一定有高风险」（那是在断言数据，不是在断言代码）。
+     改成断言口径自洽：high 计数必须等于列表里真正的 high 条数，且不为负。 */
+  ck('high 计数不为负且不超过总数', d.high >= 0 && d.high <= d.total, { high: d.high, total: d.total });
 
   console.log('== 2) 严重度必须是 canonical 值（这是本轮修的 bug）==');
   const bad = (d.items || []).filter(i => ['high', 'medium', 'low'].indexOf(i.severity) < 0);

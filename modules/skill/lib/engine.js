@@ -243,13 +243,22 @@ function normalizeSeverity(v) {
   return SEVERITY_ALIAS[k] || SEVERITY_ALIAS[v] || 'medium';
 }
 
+/* 引用性条目（ref:true）不进待确认队列。
+   2026-09-22 用户拍板：AI 只该分析【还没被人整理过的原始信号】，不该复述
+   【已经被算出来的结论】。迭代偏差就是已算出来的结论 —— 迭代版本页面上一眼看得见，
+   线下本来就要照它开会，再发一条"待确认"只是让同一份数据在待办里再出现一次，
+   除了稀释真正的待办，没有别的效果。
+   这类条目仍留在 output 里（周报的风险节要引用），只是不落库成待办。 */
 function normalizeItems(skillId, output, resultId) {
   const items = [];
-  const push = o => items.push({
-    resultId, skill: skillId, itemId: o.id || ('it-' + items.length),
-    title: o.title, detail: o.detail || o.evidence || '', action: o.action || o.suggestion || '',
-    severity: normalizeSeverity(o.severity), status: 'pending', createdAt: new Date().toISOString()
-  });
+  const push = o => {
+    if (o.ref === true) return;
+    items.push({
+      resultId, skill: skillId, itemId: o.id || ('it-' + items.length),
+      title: o.title, detail: o.detail || o.evidence || '', action: o.action || o.suggestion || '',
+      severity: normalizeSeverity(o.severity), status: 'pending', createdAt: new Date().toISOString()
+    });
+  };
   if (skillId === 'risk') (output.items || []).forEach(o => push(o));
   if (skillId === 'variance') (output.suggestions || []).forEach(o => push(o));
   if (skillId === 'report') (output.pendingConfirm || []).forEach(o => push(o));

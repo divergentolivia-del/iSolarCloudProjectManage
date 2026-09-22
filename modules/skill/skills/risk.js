@@ -59,13 +59,20 @@ function identify(input) {
     });
   }
 
-  /* R3 人力产能偏差（数据源：iteration calc） */
+  /* R3 人力产能偏差（数据源：iteration calc）
+     ⚠ 这一条【不产生待确认项】，只作为周报里的引用性描述。原因（2026-09-22 用户拍板）：
+       偏差是迭代版本板块自己算出来的结论，那个页面上一眼看得到，线下也就照这个开会。
+       再让 AI「识别」一遍等于把同一份数据换个说法重复报一次，纯空转。
+       AI 该做的是分析【还没被人整理过的原始信号】（仓库静默、里程碑临近、依赖阻塞），
+       而不是复述【已经被算出来的结论】。打了 ref:true 的项由引擎从待确认队列里剔除，
+       但仍会流进周报的风险节 —— 周报里提一句产能偏差是合理的。 */
   for (const d of input.deviations || []) {
     if (!d) continue;
     if (d.verdict === '缺人头数') {
       items.push({
         id: 'risk-cap-' + d.team,
         severity: '高',
+        ref: true,
         category: '人力产能',
         title: `团队「${d.team}」缺人头数`,
         evidence: `工作量 ${fmt(d.workload)} 人天，产能 0（无登记人头）`,
@@ -78,6 +85,7 @@ function identify(input) {
       items.push({
         id: 'risk-cap-' + d.team,
         severity: d.ratio > 0.3 ? '高' : '中',
+        ref: true,
         category: '人力产能',
         title: `团队「${d.team}」产能偏差 ${fmtRatio(d.ratio)}`,
         evidence: `工作量 ${fmt(d.workload)} 人天 vs 产能 ${fmt(d.capacity)} 人天，超 ${fmt(d.over)} 人天`,

@@ -60,9 +60,16 @@ console.log('\n[Skill1 风险识别器 · 人力产能 / 里程碑 / TOP3]');
     { team: 'T3', workload: 80, head: 4, capacity: 90, over: -10, ratio: -0.11, verdict: '产能富余' }
   ];
   const r = risk.identify({ now, repos: [], deviations: devs, plans: [] });
-  ck('产能不足>15% → 人力产能风险', r.items.some(i => i.id === 'risk-cap-T1' && i.severity === '中'), r.items);
-  ck('缺人头数 → 高风险', r.items.some(i => i.id === 'risk-cap-T2' && i.severity === '高'), r.items);
+  /* 2026-09-22 降级：产能偏差是迭代版本板块自己算出来的结论，不再重复报成待确认。
+     但它仍需作为引用性描述流进周报的风险节，所以 ref:true 而不是直接删掉。 */
+  ck('产能不足 → 仍产出条目但标 ref（不进退待确认）',
+    r.items.some(i => i.id === 'risk-cap-T1' && i.severity === '中' && i.ref === true), r.items);
+  ck('缺人头数 → 高风险且标 ref', r.items.some(i => i.id === 'risk-cap-T2' && i.severity === '高' && i.ref === true), r.items);
   ck('产能富余不报', !r.items.some(i => i.id === 'risk-cap-T3'), r.items);
+  ck('产能偏差类全部带 ref（一条都不许漏进待办）',
+    r.items.filter(i => i.category === '人力产能').every(i => i.ref === true), r.items);
+  ck('仓库静默/里程碑类不带 ref（真正的待确认只该是这些）',
+    r.items.filter(i => i.category !== '人力产能').every(i => !i.ref), r.items);
 
   const p1 = risk.identify({
     now,
@@ -171,14 +178,21 @@ console.log('\n[运行时 · 执行/确认/采纳率]');
   const r0 = engine.run('no-such');
   ck('未知 Skill → error', r0.ok === false && r0.error.indexOf('未知') >= 0, r0);
 
+  /* 这个 fixture 需要至少 2 条待确认项（下面第 2 条用来验证驳回链路）。
+     原来靠「产能不足」凑第 2 条，但产能偏差 2026-09-22 起标了 ref、不再进出待确认，
+     所以换成第二个静默仓库 —— 仓库静默才是真正该由人拍板的那类。 */
   const inputs = {
     now,
-    repos: [{ id: 'r1', name: '仓库A', ok: true, lastCommitAt: new Date(now - 30 * DAY).toISOString() }],
+    repos: [
+      { id: 'r1', name: '仓库A', ok: true, lastCommitAt: new Date(now - 30 * DAY).toISOString() },
+      { id: 'r2', name: '仓库B', ok: true, lastCommitAt: new Date(now - 18 * DAY).toISOString() }
+    ],
     deviations: [{ team: 'T1', workload: 120, head: 5, capacity: 100, over: 20, ratio: 0.2, verdict: '产能不足', workloadOverridden: false }],
     reconcile: [], history: [], plans: [], evidence: {}
   };
   const r1 = engine.run('risk', inputs);
-  ck('risk 运行成功', r1.ok && r1.result.items.length >= 1, r1);
+  ck('risk 运行成功', r1.ok && r1.result.items.length >= 2, r1);
+  ck('待确认里没有产能偏差（已降级）', !r1.result.items.some(i => i.itemId === 'risk-cap-T1'), r1.result.items.map(i => i.itemId));
   const item = r1.result.items[0];
 
   const c1 = engine.confirm(r1.result.resultId, item.itemId, true, '测试员');
@@ -227,6 +241,23 @@ console.log('\n[运行时 · 重跑失效旧 pending（采纳率分母不虚高�
   const st = JSON.parse(fs.readFileSync(path.join(process.env.SKILL_DATA_DIR, 'state.json'), 'utf8'));
   const oldR = st.results.find(x => x.resultId === rA.result.resultId);
   ck('旧结果 item 标记为 expired（不再 pending）', oldR && oldR.items.every(i => i.status === 'expired'), oldR && oldR.items);
+}
+
+console.log('\n[运行时 · 引用性条目不进待确认，但仍在周报风险节]');
+{
+  /* 一批【只有】产能偏差的输入：风险清单里有条目，待确认里必须一条都没有 */
+  const capOnly = {
+    now, repos: [],
+    deviations: [{ team: 'TC', workload: 120, head: 5, capacity: 80, over: 40, ratio: 0.5, verdict: '产能不足', workloadOverridden: false }],
+    reconcile: [], history: [], plans: [], evidence: {}
+  };
+  const rc = engine.run('risk', capOnly);
+  ck('risk 输出条目仍在（供周报引用）', rc.ok && (rc.result.output.items || []).some(i => i.id === 'risk-cap-TC'), rc.result.output.items);
+  ck('★ 引用性条目一条都不进待确认队列', rc.result.items.length === 0, rc.result.items);
+
+  const rr = engine.run('report', capOnly);
+  ck('周报风险节仍引用了产能偏差', rr.ok && rr.result.output.sections.risks.indexOf('TC') >= 0,
+    rr.result.output && rr.result.output.sections.risks);
 }
 
 console.log('\n结果：' + pass + ' 通过，' + fail + ' 失败');

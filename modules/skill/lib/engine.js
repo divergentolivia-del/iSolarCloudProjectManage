@@ -92,7 +92,17 @@ function collectInputs() {
           })) });
         }
       } catch (e) { /* 无历史则无趋势 */ }
-    } catch (e) { /* calc 依赖 config 常量，缺失时偏差为空 */ }
+      } catch (e) {
+        /* 这里绝不能静默。
+           2026-09-22 踩过：裸 node 里跑 engine.run()（没经过 server.js）时，
+           calc.js 依赖的全局 TEAMS 不存在，require/调用抛 ReferenceError，
+           被这个 catch 吞掉后 deviations=[]，三个 Skill 于是都产出 0 项 ——
+           表面上"运行成功"，实际把 82 条待办全部标成 expired，
+           用户看到的是"今天没风险"，而真相是"输入压根没采集到"。
+           宁可吵，也要让这种失败在日志里露头。 */
+        console.warn('[skill] 偏差输入采集失败，本轮的偏差类结论将为空：' + ((e && e.message) || e));
+        console.warn('[skill] 常见原因：直接 require 引擎但未经 server.js 启动，全局 TEAMS 未注入。');
+      }
   }
 
   /* plan：里程碑（可空） */
@@ -215,12 +225,30 @@ function latest(id) {
 
 /* ---------- 内部 ---------- */
 
+/* 严重度归一化。
+   各 Skill 的原始取值并不统一：risk.js 发中文「高/中/低」，report/variance 的
+   待确认项压根不带 severity。若原样透传，下游（今日待确认页）拿到的就是
+   「高」和「medium」两种词汇混在一起的值 —— 排序表只认英文，5 条真正的高风险
+   会被当成未知值排到最后，高风险的计数还是 0，页面看起来"一条严重的都没有"。
+
+   所以在这里收敛成唯一一套 canonical 值：high | medium | low。
+   中文别名照收，避免以后有人照 risk.js 的写法再发中文。 */
+const SEVERITY_ALIAS = {
+  '高': 'high', '中': 'medium', '低': 'low',
+  high: 'high', medium: 'medium', low: 'low',
+  critical: 'high', high_risk: 'high', warn: 'medium', warning: 'medium'
+};
+function normalizeSeverity(v) {
+  const k = String(v == null ? '' : v).trim().toLowerCase();
+  return SEVERITY_ALIAS[k] || SEVERITY_ALIAS[v] || 'medium';
+}
+
 function normalizeItems(skillId, output, resultId) {
   const items = [];
   const push = o => items.push({
     resultId, skill: skillId, itemId: o.id || ('it-' + items.length),
     title: o.title, detail: o.detail || o.evidence || '', action: o.action || o.suggestion || '',
-    severity: o.severity || '', status: 'pending', createdAt: new Date().toISOString()
+    severity: normalizeSeverity(o.severity), status: 'pending', createdAt: new Date().toISOString()
   });
   if (skillId === 'risk') (output.items || []).forEach(o => push(o));
   if (skillId === 'variance') (output.suggestions || []).forEach(o => push(o));

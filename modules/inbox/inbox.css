@@ -1,0 +1,132 @@
+/* modules/inbox/inbox.css — 今日待确认
+   与平台共用 platform.css 里的 CSS 变量（--panel / --line / --text / --muted / --warn 等），
+   深浅色主题自动跟随，不在这里重复定义颜色。 */
+
+.ib-page { padding: 4px 0 32px; }
+
+.ib-loading,
+.ib-error {
+  padding: 40px 20px; text-align: center; color: var(--muted); font-size: 14px;
+}
+.ib-error { color: var(--warn); }
+.ib-error-hint { margin-top: 8px; color: var(--muted); font-size: 12px; }
+
+/* ══════════ 顶部数字条 ══════════ */
+.ib-stats {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;
+}
+.ib-stat {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 16px 18px; box-shadow: var(--shadow);
+}
+.ib-stat-num {
+  font-size: 30px; font-weight: 700; line-height: 1.1; color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.ib-stat-label { margin-top: 4px; font-size: 12px; color: var(--muted); }
+/* 有待办时数字染蓝，有高风险时染红 —— 一眼看出今天要不要动手 */
+.ib-stat-active .ib-stat-num { color: var(--blue); }
+.ib-stat-danger { border-color: var(--warn); background: var(--warn-soft); }
+.ib-stat-danger .ib-stat-num { color: var(--warn); }
+
+/* ══════════ 分区 ══════════ */
+.ib-section { margin-bottom: 22px; }
+.ib-section-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-bottom: 10px; flex-wrap: wrap;
+}
+.ib-section-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
+.ib-section-head .ib-section-title { margin-bottom: 0; }
+
+/* ══════════ 各 Skill 状态行 ══════════ */
+.ib-skills {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  overflow: hidden; box-shadow: var(--shadow);
+}
+.ib-skill {
+  display: flex; align-items: center; gap: 12px; padding: 11px 16px;
+  border-bottom: 1px solid var(--line); font-size: 13px;
+}
+.ib-skill:last-child { border-bottom: none; }
+.ib-skill-name { flex: 0 0 auto; font-weight: 600; color: var(--text); min-width: 96px; }
+.ib-skill-meta { flex: 1 1 auto; color: var(--muted); font-size: 12px; }
+.ib-skill-pending {
+  flex: 0 0 auto; font-size: 12px; padding: 2px 10px; border-radius: 10px;
+  background: var(--panel-soft); color: var(--muted);
+}
+.ib-pending-on { background: var(--blue-soft); color: var(--blue); font-weight: 600; }
+
+/* ══════════ 筛选 ══════════ */
+.ib-filters { display: flex; gap: 6px; }
+.ib-filter {
+  border: 1px solid var(--line); background: var(--panel); color: var(--muted);
+  font-size: 12px; padding: 4px 12px; border-radius: 14px; cursor: pointer;
+}
+.ib-filter:hover { border-color: var(--line-strong); color: var(--text); }
+.ib-filter.active { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 600; }
+
+/* ══════════ 待确认卡片 ══════════ */
+.ib-list { display: flex; flex-direction: column; gap: 10px; }
+.ib-card {
+  background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--line-strong);
+  border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow);
+}
+.ib-card-high { border-left-color: var(--warn); }
+
+.ib-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.ib-sev {
+  flex: 0 0 auto; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 4px;
+}
+.ib-sev-high { background: var(--warn-soft); color: var(--warn); }
+.ib-sev-med  { background: var(--orange-soft); color: var(--hold); }
+.ib-sev-low  { background: var(--panel-soft); color: var(--muted); }
+.ib-card-title { flex: 1 1 auto; font-size: 14px; font-weight: 600; color: var(--text); }
+.ib-card-src { flex: 0 0 auto; font-size: 12px; color: var(--muted); }
+
+.ib-card-detail {
+  font-size: 13px; color: var(--text); line-height: 1.6; margin-bottom: 8px;
+  /* 长结论平铺展示，不做折叠省略 —— 与项目计划模块同一条 UX 红线 */
+  white-space: pre-wrap; word-break: break-word;
+}
+.ib-card-action {
+  font-size: 13px; color: var(--text); line-height: 1.6; padding: 8px 10px;
+  background: var(--panel-soft); border-radius: var(--radius-sm); margin-bottom: 10px;
+  word-break: break-word;
+}
+.ib-action-tip {
+  display: inline-block; font-size: 11px; font-weight: 600; color: var(--blue);
+  margin-right: 6px;
+}
+
+.ib-card-foot { display: flex; align-items: center; gap: 8px; }
+.ib-btn {
+  font-size: 13px; padding: 5px 16px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong); background: var(--panel); color: var(--text);
+  cursor: pointer; font-weight: 600;
+}
+.ib-btn:disabled { opacity: .5; cursor: default; }
+.ib-btn-yes { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ib-btn-yes:hover:not(:disabled) { background: var(--accent-strong); border-color: var(--accent-strong); }
+.ib-btn-no:hover:not(:disabled) { border-color: var(--warn); color: var(--warn); }
+.ib-busy { font-size: 12px; color: var(--muted); }
+
+/* ══════════ 空态 ══════════ */
+.ib-empty {
+  text-align: center; padding: 48px 20px; background: var(--panel);
+  border: 1px dashed var(--line-strong); border-radius: var(--radius);
+}
+.ib-empty-icon { font-size: 36px; line-height: 1; margin-bottom: 12px; }
+.ib-empty-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.ib-empty-hint { font-size: 12px; color: var(--muted); max-width: 460px; margin: 0 auto; line-height: 1.7; }
+
+.ib-footnote {
+  margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line);
+  font-size: 12px; color: var(--muted); line-height: 1.8;
+}
+
+/* ══════════ 窄屏 ══════════ */
+@media (max-width: 720px) {
+  .ib-stats { grid-template-columns: 1fr; }
+  .ib-skill { flex-wrap: wrap; }
+  .ib-skill-meta { flex: 1 1 100%; order: 3; }
+}

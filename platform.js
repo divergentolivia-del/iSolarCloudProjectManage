@@ -61,6 +61,7 @@ const Platform = (() => {
     csenergy:  { icon: '📊', bg: 'linear-gradient(135deg, #8b6cff, #a68bff)', shadow: 'rgba(139,108,255,.35)' },
     plan:      { icon: '🗓️', bg: 'linear-gradient(135deg, #f59a24, #ffb857)', shadow: 'rgba(245,154,36,.35)' },
     dataflow:  { icon: '🔄', bg: 'linear-gradient(135deg, #0ea5b7, #38cfe0)', shadow: 'rgba(14,165,183,.35)' },
+    inbox:     { icon: '📥', bg: 'linear-gradient(135deg, #e04f5f, #ff7b88)', shadow: 'rgba(224,79,95,.35)' },
     settings:  { icon: '⚙',  bg: 'linear-gradient(135deg, #8a94a6, #a6b0c2)', shadow: 'rgba(138,148,166,.35)' },
     help:      { icon: '📖', bg: 'linear-gradient(135deg, #8a94a6, #a6b0c2)', shadow: 'rgba(138,148,166,.35)' }
   };

@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="modules/project/project.css?v=20260910a">
 <link rel="stylesheet" href="modules/csenergy/csenergy.css?v=20260901b">
 <link rel="stylesheet" href="modules/plan/plan.css?v=20260911a">
+<link rel="stylesheet" href="modules/inbox/inbox.css?v=20260922a">
 </head>
 <body>
 
@@ -115,6 +116,7 @@
 <script src="modules/settings/index.js"></script>
 <script src="modules/csenergy/index.js"></script>
 <script src="modules/plan/index.js?v=20260911a"></script>
+<script src="modules/inbox/index.js?v=20260922a"></script>
 
 <!-- Platform orchestrator (must be last — calls Platform.init) -->
 <script src="platform.js?v=20260909j"></script>
@@ -122,7 +124,7 @@
 <!-- Initialize platform with all modules -->
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    Platform.init([DashboardModule, IterationModule, ProjectModule, CsEnergyModule, PlanModule]);
+    Platform.init([DashboardModule, InboxModule, IterationModule, ProjectModule, CsEnergyModule, PlanModule]);
   });
 </script>
 </body>

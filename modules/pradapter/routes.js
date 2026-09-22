@@ -200,7 +200,7 @@ function handleConfirm(req, res, body) {
     db.logAudit({
       user_id: me ? me.id : '', user: me ? me.name : '',
       module: 'pradapter', action: yes ? '确认映射' : '驳回映射',
-      detail: `${hash} -> ${taskId}`
+      details: `${hash} -> ${taskId}`
     });
   } catch (e) { /* ignore */ }
 

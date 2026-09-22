@@ -5,6 +5,9 @@
 
 'use strict';
 
+const riskSkill = require('./risk');
+const MS_DAY = 24 * 3600 * 1000;
+
 /**
  * 周报生成主函数。
  * @param {object} input
@@ -56,8 +59,8 @@ function generate(input) {
     }
   }
   for (const r of repos || []) {
-    if (r && r.lastCommitAt && (Date.now() - new Date(r.lastCommitAt).getTime()) > 14 * 24 * 3600 * 1000) {
-      coord.push(`- 仓库「${r.name}」近两周无提交，请确认是否停滞。`);
+    if (r && r.lastCommitAt && (Date.now() - new Date(r.lastCommitAt).getTime()) > riskSkill.RULES.repoSilentDays * MS_DAY) {
+      coord.push(`- 仓库「${r.name}」近 ${riskSkill.RULES.repoSilentDays} 天无提交，请确认是否停滞。`);
     }
   }
   const coordination = coord.length ? coord.join('\n') : '- 暂无跨团队协调事项。';

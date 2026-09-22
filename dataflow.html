@@ -67,8 +67,9 @@
 const $ = s => document.querySelector(s);
 async function j(url, opt) {
   const r = await fetch(url, opt);
-  if (r.status === 401) throw new Error('无权限（未登录或角色无权）');
-  if (r.status === 403) throw new Error('写权限不足（需 pm）');
+  if (r.status === 401) throw new Error('未登录或当前账号无 skill:read 权限（请先登录）');
+  if (r.status === 403) throw new Error('当前账号无 skill:write 权限（需 pm 角色）');
+  if (r.status === 413) throw new Error('请求体过大');
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ('HTTP ' + r.status)); }
   return r.json();
 }
@@ -180,7 +181,9 @@ function riskCard(i) {
 }
 function confirmRow(i) {
   if (i.status !== 'pending') {
-    const tag = i.status === 'adopted' ? '<span class="badge b-green">已采纳</span>' : '<span class="badge b-gray">已驳回</span>';
+    const tag = i.status === 'adopted' ? '<span class="badge b-green">已采纳</span>'
+      : i.status === 'expired' ? '<span class="badge b-gray">已失效（被新运行覆盖）</span>'
+      : '<span class="badge b-gray">已驳回</span>';
     return tag + '<span class="mono" style="color:var(--sub);font-size:12px"> ' + esc(i.title || i.itemId) + '</span>';
   }
   return '<span class="mono" style="color:var(--sub);font-size:12px">' + esc(i.title || '') + '</span> ' +

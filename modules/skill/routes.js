@@ -20,17 +20,28 @@ function sendJson(res, code, obj) {
   res.end(JSON.stringify(obj));
 }
 
-function readBody(req) {
+function readBody(req, res) {
   return new Promise(resolve => {
     let body = '';
+    let done = false;
+    const finish = obj => { if (!done) { done = true; resolve(obj); } };
     req.on('data', c => {
       body += c;
-      if (body.length > 65536) req.destroy();
+      if (body.length > 65536 && !done) {
+        // 超限：给前端明确的 413 报错，而不是静默断开连接
+        done = true;
+        if (!res.headersSent) {
+          res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+          res.end(JSON.stringify({ error: '请求体过大（上限 64KB）' }));
+        }
+        req.destroy();
+      }
     });
     req.on('end', () => {
-      try { resolve(JSON.parse(body || '{}')); } catch (e) { resolve({}); }
+      if (done) return;
+      try { finish(JSON.parse(body || '{}')); } catch (e) { finish({}); }
     });
-    req.on('error', () => resolve({}));
+    req.on('error', () => finish({}));
   });
 }
 
@@ -48,7 +59,7 @@ function handle(req, res, url) {
     if (!r.ok) return sendJson(res, 400, { error: r.error });
     return sendJson(res, 200, {
       ok: true, resultId: r.result.resultId, skill: r.result.skill,
-      at: r.result.at, itemCount: r.result.items.length,
+      at: r.result.at, itemCount: r.result.items.length, expired: r.expired || 0,
       stats: (engine.listSkills().find(s => s.id === r.result.skill) || {}).stats
     });
   }
@@ -61,7 +72,7 @@ function handle(req, res, url) {
   }
 
   if (p === '/api/skill/confirm' && method === 'POST') {
-    return readBody(req).then(body => {
+    return readBody(req, res).then(body => {
       const { resultId, itemId, yes } = body;
       if (!resultId || !itemId) return sendJson(res, 400, { error: '需要 resultId 和 itemId' });
       const who = '';
@@ -77,7 +88,7 @@ function handle(req, res, url) {
         const db = require('../../db');
         db.logAudit({
           user_id: '', user: who, module: 'skill', action: yes ? '采纳' : '驳回',
-          detail: resultId + ' / ' + itemId
+          details: resultId + ' / ' + itemId
         });
       } catch (e) { /* ignore */ }
       return sendJson(res, 200, r);

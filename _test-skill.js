@@ -96,7 +96,7 @@ console.log('\n[Skill3 偏差分析器 · 偏差表/建议/佐证]');
     { team: 'T3', workload: 80, head: 4, capacity: 90, over: -10, ratio: -0.11, verdict: '产能富余', workloadOverridden: false },
     { team: 'T4', workload: 60, head: 3, capacity: 66, over: -6, ratio: -0.09, verdict: '正常', workloadOverridden: false }
   ];
-  const a1 = variance.analyze({ deviations: devs, reconcile: [], history: [], evidence: { T1: { l1: 3, l2: 1 } } });
+  const a1 = variance.analyze({ deviations: devs, reconcile: [], history: [], evidence: { T1: { l1: 3, l2: 1 } }, evidenceConfigured: true });
   ck('偏差表 4 行', a1.table.length === 4, a1.table.length);
   ck('T1 有佐证', a1.table.find(t => t.team === 'T1').evidence.indexOf('有佐证') >= 0);
   ck('T2 缺佐证', a1.table.find(t => t.team === 'T2').evidence === '无佐证');
@@ -108,6 +108,20 @@ console.log('\n[Skill3 偏差分析器 · 偏差表/建议/佐证]');
     a1.attribution.topOver.length === 3 && a1.attribution.topOver[0].team === 'T2'
     && a1.attribution.topOver.some(x => x.team === 'T1'), a1.attribution);
   ck('趋势含本期', a1.trend.length >= 1 && a1.trend[a1.trend.length - 1].at === '本期', a1.trend);
+}
+
+console.log('\n[Skill3 偏差分析器 · 佐证映射配置开关]');
+{
+  const devs2 = [
+    { team: 'T1', workload: 120, head: 5, capacity: 100, over: 20, ratio: 0.2, verdict: '产能不足', workloadOverridden: false },
+    { team: 'T2', workload: 50, head: 0, capacity: 0, over: 50, ratio: 0, verdict: '缺人头数', workloadOverridden: false }
+  ];
+  const a3 = variance.analyze({ deviations: devs2, reconcile: [], history: [], evidence: {} });
+  ck('未配置映射 → 不产生"缺 PR 佐证"噪音建议', !a3.suggestions.some(s => s.id === 'var-evidence'), a3.suggestions.map(s => s.id));
+  ck('未配置映射 → 佐证列显示 —（不冒充"无佐证"）', a3.table.every(t => t.evidence === '—'), a3.table);
+  const a4 = variance.analyze({ deviations: devs2, reconcile: [], history: [], evidence: { T1: { l1: 2 } }, evidenceConfigured: true });
+  ck('已配置映射 + T2 无提交 → 触发缺佐证建议', a4.suggestions.some(s => s.id === 'var-evidence') && a4.suggestions.find(s => s.id === 'var-evidence').detail.indexOf('T2') >= 0, a4.suggestions);
+  ck('已配置映射 + T1 有提交 → 佐证列正常', a4.table.find(t => t.team === 'T1').evidence.indexOf('有佐证') >= 0);
 }
 
 console.log('\n[Skill3 偏差分析器 · 正常/对账]');
@@ -180,6 +194,39 @@ console.log('\n[运行时 · 执行/确认/采纳率]');
 
   const latest = engine.latest('risk');
   ck('latest 返回最近结果', latest && latest.resultId === r2.result.resultId);
+}
+
+console.log('\n[运行时 · 周报风险节真实链路]');
+{
+  const inputs2 = {
+    now,
+    repos: [{ id: 'r9', name: '仓库B', ok: true, lastCommitAt: new Date(now - 30 * DAY).toISOString() }],
+    deviations: [{ team: 'T1', workload: 120, head: 5, capacity: 100, over: 20, ratio: 0.2, verdict: '产能不足', workloadOverridden: false }],
+    reconcile: [], history: [], plans: [], evidence: {}
+  };
+  const r3 = engine.run('report', inputs2);
+  ck('run(report) 自动注入风险（不再永远是兑底文案）', r3.ok && r3.result.output.sections.risks.indexOf('仓库B') >= 0 && r3.result.output.sections.risks.indexOf('已 30 天无提交') >= 0, r3.result.output && r3.result.output.sections.risks);
+  ck('待确认项来自偏差团队', r3.result.items.length >= 1 && r3.result.items[0].itemId === 'rp-T1', r3.result.items);
+}
+
+console.log('\n[运行时 · 重跑失效旧 pending（采纳率分母不虚高）]');
+{
+  const inputs3 = {
+    now,
+    repos: [],
+    deviations: [{ team: 'TX', workload: 100, head: 5, capacity: 80, over: 20, ratio: 0.25, verdict: '产能不足', workloadOverridden: false }],
+    reconcile: [], history: [], plans: [], evidence: {}
+  };
+  const rA = engine.run('variance', inputs3);
+  const stats1 = engine.listSkills().find(s => s.id === 'variance').stats;
+  ck('首跑：pendingCount = 本批条数', rA.result.items.length === 1 && stats1.pendingCount === 1, stats1);
+  const rB = engine.run('variance', inputs3);
+  const stats2 = engine.listSkills().find(s => s.id === 'variance').stats;
+  ck('重跑：旧 pending 失效，pendingCount 仍只数最新一批', stats2.pendingCount === 1, stats2);
+  ck('返回值带失效数', rB.expired === 1, rB.expired);
+  const st = JSON.parse(fs.readFileSync(path.join(process.env.SKILL_DATA_DIR, 'state.json'), 'utf8'));
+  const oldR = st.results.find(x => x.resultId === rA.result.resultId);
+  ck('旧结果 item 标记为 expired（不再 pending）', oldR && oldR.items.every(i => i.status === 'expired'), oldR && oldR.items);
 }
 
 console.log('\n结果：' + pass + ' 通过，' + fail + ' 失败');

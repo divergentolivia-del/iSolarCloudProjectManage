@@ -46,27 +46,24 @@ function collectInputs() {
 
   /* pradapter：仓库统计特征（L3，不含提交原文） */
   const pr = readJson(path.join(root, 'data', 'pradapter', 'state.json'));
+  const prCfg = readJson(path.join(root, 'data', 'pradapter', 'config.json'));
+  /* 仓库→团队显式映射（config.json repos[].teams），不靠仓库名猜 */
+  const repoTeams = {};
+  for (const r of (prCfg && prCfg.repos) || []) {
+    if (r && r.id && Array.isArray(r.teams)) repoTeams[r.id] = r.teams.filter(Boolean);
+  }
+  inputs.evidenceConfigured = Object.keys(repoTeams).some(k => repoTeams[k].length > 0);
   if (pr && pr.repos) {
     inputs.repos = pr.repos.map(r => ({
       id: r.id, name: r.name, ok: r.ok, error: r.error, lastCommitAt: r.lastCommitAt
     }));
-    /* PR 佐证：按团队名匹配仓库名（含"团队名"片段的仓库视为关联） */
-    const teamRepo = {};
-    for (const r of pr.repos) {
-      const n = r.name || '';
-      for (const t of ['APP开发', '后端开发', 'Web开发', '测试部', '前端', '平台']) {
-        if (n.indexOf(t) >= 0) teamRepo[t] = r.id;
-      }
-    }
-    const byLevel = pr.commits || [];
-    for (const c of byLevel) {
+    /* PR 佐证：只按显式映射聚合（未配置映射时 evidence 为空，不产生"无佐证"噪音） */
+    for (const c of pr.commits || []) {
       if (c.level !== 'L1' && c.level !== 'L2') continue;
-      for (const t of Object.keys(teamRepo)) {
-        if (teamRepo[t] === c.repoId) {
-          inputs.evidence[t] = inputs.evidence[t] || { l1: 0, l2: 0 };
-          if (c.level === 'L1') inputs.evidence[t].l1++;
-          else inputs.evidence[t].l2++;
-        }
+      for (const t of repoTeams[c.repoId] || []) {
+        inputs.evidence[t] = inputs.evidence[t] || { l1: 0, l2: 0 };
+        if (c.level === 'L1') inputs.evidence[t].l1++;
+        else inputs.evidence[t].l2++;
       }
     }
   }
@@ -120,12 +117,18 @@ const SKILLS = {
 
 function listSkills() {
   const st = readState();
+  const results = st.results || [];
   return Object.keys(SKILLS).map(id => {
     const s = SKILLS[id];
     const raw = Object.assign({ runCount: 0, adoptCount: 0, rejectCount: 0, pendingCount: 0 }, st.stats[id]);
     const confirmed = raw.adoptCount + raw.rejectCount;
+    /* pendingCount 从留存结果动态重算（即使历史被裁剪也不会虚高） */
+    const pending = results
+      .filter(r => r.skill === id)
+      .reduce((a, r) => a + (r.items || []).filter(i => i.status === 'pending').length, 0);
     return Object.assign({}, s.meta, { stats: Object.assign({}, raw, {
-      adoptRate: confirmed > 0 ? Math.round(100 * raw.adoptCount / confirmed) : null
+      adoptRate: confirmed > 0 ? Math.round(100 * raw.adoptCount / confirmed) : null,
+      pendingCount: pending
     }) });
   });
 }
@@ -140,23 +143,36 @@ function run(id, overrideInputs) {
   const s = SKILLS[id];
   if (!s) return { ok: false, error: '未知 Skill：' + id };
   const inputs = overrideInputs || collectInputs();
+  /* 周报的「风险」节与风险识别 Skill 同源：先跑一遍 risk，避免永远落到兑底文案 */
+  if (id === 'report') inputs.risks = riskSkill.identify(inputs).items;
   let output;
   try { output = s.run(inputs); } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 
   /* 输出规范 → 待确认项 */
   const st = readState();
+  /* 同 Skill 重新运行 = 最新结果覆盖：旧结果的 pending 项标记为 expired（失效，不计入采纳率分母/待确认数） */
+  const expiredCount = { n: 0 };
+  for (const old of st.results || []) {
+    if (old.skill !== id) continue;
+    for (const it of old.items || []) {
+      if (it.status === 'pending') {
+        it.status = 'expired';
+        it.expiredAt = new Date().toISOString();
+        expiredCount.n++;
+      }
+    }
+  }
   const resultId = id + '-' + Date.now();
   const items = normalizeItems(id, output, resultId);
   const result = {
     resultId, skill: id, at: new Date().toISOString(),
     inputs: summarizeInputs(inputs), output, items
   };
-  st.results = (st.results || []).concat([result]).slice(-50);
+  st.results = (st.results || []).concat([result]).slice(-500);
   st.stats[id] = st.stats[id] || { runCount: 0, adoptCount: 0, rejectCount: 0, pendingCount: 0 };
   st.stats[id].runCount++;
-  st.stats[id].pendingCount = items.filter(i => i.status === 'pending').length;
   writeState(st);
-  return { ok: true, result };
+  return { ok: true, result, expired: expiredCount.n };
 }
 
 /**

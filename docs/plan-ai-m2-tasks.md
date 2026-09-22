@@ -63,6 +63,15 @@ M2 的目标是**数据不再靠人手工录**：Git 仓库、团队工作台、
 - 评测集 `_test-skill.js`：37 项断言（risk 11 / variance 9 / report 9 / engine 8）。
 - 模型可插拔：当前为**规则引擎版**（确定性、可测、内网可用）；接外部模型时只需给每个 Skill 加一个 AI 后处理层（master 决策 6）。
 
+**2026-09-22 修复（外部 review 发现，均已回归测试）**：
+1. 周报风险节永远兑底 → `run('report')` 先跑 risk 同源注入（不再空壳）
+2. `logAudit` 字段名 `detail` → `details`（skill + pradapter 两处，审计详情不再静默丢失）
+3. report.js 硬编码 14 天 → 复用 risk.js `RULES.repoSilentDays`（文案跟随阈值）
+4. PR 佐证靠仓库名猜中文关键词 → 改 config.json `repos[].teams` **显式映射**；未配置时不产生"缺佐证"噪音
+5. 重跑 Skill 自动失效旧 pending 项（`expired`），采纳率分母/待确认数不虚高
+6. `_test-gate.js` 写死模块数 → 改存在性断言
+7. 小项：`results` 裁剪窗口 50→500；readBody 超 64KB 返 413 而非断连；dataflow.html 401/403 提示精确化
+
 ## 4. M2-C（待用户输入）
 
 | # | 任务 | 需要什么 |

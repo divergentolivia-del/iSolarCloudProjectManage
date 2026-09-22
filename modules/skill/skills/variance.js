@@ -18,11 +18,12 @@ const TOP_N = 3;
  */
 function analyze(input) {
   const devs = input.deviations || [];
+  const configured = !!input.evidenceConfigured; // 仓库→团队映射是否已配置（config.json repos[].teams）
   const table = devs.map(d => ({
     team: d.team, workload: round1(d.workload), head: round1(d.head),
     capacity: round1(d.capacity), over: round1(d.over),
     ratio: Math.round(d.ratio * 1000) / 10, verdict: d.verdict,
-    evidence: evidenceOf(input.evidence, d.team)
+    evidence: evidenceOf(input.evidence, d.team, configured)
   }));
 
   /* 趋势：最近 3 期偏差（含本期），每期取"偏差团队数"与"最大正偏差" */
@@ -79,8 +80,8 @@ function analyze(input) {
       action: '核对'
     });
   }
-  // 佐证缺失提示（PR 只做佐证，不硬算）
-  const noEvidence = devs.filter(d => d.verdict !== '正常' && !((input.evidence || {})[d.team]));
+  // 佐证缺失提示（仅当映射已配置才有意义；未配置时不产生噪音建议）
+  const noEvidence = configured ? devs.filter(d => d.verdict !== '正常' && !hasEvidence(input.evidence, d.team)) : [];
   if (noEvidence.length) {
     suggestions.push({
       id: 'var-evidence',
@@ -93,11 +94,13 @@ function analyze(input) {
   return { table, trend, attribution, suggestions };
 }
 
-function evidenceOf(evidence, team) {
+function hasEvidence(evidence, team) {
   const e = (evidence || {})[team];
-  if (!e) return '无佐证';
-  const n = (e.l1 || 0) + (e.l2 || 0);
-  return n > 0 ? `有佐证（L1/L2 提交 ${n} 条）` : '无佐证';
+  return !!(e && ((e.l1 || 0) + (e.l2 || 0) > 0));
+}
+function evidenceOf(evidence, team, configured) {
+  if (!configured) return '—';
+  return hasEvidence(evidence, team) ? `有佐证（L1/L2 提交 ${((evidence || {})[team].l1 || 0) + ((evidence || {})[team].l2 || 0)} 条）` : '无佐证';
 }
 function maxRatioOf(devs) {
   const bad = (devs || []).filter(d => d.ratio > 0).map(d => d.ratio);

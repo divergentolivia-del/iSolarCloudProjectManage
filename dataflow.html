@@ -42,7 +42,42 @@
 <body>
 <div class="wrap">
   <h1>数据自动流入</h1>
-  <p class="sub">Git 仓库采集 · 四级映射 · 静默告警 · AI Skill（风险 / 周报 / 偏差）— 所有 AI 输出均为待确认项</p>
+  <p class="sub">
+    <b>这页是给「管道」看的，不是给「待办」看的。</b>
+    日常要拍板的事请去 <b>📥 今日待确认</b>；这页回答的是另一个问题：
+    <b>自动采集这条管子还活着吗。</b>
+  </p>
+
+  <div class="card" style="background:#f8fafc;box-shadow:none;border:1px solid var(--line)">
+    <h2>🧭 什么时候该来这页</h2>
+    <table>
+      <tr>
+        <th style="width:32%">场景</th><th>来这页做什么</th>
+      </tr>
+      <tr>
+        <td><b>「今日待确认」空了</b>，分不清是真没风险还是采集断了</td>
+        <td>看 <b>📦 仓库状态</b>：某个仓库采集失败 / 从未采到提交，会在这里露出，
+            而不是安静地让待办变成 0</td>
+      </tr>
+      <tr>
+        <td>想知道某条待办是<b>从哪来的</b></td>
+        <td>看 <b>🔗 映射确认</b>：提交与任务靠什么关联上的（L1 标题带任务号 / L2 语义相近 / L3 只到仓库级）</td>
+      </tr>
+      <tr>
+        <td>仓库长期没动静，但没人知道</td>
+        <td>看 <b>🔔 静默告警</b>：超过 2 周无提交的仓库会在这里被点名</td>
+      </tr>
+      <tr>
+        <td>想手动重跑一次分析</td>
+        <td>看 <b>🤖 AI Skill</b>：这里是唯一能手动触发的地方；结果自动汇进「今日待确认」，
+            不在这里逐条确认</td>
+      </tr>
+    </table>
+    <p class="sub" style="margin:12px 0 0">
+      一句话：<b>「今日待确认」是每天要看的，「数据自动流入」是管道出问题时才看的。</b>
+      平时不点开它没有任何问题。
+    </p>
+  </div>
 
   <div class="card">
     <h2>📦 仓库状态 <span id="refreshBtn"><button onclick="refreshRepo()">重新采集</button></span></h2>

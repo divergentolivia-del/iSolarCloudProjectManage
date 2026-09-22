@@ -135,13 +135,24 @@ function get() {
   return db || open();
 }
 
-/* 写入默认权限（已存在的角色不覆盖，允许后台改过之后不被重置） */
+/* 写入默认权限。
+   按【权限点】逐条补齐，不是按【角色】整体跳过 —— 这一点必须说清楚：
+
+   原写法是「该角色一行都没有才播种」。后果是：db.js 里新增一个权限点
+   （比如后来的 skill:read / pradapter:read），旧库里的角色早就"已有行"，
+   于是整批跳过，新权限点一条都落不了库，而且**全程不报错** ——
+   permissions 表看着正常，相关功能却一直 403，极难排查。
+   （2026-09-22 实测：库里 skill:read / pradapter:read 一条都没有，
+    导致 dataflow.html 全部接口返回「没有权限」。）
+
+   改成逐条 INSERT OR IGNORE 后：
+     - 新库：行为与从前一致
+     - 旧库：只补缺失的权限点，已存在的行不被动
+     - 被管理员手动改成 allowed=0 的行也不会被重置（OR IGNORE 不覆盖已存在行） */
 function seedPermissions() {
-  const has = get().prepare('SELECT COUNT(*) AS n FROM permissions WHERE role = ?');
   const ins = get().prepare(
     'INSERT OR IGNORE INTO permissions(role, resource, allowed) VALUES(?, ?, 1)');
   Object.keys(DEFAULT_PERMISSIONS).forEach(role => {
-    if (has.get(role).n > 0) return;
     DEFAULT_PERMISSIONS[role].forEach(r => ins.run(role, r));
   });
 }

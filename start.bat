@@ -3,8 +3,12 @@ rem ============================================================
 rem  iSolarCloud 项目管理工作台 — 启动脚本（Windows）
 rem
 rem  用法：
-rem    双击运行                      → 默认端口 8770，登录关闭（与旧版行为一致）
+rem    双击运行                      → 默认端口 9680，登录关闭（与旧版行为一致）
 rem    start.bat 8800                → 指定端口
+rem
+rem  ⚠ 端口 9680 是公司 SSO 回调白名单里登记的值（http://10.63.139.103:9680/sso/callback）。
+rem    改端口必须同步去「流程数字化中心」变更回调地址，否则 SSO 跳到旧端口会被拒绝。
+rem    详见 docs/plan-identity-and-dingtalk.md
 rem
 rem  启用真实登录（M1 验收后建议启用）：
 rem    set AUTH_REQUIRED=1
@@ -25,7 +29,7 @@ setlocal
 cd /d %~dp0
 
 set PORT=%~1
-if "%PORT%"=="" set PORT=8770
+if "%PORT%"=="" set PORT=9680
 
 rem 部署到服务器时，把数据指向持久化路径（留空则用同目录 data/）：
 rem set DATA_DIR=D:\pmwork\data

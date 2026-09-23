@@ -694,10 +694,16 @@ function handleImport(file, kind) {
     // Merge totals from both sources
     state.totals = (state._totalsCloud || []).concat(state._totalsMiddle || []);
     rebuildIterations();
+    /* 新数据进来后，偏差表里手工钉住的「版本工作量」必须作废 ——
+       它钉的是旧数据的值，留着就会覆盖新算出来的数，且表上看不出异常。
+       返回被清掉的团队名，用于提示用户「你的手工调整已失效」。 */
+    const cleared = clearWorkloadOverrides(state);
     save(true); renderAll();
     const label = effectiveKind === 'totalsMiddle' ? '中后台工作量统计'
       : effectiveKind === 'totals' ? '阳光云工作量统计' : '人力看板';
-    toast(label + ' 已导入 ' + res.rows.length + ' 行，迭代清单已重建，请到第⑤页重新勾选');
+    let msg = label + ' 已导入 ' + res.rows.length + ' 行，迭代清单已重建，请到第⑤页重新勾选';
+    if (cleared.length) msg += '；偏差表中 ' + cleared.length + ' 个团队的手工值已按新数据重算（' + cleared.join('、') + '）';
+    toast(msg);
   }, err => toast('导入失败：' + err.message));
 }
 
@@ -1480,9 +1486,14 @@ function runTbSync(btn) {
       }
       const s = body.stats || {};
       const c = s.cloud || {}, m = s.middle || {}, p = s.productLine || {};
+      /* 同步会作废旧的手工钉值（否则偏差表继续显示上月的数），有清掉就明确告知 */
+      const cleared = body.clearedOverrides || [];
+      const clearedHint = cleared.length
+        ? '；偏差表中 ' + cleared.length + ' 个团队的手工值已按新数据重算（' + cleared.join('、') + '）'
+        : '';
       toast('✅ TB 同步完成：阳光云 ' + (c.taskCount || 0) + ' 任务/' + (c.totalPoints || 0) +
         ' 点，中后台 ' + (m.taskCount || 0) + ' 任务/' + (m.totalPoints || 0) +
-        ' 点，产品线 ' + (p.taskCount || 0) + ' 任务/' + (p.totalPoints || 0) + ' 点');
+        ' 点，产品线 ' + (p.taskCount || 0) + ' 任务/' + (p.totalPoints || 0) + ' 点' + clearedHint);
       // 显式拉取最新 state（SSE 也会触发，双保险，避免自身 rev 判定误跳过）
       fetch('api/state', { cache: 'no-store' })
         .then(r => r.json())

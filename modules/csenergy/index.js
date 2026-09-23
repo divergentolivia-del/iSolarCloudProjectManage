@@ -1103,7 +1103,7 @@ const CsEnergyModule = (() => {
     id: 'csenergy',
     name: '全年度项目管理看板',
     icon: '📊',
-    order: 2,
+    order: 3,
     sidebar: true,
 
     init(el, context) {

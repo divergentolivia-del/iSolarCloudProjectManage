@@ -19,6 +19,9 @@ const audit = require('./audit');
 /* 身份/权限模块（服务端登录的唯一来源） */
 const authMod = require('./modules/auth/routes');
 
+/* 公司 SSO 登录（OAuth2 授权码模式）。页面级 302 跳转，不走 module-loader */
+const ssoMod = require('./modules/sso/routes');
+
 /* 数据迁移 & 模块加载器 */
 const migrate = require('./migrate');
 const moduleLoader = require('./module-loader');
@@ -219,6 +222,9 @@ const AUTH_OPEN = [
   '/api/auth/login',
   '/api/auth/logout',
   '/api/auth/me',
+  '/sso/login',
+  '/sso/callback',
+  '/sso/status',
   '/login.html',
   '/favicon.ico'
 ];
@@ -341,6 +347,19 @@ const server = http.createServer((req, res) => {
 
   /* 登录与权限门禁（AUTH_REQUIRED 关闭时不生效） */
   if (gate(req, res, u)) return;
+
+  /* 公司 SSO 登录。挂在站点根路径（/sso/...）而不是 /api 下 ——
+     它是页面级 302 跳转，浏览器直接访问，不经过前端 fetch。 */
+  if (p === '/sso/login' || p === '/sso/callback' || p === '/sso/status') {
+    return ssoMod.handle(req, res, u);
+  }
+
+  /* 未启用真实登录（AUTH_REQUIRED 为空）时登录页是个死页 ——
+     门禁不拦人、SSO 也不会被触发。直接送回平台首页，省得用户以为登录坏了。 */
+  if (p === '/login.html' && !AUTH_REQUIRED) {
+    res.writeHead(302, { Location: '/', 'Cache-Control': 'no-store' });
+    return res.end();
+  }
 
   // SSE 订阅
   if (p === '/api/events') {

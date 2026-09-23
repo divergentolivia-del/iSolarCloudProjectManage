@@ -35,6 +35,9 @@ data/dingtalk/secret.json
 data/dingtalk/state.json
 data/dingtalk/token.json
 
+# 公司 SSO 应用凭据（client_secret，绝不入库；模板见 docs/samples/sso-secret.sample.json）
+data/sso/
+
 # 登录配置（含初始密码规则，不入库）
 data/auth-config.json
 

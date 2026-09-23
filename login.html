@@ -32,6 +32,19 @@
   }
   button:hover { background:#2559c9; }
   button:disabled { background:#9db6e8; cursor:default; }
+  .sso {
+    width:100%; margin-top:12px; padding:11px; font-size:14px; font-weight:600;
+    color:var(--brand); background:#fff; border:1px solid var(--brand);
+    border-radius:8px; cursor:pointer; transition:background .15s;
+  }
+  .sso:hover { background:#f3f7ff; }
+  .divider {
+    margin:20px 0 4px; text-align:center; color:#9ca3af; font-size:12px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .divider::before, .divider::after {
+    content:''; flex:1; height:1px; background:var(--line);
+  }
   .err {
     margin-top:16px; padding:9px 12px; font-size:13px;
     color:var(--danger); background:#fef2f2; border-radius:7px;
@@ -51,6 +64,13 @@
   <input id="pw" name="password" type="password" autocomplete="current-password" required>
 
   <button type="submit" id="btn">登录</button>
+
+  <!-- SSO 入口。默认隐藏，/sso/status 说配好了才显示 ——
+       没配好就摆个按钮，点了报 503，比不显示更糟 -->
+  <div id="ssoBox" style="display:none">
+    <div class="divider">或用</div>
+    <button type="button" class="sso" id="ssoBtn">公司统一认证登录</button>
+  </div>
   <div class="err" id="err"></div>
 </form>
 
@@ -96,6 +116,27 @@
     });
   });
 })();
+
+  /* ---- SSO 入口 ----
+     配好了才显示。没配好却摆个按钮，用户点了撞 503，比不显示更让人困惑。
+     查询失败一律当「没配好」处理：这是锦上添花的入口，
+     它坏了也不能影响账号密码登录这条主路。 */
+  (function () {
+    var box = document.getElementById('ssoBox');
+    var sbtn = document.getElementById('ssoBtn');
+    fetch('/sso/status', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.configured) return;
+        box.style.display = 'block';
+        sbtn.addEventListener('click', function () {
+          /* next 一并带过去，SSO 回来后才回得到原来想去的页面 */
+          var next = new URLSearchParams(location.search).get('next') || '';
+          location.href = '/sso/login' + (next ? '?next=' + encodeURIComponent(next) : '');
+        });
+      })
+      .catch(function () { /* 忽略：不影响账号密码登录 */ });
+  })();
 </script>
 </body>
 </html>

@@ -14,6 +14,7 @@ const varianceSkill = require('../skills/variance');
 const reportSkill = require('../skills/report');
 const healthSkill = require('../skills/health');
 const gitsignalsSkill = require('../skills/gitsignals');
+const workloadSkill = require('../skills/workload');
 
 const DATA_DIR = process.env.SKILL_DATA_DIR || path.join(__dirname, '..', '..', '..', 'data', 'skill');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
@@ -133,7 +134,8 @@ const SKILLS = {
   variance: { meta: { id: 'variance', name: varianceSkill.name, desc: varianceSkill.desc }, run: varianceSkill.analyze },
   report: { meta: { id: 'report', name: reportSkill.name, desc: reportSkill.desc }, run: reportSkill.generate },
   health: { meta: { id: 'health', name: healthSkill.name, desc: healthSkill.desc }, run: healthSkill.assess },
-  gitsignals: { meta: { id: 'gitsignals', name: gitsignalsSkill.name, desc: gitsignalsSkill.desc }, run: gitsignalsSkill.analyze }
+  gitsignals: { meta: { id: 'gitsignals', name: gitsignalsSkill.name, desc: gitsignalsSkill.desc }, run: gitsignalsSkill.analyze },
+  workload: { meta: { id: 'workload', name: workloadSkill.name, desc: workloadSkill.desc }, run: workloadSkill.analyze }
 };
 
 function listSkills() {
@@ -274,8 +276,8 @@ function normalizeItems(skillId, output, resultId) {
   if (skillId === 'risk') (output.items || []).forEach(o => push(o));
   if (skillId === 'variance') (output.suggestions || []).forEach(o => push(o));
   if (skillId === 'report') (output.pendingConfirm || []).forEach(o => push(o));
-  /* health / gitsignals 直接输出 items 字段（新增 Skill 时记得在这里注册） */
-  if (skillId === 'health' || skillId === 'gitsignals') (output.items || []).forEach(o => push(o));
+  /* health / gitsignals / workload 直接输出 items 字段（新增 Skill 时记得在这里注册） */
+  if (skillId === 'health' || skillId === 'gitsignals' || skillId === 'workload') (output.items || []).forEach(o => push(o));
   return items;
 }
 

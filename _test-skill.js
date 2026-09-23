@@ -345,5 +345,37 @@ console.log('\n[运行时 · 新 Skill（health/gitsignals）待确认接通]');
   ck('run(gitsignals) 信号进待确认队列', rg.ok && rg.result.items.length >= 2, rg.result.items);
 }
 
+console.log('\n[Skill6 资源负载分析器 · 负载率分级]');
+{
+  const workload = require('./modules/skill/skills/workload');
+  const mk = (team, head, workloadV, capacity) => ({ team, head, workload: workloadV, capacity, over: workloadV - capacity });
+
+  const w1 = workload.analyze({ deviations: [mk('TA', 5, 90, 100)] });
+  ck('负载 0.9 健康 → 0 待确认项', w1.items.length === 0 && w1.table[0].state === 'ok', w1.table);
+
+  const w2 = workload.analyze({ deviations: [mk('TB', 5, 145, 100)] });
+  ck('1.45 过载 → 高严重度 + 缺口建议', w2.table[0].state === 'overload' && w2.items[0].severity === '高' && w2.overall.capacityGap === 45, w2.items);
+
+  const w3 = workload.analyze({ deviations: [mk('TC', 5, 110, 100)] });
+  ck('1.1 超载 → 中严重度', w3.table[0].state === 'busy' && w3.items[0].severity === '中', w3.items);
+
+  const w4 = workload.analyze({ deviations: [mk('TD', 0, 50, 0)] });
+  ck('缺人头 → 高 + loadRate null', w4.table[0].state === 'headless' && w4.table[0].loadRate === null && w4.items[0].severity === '高', w4.table);
+
+  const w5 = workload.analyze({ deviations: [mk('TE', 0, 0, 0)] });
+  ck('无工时无人头 → 正常不出项', w5.table[0].state === 'ok' && w5.items.length === 0, w5.table);
+
+  const w6 = workload.analyze({ deviations: [mk('TF', 5, 60, 100)] });
+  ck('富余只展示不出项', w6.table[0].state === 'idle' && w6.items.length === 0, w6.table);
+
+  const w7 = workload.analyze({ deviations: [mk('TA', 5, 90, 100), mk('TB', 5, 145, 100), mk('TC', 5, 110, 100), mk('TD', 0, 50, 0)] });
+  ck('整体：平均负载 1.15、过载1/超载1/缺人头1、缺口 105（含超载 10 + 缺人头 50）',
+    w7.overall.avgLoadRate === 1.15 && w7.overall.overloaded === 1 && w7.overall.busy === 1 &&
+    w7.overall.headless === 1 && w7.overall.capacityGap === 105, w7.overall);
+
+  const rw = engine.run('workload', { now, repos: [], deviations: [mk('TB', 5, 145, 100)], reconcile: [], history: [], plans: [], evidence: {} });
+  ck('run(workload) 过载项进待确认队列', rw.ok && rw.result.items.length === 1, rw.result.items);
+}
+
 console.log('\n结果：' + pass + ' 通过，' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

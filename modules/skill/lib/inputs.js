@@ -222,12 +222,23 @@ const knowledgeProvider = {
    ══════════════════════════════════════════════════════════════ */
 
 /* 顺序即执行顺序。新增数据源在这里加一项，engine.js 不用动。 */
+/* ---------- 6. meeting：会议记录文本（钉钉听记打通后流入；接口先就绪） ---------- */
+const transcriptsProvider = {
+  id: 'transcripts',
+  label: '会议记录',
+  enabled: true,
+  load(ctx) {
+    const m = readJson(path.join(ctx.root, 'data', 'meeting', 'transcripts.json'));
+    return { transcripts: (m && Array.isArray(m.transcripts)) ? m.transcripts : [] };
+  }
+};
 const REGISTRY = [
   reposProvider,
   deviationsProvider,
   historyProvider,
   plansProvider,
-  knowledgeProvider
+  knowledgeProvider,
+  transcriptsProvider
 ];
 
 /** 输入对象的初值 —— 也是「某个 provider 没跑时下游拿到的形状」的契约 */
@@ -240,7 +251,8 @@ function emptyInputs() {
     plans: [],
     history: [],
     evidence: {},
-    plan: { productLines: [], otherCategories: [], cycles: [], board: [] }
+    plan: { productLines: [], otherCategories: [], cycles: [], board: [] },
+    transcripts: []
   };
 }
 

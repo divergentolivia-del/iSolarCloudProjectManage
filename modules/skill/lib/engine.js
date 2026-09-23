@@ -19,6 +19,8 @@ const wbsSkill = require('../skills/wbs');
 const knowledgeSkill = require('../skills/knowledge');
 const charterSkill = require('../skills/charter');
 const stakeholderSkill = require('../skills/stakeholder');
+const meetingSkill = require('../skills/meeting');
+const retroSkill = require('../skills/retro');
 const inputsProvider = require('./inputs');
 
 const DATA_DIR = process.env.SKILL_DATA_DIR || path.join(__dirname, '..', '..', '..', 'data', 'skill');
@@ -72,7 +74,9 @@ const SKILLS = {
   wbs: { meta: { id: 'wbs', name: wbsSkill.name, desc: wbsSkill.desc }, run: wbsSkill.generate },
   knowledge: { meta: { id: 'knowledge', name: knowledgeSkill.name, desc: knowledgeSkill.desc }, run: knowledgeSkill.accumulate },
   charter: { meta: { id: 'charter', name: charterSkill.name, desc: charterSkill.desc }, run: charterSkill.generate },
-  stakeholder: { meta: { id: 'stakeholder', name: stakeholderSkill.name, desc: stakeholderSkill.desc }, run: stakeholderSkill.analyze }
+  stakeholder: { meta: { id: 'stakeholder', name: stakeholderSkill.name, desc: stakeholderSkill.desc }, run: stakeholderSkill.analyze },
+  meeting: { meta: { id: 'meeting', name: meetingSkill.name, desc: meetingSkill.desc }, run: meetingSkill.extract },
+  retro: { meta: { id: 'retro', name: retroSkill.name, desc: retroSkill.desc }, run: retroSkill.extract }
 };
 
 function listSkills() {
@@ -214,7 +218,7 @@ function normalizeItems(skillId, output, resultId) {
   if (skillId === 'variance') (output.suggestions || []).forEach(o => push(o));
   if (skillId === 'report') (output.pendingConfirm || []).forEach(o => push(o));
   /* health / gitsignals / workload / wbs / knowledge 直接输出 items 字段（新增 Skill 时记得在这里注册；ref:true 的佐证项自动跳过） */
-  if (['health', 'gitsignals', 'workload', 'wbs', 'knowledge', 'charter', 'stakeholder'].includes(skillId)) (output.items || []).forEach(o => push(o));
+  if (['health', 'gitsignals', 'workload', 'wbs', 'knowledge', 'charter', 'stakeholder', 'meeting', 'retro'].includes(skillId)) (output.items || []).forEach(o => push(o));
   return items;
 }
 

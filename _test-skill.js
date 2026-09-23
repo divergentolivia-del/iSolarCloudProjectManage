@@ -415,8 +415,6 @@ console.log('\n[Skill8 知识沉淀器 · 采纳率与高频类目]');
   ck('run(knowledge) ref 项被滤掉 → 0 待确认', rk.ok && rk.result.items.length === 0, rk.result.items);
 }
 
-console.log('\n结果：' + pass + ' 通过，' + fail + ' 失败');
-process.exit(fail ? 1 : 0);
 
 console.log('\n[Skill9 项目章程生成器 · 纯函数]');
 {
@@ -483,3 +481,59 @@ console.log('\n[Skill9/10 · engine 注册与落库]');
   const ids = engine.listSkills().map(x => x.id);
   ck('listSkills 含 charter/stakeholder', ids.includes('charter') && ids.includes('stakeholder'), ids);
 }
+
+
+console.log('\n[Skill11 会议纪要提取器 · 纯函数]');
+{
+  const meeting = require('./modules/skill/skills/meeting');
+  const r = meeting.extract({
+    transcripts: [{
+      id: 'm1', title: '版本评审会', time: '2026-09-23',
+      text: '讨论了封版。决定10月26日封版。王亚负责核对测试排期，10月20日前完成。李雷跟进中台接口联调。'
+    }]
+  });
+  ck('提取结论句（含"决定"）', r.minutes[0].conclusions.length >= 1, r.minutes[0].conclusions);
+  ck('提取行动项+责任人（王亚，去"请"）', r.minutes[0].actions.some(a => a.owner === '王亚'), r.minutes[0].actions);
+  ck('提取截止（10月20日前）', r.minutes[0].actions.some(a => a.due === '10月20日'), r.minutes[0].actions);
+  ck('无责任人行动项 → 中严重度项', meeting.extract({ transcripts: [{ id: 'm2', title: 'X', text: '数据迁移需在周末前完成。' }] }).items.some(i => i.severity === '中'), '');
+  const noSrc = meeting.extract({ transcripts: [] });
+  ck('无数据源 → 仅 1 条低严重度说明项', noSrc.items.length === 1 && noSrc.items[0].severity === '低', noSrc.items);
+}
+
+console.log('\n[Skill12 复盘提取器 · 纯函数]');
+{
+  const retro = require('./modules/skill/skills/retro');
+  const base = {
+    plan: { cycles: [{ name: 'V9', seal: '10.26', online: '10.29', active: true }], board: [], headcount: {} },
+    deviations: [
+      { team: 'TA', workload: 100, head: 5, capacity: 80, over: 20, ratio: 0.25, verdict: '产能不足' },
+      { team: 'TB', workload: 40, head: 4, capacity: 80, over: -40, ratio: -0.5, verdict: '产能富余' },
+      { team: 'TC', workload: 10, head: 0, capacity: 0, over: 10, ratio: 0, verdict: '缺人头数' }
+    ],
+    history: [{ at: 1, name: 'V8', deviation: [
+      { team: 'TA', ratio: 0.05 },
+      { team: 'TB', ratio: -0.4 }
+    ]}],
+    knowledge: { stats: { risk: { runCount: 10, adoptCount: 4, rejectCount: 0 }, report: { runCount: 10, adoptCount: 1, rejectCount: 3 } } }
+  };
+  const r = retro.extract(base);
+  ck('产能缺口团队进 TOP（产能不足+缺人头）', r.retro.top.some(t => t.team === 'TA') && r.retro.top.some(t => t.team === 'TC'), r.retro.top);
+  ck('TA 环比恶化（0.05→0.25）→ 高严重度项', r.retro.worsening >= 1 && r.items.some(i => i.id === 'retro-worsening' && i.severity === '高'), r.items);
+  ck('TB 环比改善（-0.4→-0.5）', r.retro.improving >= 1, r.retro);
+  ck('经验：risk 采纳率最高（100%）', r.markdown.includes('risk') && r.markdown.includes('100%'), r.markdown.slice(-300));
+  ck('无历史 → 趋势节提示待积累', retro.extract(Object.assign({}, base, { history: [] })).markdown.includes('无上一期历史快照'), '');
+  ck('空输入不报错且出草稿确认项', (() => { const e = retro.extract({ plan: { cycles: [], board: [], headcount: {} }, deviations: [], history: [], knowledge: {} }); return e.items.length >= 1 && e.items.some(i => i.id === 'retro-draft'); })(), '');
+}
+
+console.log('\n[Skill11/12 · engine 注册与落库]');
+{
+  const m = engine.run('meeting', { transcripts: [] });
+  ck('run(meeting) 注册且产出说明项', m.ok && m.result.items.length >= 1, m.result.items);
+  const r = engine.run('retro', { plan: { cycles: [], board: [], headcount: {} }, deviations: [], history: [], knowledge: {} });
+  ck('run(retro) 空输入不报错', r.ok && Array.isArray(r.result.items), r.result.items);
+  const ids = engine.listSkills().map(x => x.id);
+  ck('listSkills 共 12 个（含 meeting/retro）', ids.length === 12 && ids.includes('meeting') && ids.includes('retro'), ids);
+}
+
+console.log('\n结果：' + pass + ' 通过，' + fail + ' 失败');
+process.exit(fail ? 1 : 0);

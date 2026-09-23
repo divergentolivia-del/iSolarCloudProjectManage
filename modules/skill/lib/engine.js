@@ -17,6 +17,7 @@ const gitsignalsSkill = require('../skills/gitsignals');
 const workloadSkill = require('../skills/workload');
 const wbsSkill = require('../skills/wbs');
 const knowledgeSkill = require('../skills/knowledge');
+const inputsProvider = require('./inputs');
 
 const DATA_DIR = process.env.SKILL_DATA_DIR || path.join(__dirname, '..', '..', '..', 'data', 'skill');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
@@ -43,117 +44,18 @@ function readJson(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { return null; }
 }
 
-/* ---------- 输入注入（脱敏口径） ---------- */
-
+/* ---------- 输入注入 ----------
+ * 采集逻辑已拆到 lib/inputs.js 的 provider 注册表：加数据源改那个文件，
+ * 这个函数不用动。这里只做转调。
+ *
+ * ⚠ 不要在这里加 try/catch 把错误吞掉。2026-09-22 的事故就是这么来的：
+ *   采集整段失败被静默吞掉 → deviations=[] → 三个 Skill 各产出 0 项 →
+ *   82 条待办被标成 expired，用户看到「今天没风险」，真相是「压根没采到」。
+ *   inputs.js 里单个 provider 失败会记进 inputs.__errors 并打 warn，
+ *   是「部分失败可见」；这里再包一层 catch 就又变回「整体静默」了。
+ */
 function collectInputs() {
-  const root = path.join(__dirname, '..', '..', '..');
-  const inputs = { now: Date.now(), repos: [], deviations: [], reconcile: [], plans: [], history: [], evidence: {}, plan: { productLines: [], otherCategories: [], cycles: [], board: [] } };
-
-  /* pradapter：仓库统计特征（L3，不含提交原文） */
-  const pr = readJson(path.join(root, 'data', 'pradapter', 'state.json'));
-  const prCfg = readJson(path.join(root, 'data', 'pradapter', 'config.json'));
-  /* 仓库→团队显式映射（config.json repos[].teams），不靠仓库名猜 */
-  const repoTeams = {};
-  for (const r of (prCfg && prCfg.repos) || []) {
-    if (r && r.id && Array.isArray(r.teams)) repoTeams[r.id] = r.teams.filter(Boolean);
-  }
-  inputs.evidenceConfigured = Object.keys(repoTeams).some(k => repoTeams[k].length > 0);
-  if (pr && pr.repos) {
-    inputs.repos = pr.repos.map(r => ({
-      id: r.id, name: r.name, ok: r.ok, error: r.error, lastCommitAt: r.lastCommitAt
-    }));
-    /* PR 佐证：只按显式映射聚合（未配置映射时 evidence 为空，不产生"无佐证"噪音） */
-    for (const c of pr.commits || []) {
-      if (c.level !== 'L1' && c.level !== 'L2') continue;
-      for (const t of repoTeams[c.repoId] || []) {
-        inputs.evidence[t] = inputs.evidence[t] || { l1: 0, l2: 0 };
-        if (c.level === 'L1') inputs.evidence[t].l1++;
-        else inputs.evidence[t].l2++;
-      }
-    }
-    /* git 信号块（Skill 5 用）：L1-L4 分布 + L2 待确认数（confirmed yes 的 hash 不计） */
-    const confirmedHashes = new Set((pr.confirms || []).filter(c => c && c.yes).map(c => c.hash));
-    inputs.git = {
-      stats: pr.stats || {},
-      lastRefreshAt: pr.lastRefreshAt || null,
-      l2Pending: (pr.commits || []).filter(c => c.level === 'L2' && !confirmedHashes.has(c.hash)).length
-    };
-  }
-
-  /* iteration：calc.compute 偏差（与平台核算同源） */
-  const it = readJson(path.join(root, 'data', 'iteration', 'state.json'));
-  if (it && typeof global.TEAMS !== 'undefined') {
-    try {
-      const calc = require(path.join(root, 'calc.js'));
-      const computed = calc.compute(it);
-      inputs.deviations = (computed.deviation || []).map(d => ({
-        team: d.team, workload: d.workload, head: d.head, capacity: d.capacity,
-        over: d.over, ratio: d.ratio, verdict: d.verdict, workloadOverridden: d.workloadOverridden
-      }));
-      inputs.reconcile = computed.reconcile || [];
-      inputs.iterations = it.iterations || [];
-      /* plan 块（Skill WBS 生成用）：产品线×团队规划行 + 周期里程碑（共享团队会跨产品线，不强行拆树） */
-      inputs.plan = {
-        productLines: (global.PRODUCT_LINES || []).slice(),
-        otherCategories: ((global.OTHER_CATEGORIES) || []).map(c => c.key),
-        cycles: (it.cycles || []).map(c => ({ name: c.name, seal: c.seal, online: c.online, active: c.active })),
-        board: (it.board || []).map(b => ({ line: b.productLine || '', team: b.team || '', est: b.est || 0 }))
-      };
-      /* 趋势：最近 2 期历史快照的偏差（存档在 data/iteration/history/） */
-      const histDir = path.join(root, 'data', 'iteration', 'history');
-      try {
-        const files = fs.readdirSync(histDir).sort().slice(-2);
-        for (const f of files) {
-          const h = readJson(path.join(histDir, f));
-          if (!h) continue;
-          inputs.history.push({ at: h.updatedAt || f, deviations: (h.deviations || []).map(x => ({
-            ratio: x.ratio, verdict: x.verdict
-          })) });
-        }
-      } catch (e) { /* 无历史则无趋势 */ }
-      } catch (e) {
-        /* 这里绝不能静默。
-           2026-09-22 踩过：裸 node 里跑 engine.run()（没经过 server.js）时，
-           calc.js 依赖的全局 TEAMS 不存在，require/调用抛 ReferenceError，
-           被这个 catch 吞掉后 deviations=[]，三个 Skill 于是都产出 0 项 ——
-           表面上"运行成功"，实际把 82 条待办全部标成 expired，
-           用户看到的是"今天没风险"，而真相是"输入压根没采集到"。
-           宁可吵，也要让这种失败在日志里露头。 */
-        console.warn('[skill] 偏差输入采集失败，本轮的偏差类结论将为空：' + ((e && e.message) || e));
-        console.warn('[skill] 常见原因：直接 require 引擎但未经 server.js 启动，全局 TEAMS 未注入。');
-      }
-  }
-
-  /* plan：里程碑（可空） */
-  const plan = readJson(path.join(root, 'data', 'plan', 'state.json'));
-  if (plan && plan.plans) {
-    inputs.plans = plan.plans.map(p => ({
-      id: p.id, title: p.title || p.name || String(p.id),
-      due: p.due || null, status_category: p.status_category || 'todo'
-    }));
-  }
-
-  /* knowledge 块（Skill 知识沉淀用）：各 Skill 采纳率 + 历史产出类目分布（只取统计特征） */
-  try {
-    const sk = readJson(path.join(STATE_FILE));
-    const catCount = {};
-    for (const r of (sk && sk.results) || []) {
-      for (const i of (r && r.items) || []) {
-        if (i && i.category) catCount[i.category] = (catCount[i.category] || 0) + 1;
-        else if (i) catCount['综合'] = (catCount['综合'] || 0) + 1;   // 旧格式 items 无 category，归入综合（不丢数据也不虚构类目）
-      }
-    }
-    inputs.knowledge = {
-      stats: (sk && sk.stats) || {},
-      categoryCount: catCount,
-      resultCount: ((sk && sk.results) || []).length
-    };
-  } catch (e) {
-    console.warn('[skill] knowledge 块读取失败（知识沉淀 Skill 将无数据）：' + ((e && e.message) || e));
-    inputs.knowledge = { stats: {}, categoryCount: {}, resultCount: 0 };
-  }
-
-  return inputs;
+  return inputsProvider.collectInputs();
 }
 
 /* ---------- 执行与落库 ---------- */
@@ -321,4 +223,4 @@ function summarizeInputs(inputs) {
   };
 }
 
-module.exports = { ensureData, listSkills, run, confirm, latest, collectInputs, _internal: { normalizeItems } };
+module.exports = { ensureData, listSkills, run, confirm, latest, collectInputs, inputStatus: inputsProvider.status, _internal: { normalizeItems } };

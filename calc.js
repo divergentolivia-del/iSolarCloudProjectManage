@@ -122,6 +122,30 @@ function lockedTotals(state) {
 }
 
 /* 主计算入口 */
+/* 清除偏差表里手工钉住的「版本工作量」。
+   为什么必须有这一步：override 一旦写入就永久生效，且优先级高于权威值——
+   上月手工调过的团队，本月导入新数据后会继续显示上月的数字，而且
+   表面上看不出任何异常（数字是合法的、格式是对的），极难被发现。
+
+   2026-09-23 实际踩到：8 月手工调过的 4 个团队在 9 月 TB 导入后仍显示 8 月值
+   （后端开发-阳光云 323.5 / 后端开发-平台 98.5 / Web开发-阳光云 232.5 /
+     测试部-应用软件测试-云服务 608），而 9 月复算值分别是 29.25 / 132 / 119 / 495。
+
+   只清 workload，不清 head：head 是「可投入人数」的手工修正，与工时数据无关，
+   而且改人头数时已有联动清理（见 app.js 人头表 change 处理）。 */
+function clearWorkloadOverrides(state) {
+  const all = (state && state.deviationOverrides) || {};
+  const teams = [];
+  Object.keys(all).forEach(k => {
+    if (all[k] && all[k].workload !== undefined) {
+      teams.push(k);
+      delete all[k].workload;
+      if (!Object.keys(all[k]).length) delete all[k];
+    }
+  });
+  return teams;
+}
+
 function compute(state) {
   const authoritative = totalsByTeam(state);
   const byLine = boardByLine(state);
@@ -206,5 +230,8 @@ function compute(state) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { compute: compute, normTeam: normTeam, rowTotal: rowTotal };
+  module.exports = {
+    compute: compute, normTeam: normTeam, rowTotal: rowTotal,
+    clearWorkloadOverrides: clearWorkloadOverrides
+  };
 }

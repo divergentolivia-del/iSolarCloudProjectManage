@@ -21,6 +21,7 @@ const tbConfig = require('../../tb-config');
 const tbSync = require('./sync');
 const tbClient = require('./client');
 const audit = require('../../audit');
+const calc = require('../../calc');
 
 /* 数据目录 */
 const DATA_DIR = process.env.DATA_DIR
@@ -149,6 +150,12 @@ function applySyncToState(result, by, sprintMap, boardSprints) {
 
   rebuildIterations(s);
 
+  /* 偏差表里手工钉住的「版本工作量」必须随新数据作废。
+     它钉的是上一轮的旧值，优先级高于权威值 —— 不清掉的话，本月同步了新数据、
+     重新勾了迭代，偏差表却继续显示上月的数字，且数字合法、格式正常，肉眼查不出来。
+     2026-09-23 实际踩到：8 月手工调过的 4 个团队在 9 月 TB 同步后仍显示 8 月值。 */
+  const clearedOverrides = calc.clearWorkloadOverrides(s);
+
   // TB 同步后迭代已自动勾选，无需再提示"请重新勾选"
   s.iterDirty = false;
 
@@ -161,7 +168,7 @@ function applySyncToState(result, by, sprintMap, boardSprints) {
   if (typeof global._broadcast === 'function') {
     global._broadcast(s.rev, s.updatedBy);
   }
-  return s.rev;
+  return { rev: s.rev, clearedOverrides: clearedOverrides };
 }
 
 /* ---------- 请求体读取 ---------- */
@@ -367,7 +374,8 @@ module.exports = {
           // 迭代映射：优先取请求体传入，否则回退到 state 里已存的 tbSprintMap
           const sprintMap = Object.assign({}, readSprintMap(), incoming.sprintMap || {});
           const result = await tbSync.syncAll(cred, incoming.boardOverrides || {}, sprintMap);
-          const rev = applySyncToState(result, incoming.by, sprintMap, incoming.tbBoardSprints);
+          const applied = applySyncToState(result, incoming.by, sprintMap, incoming.tbBoardSprints);
+          const rev = applied.rev;
 
           // 落盘同步状态
           const status = {
@@ -381,9 +389,13 @@ module.exports = {
           audit.log({
             user: status.by, module: 'tb', action: 'TB自动同步',
             details: `云${result.stats.cloud.taskCount}任务/中后台${result.stats.middle.taskCount}任务/产品线${result.stats.productLine.taskCount}任务 → iteration rev ${rev}`
+              + (applied.clearedOverrides.length ? `；清除偏差表手工值 ${applied.clearedOverrides.length} 个团队：${applied.clearedOverrides.join('、')}` : '')
           });
 
-          return sendJson(res, 200, { ok: true, iterationRev: rev, stats: result.stats });
+          return sendJson(res, 200, {
+            ok: true, iterationRev: rev, stats: result.stats,
+            clearedOverrides: applied.clearedOverrides
+          });
         } catch (e) {
           const detail = e.body ? (' | ' + JSON.stringify(e.body).slice(0, 300)) : '';
           return sendJson(res, 502, {

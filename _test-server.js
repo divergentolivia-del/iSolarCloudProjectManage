@@ -2,12 +2,22 @@
    在子进程里起服务，跑完自动清理。 */
 const { spawn } = require('child_process');
 const http = require('http');
+const net = require('net');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const PORT = 8791;
+let PORT = 8791;   // 默认值；运行时换成动态空闲端口（sgclaw 客户端等进程可能恰好占用 8791，硬编码会 EADDRINUSE）
 const DATA = path.join(os.tmpdir(), 'wbtest-' + process.pid);
+
+/** 向系统要一个空闲端口（listen(0) 由内核分配，避开随机冲突） */
+function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const s = net.createServer();
+    s.once('error', reject);
+    s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => resolve(p)); });
+  });
+}
 let pass = 0, fail = 0;
 function ck(n, c, extra) {
   if (c) { pass++; console.log('  PASS ' + n); }
@@ -60,30 +70,33 @@ function gracefulStop(p) {
   try { p.send({ cmd: 'sigint' }); } catch (e) { p.kill(); }
 }
 
-/** 轮询等待服务就绪（替代固定 sleep：node --test 并发时启动可能 >1.2s） */
-async function waitReady(timeoutMs) {
+/** 轮询等待服务就绪。固定 sleep 不可靠：node --test 并发跑多个测试文件时 CPU 争抢，
+ *  冷启动可能远超 1.2s，睡不够就直接 ECONNREFUSED（表现为_[4] 重启后数据保留 偶发失败）。
+ *  ready 可自定义就绪判据 —— [6] 的期望结果本身就是空态（rev=0），只等 200 会永远等不到。 */
+async function waitReady(timeoutMs, ready) {
+  const ok = ready || (r => r.code === 200);
   const t0 = Date.now();
   while (Date.now() - t0 < timeoutMs) {
     try {
       const r = await req('GET', '/api/state');
-      if (r.code === 200) return true;
+      if (ok(r)) return r;
     } catch (e) { /* 未就绪，继续等 */ }
     await sleep(200);
   }
-  return false;
+  return null;
 }
 
 (async () => {
+  PORT = await getFreePort();
   writeWrapper();
   let srv = start();
   const ready = await waitReady(15000);
-  if (!ready) {
-    console.log('\nFAIL 服务未在 15s 内就绪：' + srv.getOut().slice(-500));
+  if (!ready) {    const out = srv.getOut();
+    console.log('\nFAIL 服务未在 15s 内就绪' + (out.indexOf('EADDRINUSE') >= 0 ? '（端口被占用，请检查残留 node 进程）' : '') + '：' + out.slice(-500));
     process.exit(1);
   }
-
+  console.log('\n[0] 归档不可变性（测试端口 ' + PORT + '）');
   {
-    console.log('\n[0] 归档不可变性');
     const archiveDir = path.join(DATA, 'archive');
     const archivePath = path.join(archiveDir, 'test-archive.json');
     fs.mkdirSync(archiveDir, { recursive: true });
@@ -130,8 +143,8 @@ async function waitReady(timeoutMs) {
 
   console.log('\n[4] 重启后数据保留');
   srv = start();
-  await sleep(1200);
-  r = await req('GET', '/api/state');
+  r = await waitReady(15000);
+  if (!r) ck('重启后服务就绪', false, '15s 内未起来：' + srv.getOut().slice(-300));
   ck('重启后 rev 保留', r.body.rev === 100, r.body.rev);
   ck('重启后数据保留', JSON.stringify(r.body.headcount) === JSON.stringify({ x: 1 }), r.body.headcount);
   gracefulStop(srv);
@@ -140,8 +153,8 @@ async function waitReady(timeoutMs) {
   console.log('\n[5] iteration/state.json 损坏时回退历史快照，而非返回空态');
   fs.writeFileSync(path.join(DATA, 'iteration', 'state.json'), '{"headcount": {broken', 'utf8');
   srv = start();
-  await sleep(1200);
-  r = await req('GET', '/api/state');
+  r = await waitReady(15000);
+  if (!r) ck('[5] 重启后服务就绪', false, '15s 内未起来：' + srv.getOut().slice(-300));
   ck('未返回空态（rev>0）', Number(r.body.rev) > 0, r.body.rev);
   ck('从快照恢复出数据', !!r.body.headcount && Object.keys(r.body.headcount).length > 0, r.body.headcount);
   ck('日志提示已回退', /回退到快照/.test(srv.getOut()), srv.getOut().slice(-300));
@@ -152,14 +165,16 @@ async function waitReady(timeoutMs) {
   fs.rmSync(path.join(DATA, 'iteration', 'history'), { recursive: true, force: true });
   fs.writeFileSync(path.join(DATA, 'iteration', 'state.json'), 'not json at all', 'utf8');
   srv = start();
-  await sleep(1200);
-  r = await req('GET', '/api/state');
+  /* 本关期望的就是降级空态（rev=0），不能只等「200 且 rev>0」，所以自定义就绪判据：
+     只要能拿到 200 响应就算服务起来了，对不对由下面的 ck 判。 */
+  r = await waitReady(15000, x => x.code === 200);
+  if (!r) ck('[6] 重启后服务就绪', false, '15s 内未起来：' + srv.getOut().slice(-300));
   ck('降级为空态', Number(r.body.rev || 0) === 0, r.body.rev);
   ck('原损坏文件已另存 .broken', fs.existsSync(path.join(DATA, 'iteration', 'state.json.broken')));
   gracefulStop(srv);
   await sleep(700);
 
-  fs.rmSync(DATA, { recursive: true, force: true });
+  fs.rmSync(DATA, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
   console.log('\n结果：' + pass + ' 通过，' + fail + ' 失败');
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.error('测试异常', e); process.exit(1); });

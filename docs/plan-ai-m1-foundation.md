@@ -22,7 +22,7 @@
 | 要求 | 依赖 | 现状 |
 |---|---|---|
 | 知道「谁」在操作 | 真实身份认证 | ❌ 假的 |
-| 管住「谁能干什么」 | 角色权限矩阵 | ❌ 只有全平台一个口令 |
+| 管住「谁能干什么」 | 角色权限矩阵 | ❌ 只有全平台一个密码 |
 | 记下「谁干了什么、采纳与否」 | 长期可查的审计 | ⚠️ 只留 200 条，且全量重写 |
 
 **身份是假的 → 权限没意义 → 审计只是自娱自乐 → 审计不可信 → 不敢让 Agent 自主执行。**
@@ -99,7 +99,7 @@ CREATE TABLE users (
   id TEXT PRIMARY KEY,          -- 用户 ID
   name TEXT NOT NULL,           -- 显示名
   dingtalk_id TEXT,             -- 钉钉 userId（将来扫码登录用）
-  password_hash TEXT,           -- 口令哈希（加盐），钉钉登录用户可空
+  password_hash TEXT,           -- 密码哈希（加盐），钉钉登录用户可空
   role TEXT NOT NULL,           -- 角色：pm | dev | viewer | admin
   enabled INTEGER DEFAULT 1,
   created_at TEXT, updated_at TEXT
@@ -155,9 +155,9 @@ function whoami() {
 
 > ⚠️ **这是最重要的一条安全改动。** 现在客户端能自报身份，等于审计日志可以随便伪造。
 
-### 4.3 权限矩阵：从「一个口令」到「按角色」
+### 4.3 权限矩阵：从「一个密码」到「按角色」
 
-**现状（`server.js:232`）：** 全平台一个 `ACCESS_TOKEN`，有口令就能读写一切。
+**现状（`server.js:232`）：** 全平台一个 `ACCESS_TOKEN`，有密码就能读写一切。
 
 **改造：**
 - 保留 `ACCESS_TOKEN` 作为**访问门禁**（能进门），新增**角色**决定「进门后能干什么」；

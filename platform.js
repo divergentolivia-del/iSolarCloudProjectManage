@@ -328,7 +328,7 @@ const Platform = (() => {
      ============================================================ */
 
   /* ============================================================
-     账号下拉（改口令 / 退出登录）
+     账号下拉（改密码 / 退出登录）
      ============================================================ */
 
   /**
@@ -348,7 +348,7 @@ const Platform = (() => {
       menu.classList.toggle('hidden');
     });
 
-    /* 点下拉里的链接（账号与口令）时让它自己跳，别被外面那层 click 提前关掉；
+    /* 点下拉里的链接（账号与密码）时让它自己跳，别被外面那层 click 提前关掉；
        点其他地方一律收起。 */
     menu.addEventListener('click', e => e.stopPropagation());
     document.addEventListener('click', () => menu.classList.add('hidden'));
@@ -390,13 +390,13 @@ const Platform = (() => {
   let _serverPermissions = [];
   let _serverIsInitialPwd = false;
 
-  /* 「初始口令」提示条的关闭状态。
+  /* 「初始密码」提示条的关闭状态。
      存 sessionStorage 而不是 localStorage：本次登录会话不再打扰，
-     但下次再登录还会提醒一次 —— 目的就是把人烦到去改口令。 */
+     但下次再登录还会提醒一次 —— 目的就是把人烦到去改密码。 */
   const PWD_NOTICE_KEY = 'wb_pwd_notice_closed';
 
   /**
-   * 初始口令提示条：还挂着批量建号发的口令时显示，否则隐藏。
+   * 初始密码提示条：还挂着批量建号发的密码时显示，否则隐藏。
    * 未启用登录（_serverUser 为空）时不显示 —— 那种模式下根本没有账号概念。
    */
   function renderPwdNotice() {
@@ -715,7 +715,7 @@ const Platform = (() => {
     // Render user name in navbar
     renderNavbarUser();
 
-    // Bind 初始口令提示条的关闭按钮（显示与否由 refreshIdentity 决定）
+    // Bind 初始密码提示条的关闭按钮（显示与否由 refreshIdentity 决定）
     bindPwdNotice();
 
     // Pre-create module containers
@@ -759,7 +759,7 @@ const Platform = (() => {
       });
     }
 
-    // Bind 账号下拉（改口令 / 退出登录）
+    // Bind 账号下拉（改密码 / 退出登录）
     bindUserMenu();
 
     // Bind sidebar help link — show toast instead of navigating

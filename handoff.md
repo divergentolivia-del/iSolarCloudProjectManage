@@ -189,7 +189,7 @@ E:\PMWork\Project Materials\iSolarCloudProject\迭代版本\iSolarCloudProjectMa
 | `db.js` | 新增 | `node:sqlite` 连接 + users/sessions/audit_log/permissions/meta 五张表 |
 | `audit.js` | 改写 | 底层切到 SQLite；**`log()` / `getRecent()` 签名不变**，调用方零改动 |
 | `_db-test.js` | 新增 | 6 个用例，`node --test _db-test.js`，全绿 |
-| `server.js` | 小改 | 启动时开库 + 迁移旧审计 + 首次打印管理员口令 |
+| `server.js` | 小改 | 启动时开库 + 迁移旧审计 + 首次打印管理员密码 |
 | `.gitignore` | 小改 | 忽略 `data/platform.db*` |
 
 **未动**：模块业务数据仍写各自 `data/<模块>/state.json`（见下面第 4 条坑）。
@@ -222,8 +222,8 @@ E:\PMWork\Project Materials\iSolarCloudProject\迭代版本\iSolarCloudProjectMa
 - `data/iteration/state.json` **已被 git 跟踪**且含真实工时数据 —— **绝不提交**。
 - **永远不要用 `git add .`**，只显式 add 具体文件。
 - 钉钉/TB 凭据一律放 `data/**/secret.json`（已 ignore），**绝不入库**。
-- **新增：`data/platform.db` 含口令哈希与审计记录 —— 已 ignore，绝不入库。**
-  首次启动打印的 admin 口令只出现一次，看到就记下来。
+- **新增：`data/platform.db` 含密码哈希与审计记录 —— 已 ignore，绝不入库。**
+  首次启动打印的 admin 密码只出现一次，看到就记下来。
 
 ## E. 下一步（M1 剩余）
 
@@ -246,8 +246,8 @@ E:\PMWork\Project Materials\iSolarCloudProject\迭代版本\iSolarCloudProjectMa
 **身份不再是浏览器里的一串字符。**
 
 新增两件：
-- `modules/auth/routes.js` —— 服务端身份的唯一来源。登录/登出/改口令/用户管理/查权限；
-  30 天 `HttpOnly; SameSite=Lax` 会话 Cookie；登录失败统一回「账号或口令不正确」，
+- `modules/auth/routes.js` —— 服务端身份的唯一来源。登录/登出/改密码/用户管理/查权限；
+  30 天 `HttpOnly; SameSite=Lax` 会话 Cookie；登录失败统一回「账号或密码不正确」，
   不透露账号是否存在。导出 `currentUser()` / `can()` 给 `server.js` 复用。
 - `login.html` —— 独立登录页，登录成功后清掉 localStorage 里的旧假身份。
 
@@ -276,8 +276,8 @@ E:\PMWork\Project Materials\iSolarCloudProject\迭代版本\iSolarCloudProjectMa
 
 12. **起点测试脚本会占着端口。** 起服务端测完要 `child.kill()`，且杀完**要等约 600ms**
     再起下一个，否则新服务抢不到端口——表现是「连不上」而不是报错，很容易误判成代码坏了。
-13. **测异步断言别只断言「成功」。** 我第一次写的断言是「重启后应重新打印 admin 口令」，
-    结果判定失败——但代码是对的：`takeInitialAdmin()` 取过就清空，口令只该出现一次。
+13. **测异步断言别只断言「成功」。** 我第一次写的断言是「重启后应重新打印 admin 密码」，
+    结果判定失败——但代码是对的：`takeInitialAdmin()` 取过就清空，密码只该出现一次。
     是断言写反了。**写断言前先确认自己期望的行为是不是真的对。**
 14. **`node --check` 对 `.html` 无效。** 想验证 `login.html` 里的脚本语法，
     得把 `<script>` 里的内容抠出来单独 check，或者干脆靠端到端跑。
@@ -286,7 +286,7 @@ E:\PMWork\Project Materials\iSolarCloudProject\迭代版本\iSolarCloudProjectMa
 
 15. **`git add .` 一次都不能用** —— `data/iteration/state.json` 被 git 跟踪着，会被带走。
     提交前 `git diff --cached --name-only` 确认暂存区里没有 `data/`。
-16. `data/platform.db`（口令哈希 + 审计）已 ignore。首次启动打印的 admin 口令**只出现一次**。
+16. `data/platform.db`（密码哈希 + 审计）已 ignore。首次启动打印的 admin 密码**只出现一次**。
 
 ## E. 下一步
 
@@ -305,7 +305,7 @@ E:\PMWork\Project Materials\iSolarCloudProject\迭代版本\iSolarCloudProjectMa
 | 提交 | 内容 |
 |---|---|
 | `492dc95` | 修专项锁定页侧栏抖动（判定改为与动画无关的几何比较） |
-| `9cf6546` | 新增 `user-cli.js` —— 账号维护/口令重置的终端兜底 |
+| `9cf6546` | 新增 `user-cli.js` —— 账号维护/密码重置的终端兜底 |
 | `e020925` | 新增 `docs/plan-dingtalk-sso.md` + `check-network.js` + ops-manual 批量建号一节 |
 
 **`docs/plan-dingtalk-sso.md` 是身份这条线的唯一权威执行依据**，决策已全部拍板（D1–D9），
@@ -316,17 +316,17 @@ E:\PMWork\Project Materials\iSolarCloudProject\迭代版本\iSolarCloudProjectMa
 | # | 结论 |
 |---|---|
 | D1 | 工号当 `users.id`，钉钉 userId 存 `dingtalk_id`，姓名只用于显示 |
-| D2 | 默认口令 = 姓名缩写 + 固定后缀（**不按入职时间做复杂规则**） |
+| D2 | 默认密码 = 姓名缩写 + 固定后缀（**不按入职时间做复杂规则**） |
 | D3 | **不强制改密**，只给可关闭提示（用户明确要求） |
-| D4 | 口令规则放配置文件，**不写死在代码里**（代码进 git） |
+| D4 | 密码规则放配置文件，**不写死在代码里**（代码进 git） |
 | D5 | 第一阶段用纯内网 IP，域名不阻塞上线 |
-| D6 | 先只做 P0（工号+口令），钉钉接口不阻塞 |
+| D6 | 先只做 P0（工号+密码），钉钉接口不阻塞 |
 | D7 | 钉钉接入顺序：P1 通讯录 → P2 扫码 |
 | D8 | 自动建号**一律 viewer**，角色只在平台里改，不被钉钉覆盖 |
 | D9 | 离职对账自动停用 |
 
 **表结构已预留**：`users.dingtalk_id` + `password_hash` 可 NULL —— **P0/P1 零 schema 改动**
-（唯一例外：P0 要加 `users.pwd_is_initial` 列用于"初始口令"提示）。
+（唯一例外：P0 要加 `users.pwd_is_initial` 列用于"初始密码"提示）。
 
 ## C. 本轮踩过的坑（务必别再踩）
 
@@ -393,7 +393,7 @@ E:\PMWork\Project Materials\iSolarCloudProject\迭代版本\iSolarCloudProjectMa
 **沿用（未变）**：
 - **`git add .` 一次都不能用** —— `data/iteration/state.json` 被 git 跟踪且含真实工时
 - 提交前 `git diff --cached --name-only` 确认暂存区没有 `data/`
-- `data/platform.db`（口令哈希+审计）、`data/dingtalk/secret.json`、`data/auth-config.json` 一律不入库
+- `data/platform.db`（密码哈希+审计）、`data/dingtalk/secret.json`、`data/auth-config.json` 一律不入库
 
 ## E. 现状与下一步
 
@@ -403,9 +403,9 @@ E:\PMWork\Project Materials\iSolarCloudProject\迭代版本\iSolarCloudProjectMa
 
 **P0 待做（无外部依赖，可立即开工）**：
 1. `user-import.js` 批量建号脚本（含 `--dry-run`，见 sso 文档 §2.2）
-2. `data/auth-config.json` 口令规则配置（已 gitignore）
+2. `data/auth-config.json` 密码规则配置（已 gitignore）
 3. `users.pwd_is_initial` 列 + 首次登录提示横幅
-4. `docs/ops-manual.md` 补「批量建号」（✅ 已补）与「初始口令」两节
+4. `docs/ops-manual.md` 补「批量建号」（✅ 已补）与「初始密码」两节
 
 **等公司侧**：开发者权限 → 企业内部应用凭据 → 最小连通验证脚本 → 才动 P1。
 **Teambition 教训：拿到凭据后第一件事是写最小连通脚本跑通，跑通之前同步逻辑一行都不写。**
@@ -423,8 +423,8 @@ E:\PMWork\Project Materials\iSolarCloudProject\迭代版本\iSolarCloudProjectMa
 ### A1. P0 六项（已推送 `889a97d`）
 `user-import.js`（含 `--dry-run`）、`data/auth-config.json`、`users.pwd_is_initial`
 + 首登横幅、`ops-manual.md` §2.4、`start.bat` 注释、全链路验收。
-实测：干跑 → 真导入（新建 5 / 跳过 0 / 失败 0）→ 重跑全跳过 → 初始口令登录
-返回 `isInitialPwd:true` → 改口令后 `false` → 新口令复登成功。
+实测：干跑 → 真导入（新建 5 / 跳过 0 / 失败 0）→ 重跑全跳过 → 初始密码登录
+返回 `isInitialPwd:true` → 改密码后 `false` → 新密码复登成功。
 
 ### A2. 修掉「看不见」的四条根因
 用户的抱怨不是错觉，是四件事叠加：
@@ -514,7 +514,7 @@ E:\PMWork\Project Materials\iSolarCloudProject\迭代版本\iSolarCloudProjectMa
 **沿用（一条都没放松）**：
 - **`git add .` 一次都不能用** —— `data/iteration/state.json` 被 git 跟踪且含真实工时
 - 提交前 `git diff --cached --name-only` 确认暂存区没有 `data/`
-- `data/platform.db`（口令哈希+审计）、`data/dingtalk/secret.json`、`data/auth-config.json`、
+- `data/platform.db`（密码哈希+审计）、`data/dingtalk/secret.json`、`data/auth-config.json`、
   `data/skill/state.json` 一律不入库
 - 新增任何模块后，第一件事是确认 `data/<模块>/state.json` 进了 `.gitignore`
 

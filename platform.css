@@ -405,9 +405,9 @@ body.dark-theme .sidebar-nav-item.active:hover {
 .module-view.hidden { display: none; }
 @keyframes viewEnter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-/* ══════════ 初始口令提示条 ══════════ */
-/* 批量建号（user-import.js）发出的口令是「姓名缩写 + 固定后缀」，同批次规则相同，
-   知道规则的人能猜出别人的口令。所以在用户改掉之前提示一句 —— 不强制，
+/* ══════════ 初始密码提示条 ══════════ */
+/* 批量建号（user-import.js）发出的密码是「姓名缩写 + 固定后缀」，同批次规则相同，
+   知道规则的人能猜出别人的密码。所以在用户改掉之前提示一句 —— 不强制，
    点「×」关掉即可，本次会话不再出现。 */
 .pwd-notice {
   display: flex;

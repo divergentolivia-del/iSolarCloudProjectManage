@@ -50,7 +50,7 @@
 | `tb` | 406 | Teambition 打通（应用凭据四件套） |
 
 另有 `server.js`(493) + `module-loader.js`(132) + `router.js`(310) + `platform.js`(670) 的平台骨架。
-**模块化架构、SSE 实时协同、乐观锁、审计日志、访问口令——这些骨架已经在了，是很好的起点。**
+**模块化架构、SSE 实时协同、乐观锁、审计日志、访问密码——这些骨架已经在了，是很好的起点。**
 
 ### 2.2 地基上的四个硬缺口
 
@@ -58,7 +58,7 @@
 |---|---|---|---|
 | 1 | **没有真正的数据库** | 每个模块各自 `fs.writeFileSync` 写独立 JSON（`server.js:132`、`budget/routes.js:112`、`csenergy/routes.js:114`、`iteration/routes.js:98`、`plan/routes.js:121`…） | 无法按人/按项目做细粒度查询与权限；并发写靠乐观锁硬扛；数据量一大就全量读写 |
 | 2 | **身份是假的** | `platform.js:316` 的 `whoami()` 读的是浏览器 **localStorage** 里的一个字符串，无密码、无校验 | 任何人改一下 localStorage 就是别人。**当前所有「谁改的」记录都不可信** |
-| 3 | **权限只有「有口令/无口令」** | `server.js:232` 的 `ACCESS_TOKEN` 是全平台一个口令；`data/platform.json` 只有 `editMode: open` 和空 `whitelist` | 无法表达「PM 能改计划、研发只能看」这类角色差异 |
+| 3 | **权限只有「有密码/无密码」** | `server.js:232` 的 `ACCESS_TOKEN` 是全平台一个密码；`data/platform.json` 只有 `editMode: open` 和空 `whitelist` | 无法表达「PM 能改计划、研发只能看」这类角色差异 |
 | 4 | **审计日志会丢** | `audit.js` 每条新日志都全量重写文件，且 **只保留最近 200 条** | 作为「AI 行为可追溯」的底座是不够的（Harness 审计层要求长期留存） |
 
 ### 2.3 这些缺口为什么必须先补

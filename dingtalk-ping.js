@@ -33,6 +33,15 @@ const arg = (name, dft) => {
 const RANGE = arg('range', 'A1:F20');
 const SHEET_IDX = parseInt(arg('sheet', '1'), 10);
 
+/* 三跳的真实结果，供结尾小结判断。
+   踩过两次：
+     1) 小结只看「配置填没填」，于是 hop2 报错、hop3 被跳过的那一次，
+        结尾照样打印「三跳都跑完了」—— 和同一屏里的 ❌ 自相矛盾。
+     2) 改成看结果后仍漏报：失败分支从没把值写成 false，undefined 既不进
+        「通过」也不进「未通过」，被静默跳过 → 又打印了一次假成功。
+   所以默认值必须是 false：只有明确成功才置 true，没走到的就是没通过。 */
+const hop = { token: false, node: false, sheet: false };
+
 /* ---------- 小工具 ---------- */
 
 const ok = s => '\x1b[32m' + s + '\x1b[0m';
@@ -148,6 +157,7 @@ function maskDeep(obj) {
     });
     if (r.status === 200 && r.json && r.json.accessToken) {
       token = r.json.accessToken;
+      hop.token = true;
       console.log('  ' + ok('✅ 连通且鉴权通过'));
       console.log('  ' + dim('  有效期：' + (r.json.expireIn || '?') + ' 秒'));
       console.log('  ' + dim('  token：' + maskToken(token)));
@@ -169,12 +179,17 @@ function maskDeep(obj) {
   let nodeId = missing(cfg.nodeId) ? null : cfg.nodeId;
   if (!missing(cfg.docUrl)) {
     try {
-      const r = await req('POST', API + '/v2.0/wiki/nodes/query', {
+      /* 路径是 queryByUrl，不是 query。
+         踩过：写成 /v2.0/wiki/nodes/query → 404 InvalidAction.NotFound。
+         这类 404 很容易被误读成「没权限」，其实是路径根本不存在。
+         判据：没权限会回 403/Forbidden，404 + InvalidAction.NotFound 是路径错。 */
+      const r = await req('POST', API + '/v2.0/wiki/nodes/queryByUrl', {
         token,
         body: { url: cfg.docUrl, operatorId: cfg.operatorId || undefined }
       });
       if (r.status === 200 && r.json && r.json.node) {
         nodeId = r.json.node.nodeId || r.json.node.id;
+        hop.node = true;
         console.log('  ' + ok('✅ 解析成功') + dim('  nodeId=' + nodeId));
         console.log('  ' + dim('  名称：' + (r.json.node.name || '?')));
       } else {
@@ -199,6 +214,7 @@ function maskDeep(obj) {
       const r = await req('GET', API + '/v1.0/doc/workbooks/' + nodeId + '/sheets?operatorId=' + (cfg.operatorId || ''), { token });
       if (r.status === 200 && r.json && r.json.value) {
         const sheets = r.json.value;
+        hop.sheet = true;
         console.log('  ' + ok('✅ 拿到 ' + sheets.length + ' 个 sheet'));
         sheets.forEach((s, i) => console.log('  ' + dim('  [' + (i + 1) + '] ' + (s.name || s.id) + '  id=' + (s.id || '?'))));
         const sh = sheets[Math.min(SHEET_IDX, sheets.length) - 1];
@@ -224,14 +240,34 @@ function maskDeep(obj) {
 
   /* ---- 小结 ---- */
   step('结果');
+  /* 小结看的是【真实结果】，不是配置填没填 —— 配置齐全但接口报错的那次，
+     旧版照样打印「三跳都跑完了」，和上面的 ❌ 自相矛盾。 */
+  const names = ['换 token', '解析文档链接', '读表格内容'];
+  const flags = [hop.token, hop.node, hop.sheet];
+  const failed = names.filter((n, i) => flags[i] === false);
+  const passed = names.filter((n, i) => flags[i] === true);
+
+  if (passed.length) console.log(ok('  通过：') + passed.join(' → '));
+  if (failed.length) {
+    console.log(bad('  未通过：' + failed.join('、')));
+    if (failed.indexOf('解析文档链接') >= 0) {
+      console.log(dim('   解析失败先分清两类原因：'));
+      console.log(dim('     404 InvalidAction.NotFound → 路径写错了（本脚本曾把 queryByUrl 写成 query，就是这类）'));
+      console.log(dim('     403 / Forbidden            → 路径对，但缺权限点或 operatorId 无权访问该文档'));
+    }
+  }
+
+  /* 配置层还没补齐的，单独提示 —— 这是「没开始」，不是「跑挂了」 */
   const blocker = [];
   if (missing(cfg.operatorId)) blocker.push('operatorId 未填（读文档需要「有权访问该文档的人」的 userId）');
   if (missing(cfg.docUrl) && missing(cfg.nodeId)) blocker.push('docUrl / nodeId 未填（还不知道要读哪份文档）');
   if (blocker.length) {
-    console.log(bad('  还不能跑完整的「读一份文档」验证，卡在：'));
+    console.log(bad('\n  还不能跑完整的「读一份文档」验证，卡在：'));
     blocker.forEach(b => console.log('   · ' + b));
+  } else if (failed.length === 0) {
+    console.log(ok('\n  三跳都跑完了 —— 读文档这条链路是通的。'));
   } else {
-    console.log(ok('  三跳都跑完了。'));
+    console.log(bad('\n  配置齐全，但上面有跳没通过，先解决它再谈同步。'));
   }
   console.log(dim('  下一步：按 docs/plan-dingtalk-checklist.md 补齐上面两项，再重跑本脚本。'));
 })();

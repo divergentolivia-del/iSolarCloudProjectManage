@@ -33,7 +33,7 @@ const { compute } = require('./calc');
 /* 配置优先级：命令行参数 > 环境变量 > 默认值
    PORT           监听端口
    DATA_DIR       数据目录（部署时建议指向服务器上的持久化路径）
-   ACCESS_TOKEN   访问口令，设置后所有请求需带 ?token=xxx，留空则不校验 */
+   ACCESS_TOKEN   访问密码，设置后所有请求需带 ?token=xxx，留空则不校验 */
 const PORT = Number(process.argv[2]) || Number(process.env.PORT) || 8770;
 const ROOT = __dirname;
 const DATA_DIR = process.env.DATA_DIR
@@ -41,10 +41,10 @@ const DATA_DIR = process.env.DATA_DIR
   : path.join(ROOT, 'data');
 const ACCESS_TOKEN = (process.env.ACCESS_TOKEN || '').trim();
 
-/* AUTH_REQUIRED=1 时启用真实登录（账号 + 口令 + 会话 Cookie）。
+/* AUTH_REQUIRED=1 时启用真实登录（账号 + 密码 + 会话 Cookie）。
    默认关闭 —— 这样升级到这版代码时，现有部署的行为一字不变，
    不会因为「库里还没有用户」把所有人挡在门外。
-   启用前先确认能登录（首次启动会打印 admin 的随机口令），再打开这个开关。 */
+   启用前先确认能登录（首次启动会打印 admin 的随机密码），再打开这个开关。 */
 const AUTH_REQUIRED = /^(1|true|yes)$/i.test(String(process.env.AUTH_REQUIRED || '').trim());
 
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
@@ -265,9 +265,9 @@ function gate(req, res, url) {
   }
 
   /* auth 模块不走资源门禁：它每个接口内部都做了自身的权限判断
-     （登录/登出/改自己口令只认「当前登录者」，用户管理只认 admin）。
+     （登录/登出/改自己密码只认「当前登录者」，用户管理只认 admin）。
      再叠一层资源门禁反而会拦死正常操作：没有哪个角色持有 auth:write，
-     于是 pm/dev/viewer 连「改自己的口令」都会被这里 403 掉。
+     于是 pm/dev/viewer 连「改自己的密码」都会被这里 403 掉。
      登录门禁（上面 me 为空那一段）对 auth 同样生效。 */
   if (p === '/api/auth' || p.startsWith('/api/auth/')) return false;
 
@@ -321,8 +321,8 @@ const server = http.createServer((req, res) => {
   const u = url.parse(req.url, true);
   const p = u.pathname;
 
-  /* 访问口令校验。ACCESS_TOKEN 为空则跳过。
-     口令可放在 ?token= 或 Cookie 里；命中查询串时写入 Cookie，
+  /* 访问密码校验。ACCESS_TOKEN 为空则跳过。
+     密码可放在 ?token= 或 Cookie 里；命中查询串时写入 Cookie，
      这样同事只需第一次点带 token 的链接，后续刷新无需重复带参。 */
   if (ACCESS_TOKEN) {
     const qs = String(u.query.token || '');
@@ -330,7 +330,7 @@ const server = http.createServer((req, res) => {
     const got = qs || (cookie ? decodeURIComponent(cookie[1]) : '');
     if (got !== ACCESS_TOKEN) {
       res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end('<h3>需要访问口令</h3><p>请使用管理员提供的完整链接访问（含 ?token= 参数）。</p>');
+      res.end('<h3>需要访问密码</h3><p>请使用管理员提供的完整链接访问（含 ?token= 参数）。</p>');
       return;
     }
     if (qs) {
@@ -593,9 +593,9 @@ server.listen(PORT, () => {
     console.log('  审计日志已迁入系统库：' + _auditMig.migrated + ' 条（旧文件改名留档为 audit-log.json.migrated）');
   }
   if (_bootAdmin) {
-    console.log('\n【首次启动】已创建默认管理员，请记下口令并尽快登录修改：');
-    console.log('  账号：' + _bootAdmin.id + '    口令：' + _bootAdmin.password);
-    console.log('  改口令：登录后调用 POST /api/auth/password，或联系管理员重置。');
+    console.log('\n【首次启动】已创建默认管理员，请记下密码并尽快登录修改：');
+    console.log('  账号：' + _bootAdmin.id + '    密码：' + _bootAdmin.password);
+    console.log('  改密码：登录后调用 POST /api/auth/password，或联系管理员重置。');
   }
   if (AUTH_REQUIRED) {
     const n = require('./db').listUsers().length;
@@ -603,17 +603,17 @@ server.listen(PORT, () => {
     if (n === 0) {
       console.log('  ⚠ 库里一个账号都没有，所有人都会进不来。请先去掉 AUTH_REQUIRED 启动，建好账号再启用。');
     }
-    if (ACCESS_TOKEN) console.log('  访问口令与登录同时生效：先过口令，再登账号。');
+    if (ACCESS_TOKEN) console.log('  访问密码与登录同时生效：先过密码，再登账号。');
   } else {
     console.log('\n未启用登录（AUTH_REQUIRED 未设置）。当前任何能访问端口的人都可以读写，');
     console.log('且「谁改的」仍来自浏览器本地存储、可以随意伪造。');
     console.log('确认能登录之后，用 AUTH_REQUIRED=1 启动即可开启真实身份。');
   }
   if (ACCESS_TOKEN) {
-    console.log('\n已启用访问口令。分享给同事的链接需带参数：');
+    console.log('\n已启用访问密码。分享给同事的链接需带参数：');
     ips.forEach(ip => console.log('  http://' + ip + ':' + PORT + '/?token=' + ACCESS_TOKEN));
   } else {
-    console.log('\n注意：未设访问口令（ACCESS_TOKEN 为空），能访问端口的人都可读写。');
+    console.log('\n注意：未设访问密码（ACCESS_TOKEN 为空），能访问端口的人都可读写。');
     console.log('仅适合内网可信网络。如需限制，启动前设置 ACCESS_TOKEN 环境变量。');
   }
 });

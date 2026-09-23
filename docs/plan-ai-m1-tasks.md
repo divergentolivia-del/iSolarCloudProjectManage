@@ -53,7 +53,7 @@ M1 就是把这个链条从根上打断。做完 M1，平台才算「系统」�
 | 行号 | 原写法 | 问题 | 改成 |
 |---|---|---|---|
 | 312 | `1 \| 上数据库 \| fs.writeFileSync 写独立 JSON \| SQLite` | **会误导**。真实理由不是性能，是「查询与留痕」 | `1 \| 系统库（身份/权限/审计） \| 各模块独立 JSON \| SQLite 只接管身份/权限/审计；业务数据仍留 JSON（混合存储）` |
-| 313 | `2 \| 真实登录 \| localStorage 字符串 \| 账号+密码，或钉钉扫码` | 「或」字让范围含糊，钉钉扫码依赖 M2 凭据 | `2 \| 真实登录 \| localStorage 字符串 \| 账号+口令+会话 Cookie（钉钉扫码留到 M2，`users.dingtalk_id` 字段已预留）` |
+| 313 | `2 \| 真实登录 \| localStorage 字符串 \| 账号+密码，或钉钉扫码` | 「或」字让范围含糊，钉钉扫码依赖 M2 凭据 | `2 \| 真实登录 \| localStorage 字符串 \| 账号+密码+会话 Cookie（钉钉扫码留到 M2，`users.dingtalk_id` 字段已预留）` |
 | 314 | `3 \| 权限矩阵 \| 全平台一个 ACCESS_TOKEN \| 角色 = PM / 研发 / 只读` | 角色名对不上代码 | `3 \| 权限矩阵 \| 全平台一个 ACCESS_TOKEN \| 角色 = admin / pm / dev / viewer，`permissions` 表 role×resource 判定` |
 | 316 | `5 \| 审计加厚 \| 全量重写 + 只留 200 条 \| 追加写 + 长期留存 + 按人/模块可查` | **已经做完了**，还挂在 M1 待办里 | 挪到「已完成」，或标注 ✅ |
 | 317 | `6 \| 脱敏规范发布` | 这是文档活，不阻塞 M1 代码 | 保留，但标注「不阻塞 M1 验收」 |
@@ -156,16 +156,16 @@ auth 模块→db.js，db 模块顶层读 env，晚设就绑到项目真实 data/
    **必须带日期**，保留最近 N 份。注意 `platform.db` 开了 WAL，
    备份要么用 `VACUUM INTO`，要么停服后拷——**别直接 `cp` 正在写的 WAL 库**。
 3. **运行手册**（`docs/runbook.md`）：至少覆盖
-   - 怎么首次启动、去哪找 admin 口令（**只打印一次**，见第 5 节）
-   - 忘了 admin 口令怎么重置
+   - 怎么首次启动、去哪找 admin 密码（**只打印一次**，见第 5 节）
+   - 忘了 admin 密码怎么重置
    - 怎么加人、改角色、停用人
    - `data/platform.db` 损坏了怎么办（重建 + 审计日志不可恢复，要写清楚）
    - 端口被占用怎么换
-4. **`ACCESS_TOKEN` 与 `AUTH_REQUIRED` 的关系写清楚**：两者同时开时是「先过口令，再登账号」双层。
+4. **`ACCESS_TOKEN` 与 `AUTH_REQUIRED` 的关系写清楚**：两者同时开时是「先过密码，再登账号」双层。
 
 【完成记录 2026-09-20】交付物：`start.bat`/`start.sh`（启动）、`backup-data.bat`/`backup.sh`/`backup.js`
 （备份：先 `PRAGMA wal_checkpoint(TRUNCATE)` 合并 WAL 再整目录复制，自带日期、保留最近 30 份）、
-`docs/ops-manual.md`（手册，含口令重置/权限矩阵/备份恢复/库核查/FAQ/部署检查清单；工单里写的
+`docs/ops-manual.md`（手册，含密码重置/权限矩阵/备份恢复/库核查/FAQ/部署检查清单；工单里写的
 runbook.md 已合并进 ops-manual.md，避免两本手册）。
 备份脚本已实测（WAL 合并 + 复制成功），但验收有一个前置：data/ 下有一个嵌套遗留目录
 `data\backups\pre-m1-step34-20260920-2102`（2026-09-20 21:02 一次误操作的递归备份产物，
@@ -223,14 +223,14 @@ runbook.md 已合并进 ops-manual.md，避免两本手册）。
 **系统库（`db.js`）**
 - 选型 `node:sqlite`（Node v24 内置，零依赖、免原生编译）。启动会有 `ExperimentalWarning`，**正常噪音，别去消除它**。
 - 5 张表：`users` / `sessions` / `audit_log` / `permissions` / `meta`
-- 口令用 `scrypt` + 随机盐 + `timingSafeEqual` 比对
+- 密码用 `scrypt` + 随机盐 + `timingSafeEqual` 比对
 - **所有 SQL 都收敛在 `db.js` 内**。将来若要换 `better-sqlite3`，只改这一个文件。
 - 已从旧 `audit-log.json` 迁移 200 条历史记录（**顺序已验证正确**，见第 5 节坑 #9）
 
 **身份（`modules/auth/routes.js`）**
-- 端点：登录 / 登出 / `me` / 改口令 / 用户列表 / 建用户 / 改角色 / 启用停用 / 重置口令 / 查权限
+- 端点：登录 / 登出 / `me` / 改密码 / 用户列表 / 建用户 / 改角色 / 启用停用 / 重置密码 / 查权限
 - 会话 Cookie `wb_session`，30 天，`HttpOnly; SameSite=Lax`
-- 登录失败**统一**回「账号或口令不正确」——不透露账号是否存在
+- 登录失败**统一**回「账号或密码不正确」——不透露账号是否存在
 - 导出 `currentUser(req)` / `can(user, resource)` 供 `server.js` 复用
 
 **门禁（`server.js`）**
@@ -315,7 +315,7 @@ runbook.md 已合并进 ops-manual.md，避免两本手册）。
 
 ```
 当前分支：main
-最新提交：18f0bd0  feat(auth): M1 步骤2 —— 真登录（账号/口令/会话）+ 服务端权限门禁
+最新提交：18f0bd0  feat(auth): M1 步骤2 —— 真登录（账号/密码/会话）+ 服务端权限门禁
 远程：    origin/main（是的，main 是要推到远端的）
 ```
 
@@ -344,7 +344,7 @@ git status --short          # 应该能看到 data/iteration/state.json 是 M（
 | 文件 | 为什么 | 状态 |
 |---|---|---|
 | `data/iteration/state.json` | **含有真实工时数据** | **已被 git 跟踪**，所以最危险 |
-| `data/platform.db` | 含口令哈希 + 审计记录 | 已在 `.gitignore` |
+| `data/platform.db` | 含密码哈希 + 审计记录 | 已在 `.gitignore` |
 | `data/**/secret.json` | 钉钉 / TB 的 API 凭据 | 已在 `.gitignore` |
 
 ### 7.2 因此：**永远不要执行 `git add .`**

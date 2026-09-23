@@ -3,7 +3,7 @@
 
    覆盖点：
    1) 建表 + 默认权限种子
-   2) 用户 CRUD、口令哈希与校验
+   2) 用户 CRUD、密码哈希与校验
    3) 会话签发/校验/过期/注销
    4) 权限判定（admin 放行、默认拒绝）
    5) 审计追加写不截断、按条件查询
@@ -42,7 +42,7 @@ test('建表与默认权限种子', () => {
   assert.strictEqual(db.listPermissions('admin').length, 0);
 });
 
-test('用户 CRUD 与口令哈希', () => {
+test('用户 CRUD 与密码哈希', () => {
   fresh();
   const u = db.createUser({ id: 'zhang', name: '张三', password: 'pw123456', role: 'pm' });
   assert.strictEqual(u.role, 'pm');

@@ -35,7 +35,7 @@ data/dingtalk/secret.json
 data/dingtalk/state.json
 data/dingtalk/token.json
 
-# 登录配置（含初始口令规则，不入库）
+# 登录配置（含初始密码规则，不入库）
 data/auth-config.json
 
 # 员工名单（含工号/姓名，不入库）
@@ -47,7 +47,7 @@ data/platform.db-wal
 data/platform.db-shm
 data/platform.db.bak
 
-# 备份目录（含口令哈希与审计，不入 git）
+# 备份目录（含密码哈希与审计，不入 git）
 backups/
 
 # PR adapter（本地仓库配置含机器路径，运行快照不入库）

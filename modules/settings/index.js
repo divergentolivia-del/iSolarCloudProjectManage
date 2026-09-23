@@ -33,10 +33,10 @@ const SettingsModule = (() => {
         <h2 class="page-title">系统设置</h2>
 
         <div class="settings-section">
-          <!-- 账号：口令改这里、退出登录也在这里。
-               2026-09-22 之前全平台没有任何改口令界面，而顶部提示条的
-               「去修改口令」正是指向本页 —— 点了没反应，于是所有人都停在
-               批量建号的初始口令上（同批次规则相同，可被同事猜中）。 -->
+          <!-- 账号：密码改这里、退出登录也在这里。
+               2026-09-22 之前全平台没有任何改密码界面，而顶部提示条的
+               「去修改密码」正是指向本页 —— 点了没反应，于是所有人都停在
+               批量建号的初始密码上（同批次规则相同，可被同事猜中）。 -->
           <div class="form-group">
             <label class="form-label">当前账号</label>
             <div class="form-control">
@@ -44,24 +44,24 @@ const SettingsModule = (() => {
             </div>
           </div>
           <div class="form-group">
-            <label class="form-label">口令</label>
+            <label class="form-label">密码</label>
             <div class="form-control">
-              <button class="btn" id="acctChangePwd">修改口令</button>
+              <button class="btn" id="acctChangePwd">修改密码</button>
               <button class="btn danger" id="acctLogout">退出登录</button>
             </div>
           </div>
         </div>
 
-        <!-- 改口令表单：默认收起，点「修改口令」才展开 -->
+        <!-- 改密码表单：默认收起，点「修改密码」才展开 -->
         <div class="settings-section" id="acctPwdForm" style="display:none">
           <div class="form-group">
-            <label class="form-label">原口令</label>
+            <label class="form-label">原密码</label>
             <div class="form-control">
               <input type="password" id="acctOldPwd" class="settings-input" autocomplete="current-password" style="text-align:left">
             </div>
           </div>
           <div class="form-group">
-            <label class="form-label">新口令</label>
+            <label class="form-label">新密码</label>
             <div class="form-control">
               <input type="password" id="acctNewPwd" class="settings-input" autocomplete="new-password" style="text-align:left">
             </div>
@@ -215,9 +215,9 @@ const SettingsModule = (() => {
     }
   }
 
-  /* ---------- 账号：改口令 / 退出登录 ---------- */
+  /* ---------- 账号：改密码 / 退出登录 ---------- */
 
-  /** 账号区：填当前账号名、绑「修改口令」「退出登录」 */
+  /** 账号区：填当前账号名、绑「修改密码」「退出登录」 */
   function loadAccountSection() {
     const who = document.getElementById('acctWho');
     const u = (typeof Platform !== 'undefined' && Platform.currentUser) ? Platform.currentUser() : null;
@@ -244,22 +244,24 @@ const SettingsModule = (() => {
     const el = document.getElementById('acctPwdMsg');
     if (!el) return;
     el.textContent = text || '';
-    el.style.color = kind === 'ok' ? 'var(--ok)' : 'var(--danger)';
+    /* 主题里根本没有 --danger 这个变量（只有 --warn），写成 --danger 是静默失效：
+       style.color 拿到空值，文字保持原色，报错看起来像成功了。 */
+    el.style.color = kind === 'ok' ? 'var(--ok)' : 'var(--warn)';
   }
 
   /**
-   * 提交改口令。
+   * 提交改密码。
    * 前端只做「两次输入是否一致」这类能立刻判断的校验；
-   * 原口令对不对、新口令够不够长，一律以服务端返回为准 —— 规则只有一处，不在这边复刻。
+   * 原密码对不对、新密码够不够长，一律以服务端返回为准 —— 规则只有一处，不在这边复刻。
    */
   function submitPasswordChange() {
     const oldPwd = (document.getElementById('acctOldPwd') || {}).value || '';
     const np = (document.getElementById('acctNewPwd') || {}).value || '';
     const np2 = (document.getElementById('acctNewPwd2') || {}).value || '';
 
-    if (!oldPwd) return pwdMsg('请填写原口令');
-    if (!np) return pwdMsg('请填写新口令');
-    if (np !== np2) return pwdMsg('两次输入的新口令不一致');
+    if (!oldPwd) return pwdMsg('请填写原密码');
+    if (!np) return pwdMsg('请填写新密码');
+    if (np !== np2) return pwdMsg('两次输入的新密码不一致');
 
     pwdMsg('提交中…', 'ok');
     fetch('/api/auth/password', {
@@ -277,17 +279,17 @@ const SettingsModule = (() => {
         });
         const form = document.getElementById('acctPwdForm');
         if (form) form.style.display = 'none';
-        /* 改完立刻刷新身份：服务端已经把「初始口令」标记清掉了，
+        /* 改完立刻刷新身份：服务端已经把「初始密码」标记清掉了，
            顶部那条提示条应该当场消失，而不是等下次刷新。 */
         if (typeof Platform !== 'undefined' && Platform.refreshIdentity) {
           Platform.refreshIdentity().then(function () {
-            SharedUI.toast('口令已修改', 'success');
+            SharedUI.toast('密码已修改', 'success');
           });
         } else {
-          SharedUI.toast('口令已修改', 'success');
+          SharedUI.toast('密码已修改', 'success');
         }
       })
-      .catch(function () { pwdMsg('网络异常，口令未修改'); });
+      .catch(function () { pwdMsg('网络异常，密码未修改'); });
   }
 
   /** 退出登录：服务端销毁会话并清 Cookie，然后回登录页 */

@@ -107,7 +107,7 @@ async function testGate() {
 
   /* 登录 */
   r = await req('POST', '/api/auth/login', { id: 'pm', password: 'wrong-pass' });
-  ck('错误口令 → 401', r.code === 401, r.code);
+  ck('错误密码 → 401', r.code === 401, r.code);
   r = await req('POST', '/api/auth/login', { id: 'dev', password: 'dev-pass-123' });
   const devCookie = r.cookie;
   ck('dev 登录成功并种 HttpOnly Cookie', r.code === 200 && !!devCookie && /HttpOnly/i.test(r.setCookieRaw || ''), r.body);
@@ -148,15 +148,15 @@ async function testThrottle() {
   for (let i = 1; i <= 4; i++) {
     last = await req('POST', '/api/auth/login', { id: 'lockme', password: 'nope-' + i });
   }
-  ck('连错 4 次仍是普通 401（还没到阈值）', last.code === 401 && /账号或口令不正确/.test(last.body.error || ''), last);
+  ck('连错 4 次仍是普通 401（还没到阈值）', last.code === 401 && /账号或密码不正确/.test(last.body.error || ''), last);
 
   /* 第 5 次错：触发锁定，必须换文案 */
   last = await req('POST', '/api/auth/login', { id: 'lockme', password: 'nope-5' });
   ck('第 5 次错 → 429 且明说「临时锁定」', last.code === 429 && /锁定/.test(last.body.error || ''), last);
 
-  /* 锁定期内，即使口令正确也进不来 —— 否则锁形同虚设 */
+  /* 锁定期内，即使密码正确也进不来 —— 否则锁形同虚设 */
   const afterLock = await req('POST', '/api/auth/login', { id: 'lockme', password: 'lock-pass-123' });
-  ck('锁定期内正确口令也进不来（429）', afterLock.code === 429, afterLock.code);
+  ck('锁定期内正确密码也进不来（429）', afterLock.code === 429, afterLock.code);
 
   /* 换个没试过的账号不受影响 —— 锁的粒度是账号，不是一刀切 */
   const other = await req('POST', '/api/auth/login', { id: 'dev', password: 'dev-pass-123' });

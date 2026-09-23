@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 /* user-cli.js — 账号维护 CLI（服务未启动时使用）
 
-   为什么需要它：db.js 只在「库里一个账号都没有」时建默认管理员，并把随机口令打印在启动日志里；
-   该口令取过一次就清空（takeInitialAdmin），之后控制台再也不会显示。
-   于是库里已有账号、又没记下口令的机器，从页面上是无路可进的 —— 只能由运维在终端重置。
+   为什么需要它：db.js 只在「库里一个账号都没有」时建默认管理员，并把随机密码打印在启动日志里；
+   该密码取过一次就清空（takeInitialAdmin），之后控制台再也不会显示。
+   于是库里已有账号、又没记下密码的机器，从页面上是无路可进的 —— 只能由运维在终端重置。
 
    用法:
      node user-cli.js list                          → 列出全部账号
-     node user-cli.js pass <账号> <新口令>            → 重置指定账号口令
-     node user-cli.js pass admin                    → 随机生成一个 12 位口令并打印
+     node user-cli.js pass <账号> <新密码>            → 重置指定账号密码
+     node user-cli.js pass admin                    → 随机生成一个 12 位密码并打印
      node user-cli.js role <账号> <角色>              → 改角色（admin/pm/dev/viewer）
-     node user-cli.js add  <账号> <姓名> <角色> <口令>  → 新建账号
+     node user-cli.js add  <账号> <姓名> <角色> <密码>  → 新建账号
 
    注意：本脚本直接读写平台数据库，请先停掉服务再执行，避免写入竞争。
 */
@@ -59,14 +59,14 @@ function main() {
     const id = args[0];
     if (!id) return usage(1);
     if (!db.findUser(id)) return fail('账号不存在：' + id);
-    /* 未给口令则随机生成。用 base64url 去掉易混淆字符后截 12 位，足够强且能对着屏幕手抄。 */
+    /* 未给密码则随机生成。用 base64url 去掉易混淆字符后截 12 位，足够强且能对着屏幕手抄。 */
     const pwd = args[1] || crypto.randomBytes(16).toString('base64url').replace(/[-_]/g, '').slice(0, 12);
-    if (pwd.length < 6) return fail('口令太短，至少 6 位。');
+    if (pwd.length < 6) return fail('密码太短，至少 6 位。');
     db.setPassword(id, pwd);
-    console.log('\n已重置口令：');
+    console.log('\n已重置密码：');
     console.log('  账号：' + id);
-    console.log('  口令：' + pwd);
-    console.log('\n请登录后立即通过「修改口令」改成自己的，并妥善保存。');
+    console.log('  密码：' + pwd);
+    console.log('\n请登录后立即通过「修改密码」改成自己的，并妥善保存。');
     return;
   }
 
@@ -89,7 +89,7 @@ function main() {
     db.createUser({ id, name, role, password });
     console.log('\n已新建账号：');
     console.log('  账号：' + id + '   姓名：' + name + '   角色：' + role);
-    console.log('  口令：' + password);
+    console.log('  密码：' + password);
     return;
   }
 

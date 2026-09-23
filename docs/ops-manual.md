@@ -21,25 +21,25 @@
 | `PORT` | 8770 | 监听端口（也可用命令行第 1 个参数） |
 | `DATA_DIR` | 项目目录 `data/` | 数据根目录，部署时建议指向持久化路径 |
 | `AUTH_REQUIRED` | 关 | `1` 启用真实登录。**升级当天先关着启动确认一切正常，再开** |
-| `ACCESS_TOKEN` | 空 | 旧版口令门禁（整站级），与登录并存：先过口令再过登录 |
+| `ACCESS_TOKEN` | 空 | 旧版密码门禁（整站级），与登录并存：先过密码再过登录 |
 | `DB_FILE` | platform.db | 系统库文件名（一般不用改） |
 
 **首次启用登录的流程（重要）：**
 
 1. 确认数据已备份（见第 3 节）。
 2. 不设 `AUTH_REQUIRED` 启动，确认页面正常。
-3. 设 `AUTH_REQUIRED=1` 再启动。若系统库里还没有 admin，启动日志会打印**一次性随机口令**：
-   `首次建库：默认管理员 admin，随机口令 xxxx，登录后请立即修改`。
+3. 设 `AUTH_REQUIRED=1` 再启动。若系统库里还没有 admin，启动日志会打印**一次性随机密码**：
+   `首次建库：默认管理员 admin，随机密码 xxxx，登录后请立即修改`。
    记下来，登录一次改掉。
-4. 如果日志没打印（admin 已存在），用现有 admin 登录；忘了就走第 2 节"重置口令"。
+4. 如果日志没打印（admin 已存在），用现有 admin 登录；忘了就走第 2 节"重置密码"。
 
 ---
 
-## 2. 账号与口令
+## 2. 账号与密码
 
 ### 2.1 日常操作（走界面）
 
-登录页登录后，admin 可在界面里管理用户：建账号、改角色（admin/pm/dev/viewer）、停用、改自己的口令。
+登录页登录后，admin 可在界面里管理用户：建账号、改角色（admin/pm/dev/viewer）、停用、改自己的密码。
 
 ### 2.2 命令行操作（界面进不去时）
 
@@ -49,7 +49,7 @@
 rem 查看所有用户
 node -e "const d=require('./db'); console.table(d.listUsers())"
 
-rem 重置某账号口令（例如把 pm 重置为 NewPass@123）
+rem 重置某账号密码（例如把 pm 重置为 NewPass@123）
 node -e "require('./db').setPassword('pm','NewPass@123'); console.log('已重置')"
 
 rem 改某账号角色
@@ -65,13 +65,13 @@ rem 查看当前角色权限矩阵
 node -e "const d=require('./db'); ['pm','dev','viewer'].forEach(r=>console.log(r+':', d.listPermissions(r).map(x=>x.resource).join(', ')))"
 ```
 
-> 口令哈希用 scrypt + 加盐，库里不存明文。口令建议 ≥10 位、含大小写和符号。
+> 密码哈希用 scrypt + 加盐，库里不存明文。密码建议 ≥10 位、含大小写和符号。
 
 ### 2.3 批量建号（几百人规模用）
 
 > 完整方案见 [`plan-dingtalk-sso.md`](./plan-dingtalk-sso.md)。这里只讲怎么用。
 
-**适用场景**：部门几百人一次性开号，账号 = 工号，口令 = 姓名缩写 + 固定后缀。
+**适用场景**：部门几百人一次性开号，账号 = 工号，密码 = 姓名缩写 + 固定后缀。
 
 **前置**：先**停掉服务**（避免 SQLite 写竞争），再执行：
 
@@ -86,20 +86,20 @@ node user-import.js docs/samples/员工名单.csv
 **名单格式**（CSV，首行表头，UTF-8，放 `docs/samples/员工名单.csv`，**已 gitignore**）：
 
 ```
-工号,姓名,口令前缀[,角色]
+工号,姓名,密码前缀[,角色]
 10017xxx,张三,zs
 10018xxx,李四,ls,pm
 ```
 
-- `口令前缀`：姓名缩写，**由 Excel 公式或人工生成好**（程序不做拼音转换，避免引入依赖和多音字出错）
+- `密码前缀`：姓名缩写，**由 Excel 公式或人工生成好**（程序不做拼音转换，避免引入依赖和多音字出错）
 - `角色`列可选，缺省 `viewer`。**建议只给 PMO 的人写 `pm`，其余一律留空**
-- **重复导入安全**：已存在的工号会跳过，**不覆盖其口令和角色**
+- **重复导入安全**：已存在的工号会跳过，**不覆盖其密码和角色**
 
-**初始口令提示**：用初始口令登录后，页面顶部会出现可关闭的提醒横幅（不强制改密，见方案 D3）。用户改密后自动消失。
+**初始密码提示**：用初始密码登录后，页面顶部会出现可关闭的提醒横幅（不强制改密，见方案 D3）。用户改密后自动消失。
 
-### 2.4 初始口令规则与提示
+### 2.4 初始密码规则与提示
 
-**口令从哪来**：批量建号时按「姓名缩写 + 固定后缀」拼出来（如 `zs2026`）。
+**密码从哪来**：批量建号时按「姓名缩写 + 固定后缀」拼出来（如 `zs2026`）。
 
 **规则配在哪**：`data/auth-config.json`（**已 gitignore，不进 git**）。改完**重启服务**生效；批量建号脚本 `user-import.js` 也读这个文件，所以**先改配置再导名单**。
 
@@ -113,7 +113,7 @@ node user-import.js docs/samples/员工名单.csv
 
 | 字段 | 说明 |
 |---|---|
-| `defaultPasswordSuffix` | 后缀。**每年换一次**，避免跨年入职的人撞口令 |
+| `defaultPasswordSuffix` | 后缀。**每年换一次**，避免跨年入职的人撞密码 |
 | `defaultPasswordMode` | 目前只实现了 `initials+suffix`，填别的会直接报错退出 |
 | `forceChangeOnFirstLogin` | 当前只做「提示不强制」。置 `true` 也不会拦登录，别指望它当强制手段 |
 
@@ -121,12 +121,12 @@ node user-import.js docs/samples/员工名单.csv
 
 **提示条逻辑**（用户视角）：
 
-- 登录时服务端返回 `isInitialPwd`，为真则顶部出现横幅「你还在使用初始口令」
+- 登录时服务端返回 `isInitialPwd`，为真则顶部出现横幅「你还在使用初始密码」
 - 点「×」关闭后，**本次登录会话不再出现**（存 `sessionStorage`）；下次登录还会提醒
-- 用户改过口令后 `pwd_is_initial` 置 0，横幅**永久消失**
+- 用户改过密码后 `pwd_is_initial` 置 0，横幅**永久消失**
 - 未启用登录（不设 `AUTH_REQUIRED`）时不显示 —— 那种模式没有账号概念
 
-**为什么值得提示**：同批次口令规则相同，知道规则的人能猜出同事的口令。横幅的目的是把人烦到去改，不是拦人。
+**为什么值得提示**：同批次密码规则相同，知道规则的人能猜出同事的密码。横幅的目的是把人烦到去改，不是拦人。
 
 ### 2.5 权限矩阵（默认值）
 
@@ -177,7 +177,7 @@ set BACKUP_DIR=E:\pm-backups && backup-data.bat
 | `plan/`、`project/`、`budget/`、`csenergy/`、`token/`、`tb/`、`dashboard/`、`archive/` | 各模块 state + history 快照 |
 | `history/` | 根级历史快照 |
 
-> `secret.json`（TB/钉钉凭据）**不入库**（.gitignore 已挡），但**在备份目录里**——备份目录的权限比 git 仓库更值得管住（含口令哈希和审计）。
+> `secret.json`（TB/钉钉凭据）**不入库**（.gitignore 已挡），但**在备份目录里**——备份目录的权限比 git 仓库更值得管住（含密码哈希和审计）。
 
 ---
 
@@ -211,7 +211,7 @@ node -e "const d=require('./db'); d.open(); console.table(d.get().prepare('SELEC
 | 启动日志刷 `ExperimentalWarning: SQLite` | 正常现象（node:sqlite 尚标记 experimental），不影响使用 |
 | 页面一直转圈 | 看 server 日志；若 `state.json 解析失败`，服务端会自动回退最近快照（日志有提示） |
 | 有人反馈"我登录的是别人" | 不应再发生（身份只认服务端会话 Cookie，不再信 localStorage）；若发生，查该请求的审计记录里 `user_id` |
-| 忘了 admin 口令 | 第 2.2 节 `setPassword` 重置；重置前建议先备份 |
+| 忘了 admin 密码 | 第 2.2 节 `setPassword` 重置；重置前建议先备份 |
 | 想回退到"无登录"模式 | 去掉 `AUTH_REQUIRED=1` 重启即可，数据不受影响 |
 | `data/platform.db` 损坏 | 用最近备份恢复；或删库重建（`setPassword`/`createUser` 重建账号，审计不可恢复） |
 

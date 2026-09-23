@@ -36,7 +36,7 @@
 | plan | 项目计划 / WBS / 里程碑 / 资源 / 甘特 / 高管视图（AI 入口预留） |
 | project / budget / csenergy / token / dashboard / tb | 项目跟踪 / 预算 / 项目线 / 令牌 / 跨模块聚合 / TB 同步 |
 
-平台骨架：`server.js` + `module-loader.js`（模块自动发现）+ `router.js` + `platform.js`。**模块化架构、SSE 实时协同、乐观锁（409）、审计日志、访问口令已具备。**
+平台骨架：`server.js` + `module-loader.js`（模块自动发现）+ `router.js` + `platform.js`。**模块化架构、SSE 实时协同、乐观锁（409）、审计日志、访问密码已具备。**
 
 ### 2.2 地基四个硬缺口（M1 必须解决）
 
@@ -44,7 +44,7 @@
 |---|---|---|---|
 | 1 | 没有真正的数据库 | 各模块 `fs.writeFileSync` 写独立 JSON | 无法按人/按条件查询；无法追加写与长期留存；并发写靠乐观锁硬扛（乐观锁只解决并发，不解决身份） |
 | 2 | 身份是假的 | `platform.js` `whoami()` 读浏览器 localStorage 字符串 | 任何人改 localStorage 就是别人，所有"谁改的"记录不可信 |
-| 3 | 权限只有口令/无口令 | 全平台一个 `ACCESS_TOKEN` | 无法表达"PM 能改计划、研发只能看" |
+| 3 | 权限只有密码/无密码 | 全平台一个 `ACCESS_TOKEN` | 无法表达"PM 能改计划、研发只能看" |
 | 4 | 审计日志会丢 | `audit.js` 全量重写且只保留最近 200 条 | 无法支撑 Harness 审计层长期留存 |
 
 > **缺口 1 的「数据量大全量读写」不是换数据库的理由。** 实测 280KB 的 `state.json`
@@ -319,7 +319,7 @@ TB OpenAPI 拉取 + Webhook 订阅 + 每日全量对账。迭代工时与偏差�
 | # | 任务 | 现状 | 目标 | 状态 |
 |---|---|---|---|---|
 | 1 | 系统库（身份/权限/审计） | 各模块 `fs.writeFileSync` 写独立 JSON | SQLite **只接管身份/权限/审计**；业务数据仍留 JSON（混合存储） | ✅ 完成 |
-| 2 | 真实登录 | localStorage 字符串 | 账号+口令+会话 Cookie（钉钉扫码留到 M2，`users.dingtalk_id` 已预留） | ✅ 完成 |
+| 2 | 真实登录 | localStorage 字符串 | 账号+密码+会话 Cookie（钉钉扫码留到 M2，`users.dingtalk_id` 已预留） | ✅ 完成 |
 | 3 | 权限矩阵 | 全平台一个 ACCESS_TOKEN | 角色 `admin`/`pm`/`dev`/`viewer`，`permissions` 表按 role×resource 判定 | ✅ 完成（模块自声明 resource，新增模块零改动） |
 | 4 | 部署 | 仅本机 `node server.js` | 内网服务器 + 启动脚本 + 备份 + 数据持久化路径 + 运行手册 | ✅ 完成（`start.bat`/`start.sh`/`backup*.js`/`ops-manual.md`，备份实测 463 文件 38MB） |
 | 5 | 审计加厚 | 全量重写 + 只留 200 条 | 追加写 + 长期留存 + 按人/模块可查 | ✅ 完成 |

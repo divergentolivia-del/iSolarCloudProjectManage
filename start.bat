@@ -9,7 +9,7 @@ rem
 rem  启用真实登录（M1 验收后建议启用）：
 rem    set AUTH_REQUIRED=1
 rem    start.bat
-rem  首次启用登录前，请先看启动日志里打印的 admin 一次性口令，
+rem  首次启用登录前，请先看启动日志里打印的 admin 一次性密码，
 rem  或确认已能登录，再打开该开关。详见 docs/ops-manual.md。
 rem
 rem  ⚠ 在 PowerShell 里不要用上面两句：PowerShell 不认 set，会当成
@@ -19,7 +19,7 @@ rem
 rem  几百人开号：先停服务，再干跑一遍确认名单没问题：
 rem    node user-import.js --dry-run docs/samples/员工名单.csv
 rem    node user-import.js docs/samples/员工名单.csv
-rem  口令规则在 data/auth-config.json 里改（已 gitignore），改完重启生效。
+rem  密码规则在 data/auth-config.json 里改（已 gitignore），改完重启生效。
 rem ============================================================
 setlocal
 cd /d %~dp0

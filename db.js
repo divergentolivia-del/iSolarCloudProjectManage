@@ -23,7 +23,7 @@ const DATA_DIR = process.env.DATA_DIR
 const DB_FILE = path.join(DATA_DIR, process.env.DB_FILE || 'platform.db');
 
 let db = null;
-let initialAdmin = null;   // 首次建库时生成的默认管理员（含一次性明文口令），仅供启动日志使用
+let initialAdmin = null;   // 首次建库时生成的默认管理员（含一次性明文密码），仅供启动日志使用
 
 /* ---------- 建表 ---------- */
 
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT,                      -- scrypt 加盐哈希；纯钉钉登录的用户可为空
   role          TEXT NOT NULL DEFAULT 'viewer',
   enabled       INTEGER NOT NULL DEFAULT 1,
-  pwd_is_initial INTEGER NOT NULL DEFAULT 0, -- 1 = 还在用批量建号发的初始口令（前端提示可改，不强制）
+  pwd_is_initial INTEGER NOT NULL DEFAULT 0, -- 1 = 还在用批量建号发的初始密码（前端提示可改，不强制）
   created_at    TEXT,
   updated_at    TEXT
 );
@@ -115,7 +115,7 @@ function migrate() {
   const cols = get().prepare('PRAGMA table_info(users)').all().map(c => c.name);
   if (!cols.includes('pwd_is_initial')) {
     get().exec('ALTER TABLE users ADD COLUMN pwd_is_initial INTEGER NOT NULL DEFAULT 0');
-    console.log('[db] 已为 users 表补列 pwd_is_initial（初始口令标记）');
+    console.log('[db] 已为 users 表补列 pwd_is_initial（初始密码标记）');
   }
 }
 
@@ -158,12 +158,12 @@ function seedPermissions() {
   });
 }
 
-/* 首次启动时建一个默认管理员，口令打印在控制台，强制首次登录后修改 */
+/* 首次启动时建一个默认管理员，密码打印在控制台，强制首次登录后修改 */
 function seedDefaults() {
   const n = get().prepare('SELECT COUNT(*) AS n FROM users').get().n;
   if (n > 0) return null;
 
-  const pwd = crypto.randomBytes(6).toString('base64url');   // 8 位随机口令
+  const pwd = crypto.randomBytes(6).toString('base64url');   // 8 位随机密码
   const now = new Date().toISOString();
   get().prepare(
     'INSERT INTO users(id, name, password_hash, role, enabled, created_at, updated_at) VALUES(?,?,?,?,1,?,?)'
@@ -173,14 +173,14 @@ function seedDefaults() {
   return initialAdmin;
 }
 
-/** 取首次建库时生成的默认管理员口令，取过就没了（避免口令反复出现在日志里） */
+/** 取首次建库时生成的默认管理员密码，取过就没了（避免密码反复出现在日志里） */
 function takeInitialAdmin() {
   const r = initialAdmin;
   initialAdmin = null;
   return r;
 }
 
-/* ---------- 口令哈希（scrypt 加盐）---------- */
+/* ---------- 密码哈希（scrypt 加盐）---------- */
 
 function hashPassword(plain) {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -188,7 +188,7 @@ function hashPassword(plain) {
   return 'scrypt$' + salt + '$' + hash;
 }
 
-/** 校验口令。用 timingSafeEqual 防时序侧信道。 */
+/** 校验密码。用 timingSafeEqual 防时序侧信道。 */
 function verifyPassword(plain, stored) {
   try {
     const parts = String(stored || '').split('$');
@@ -222,7 +222,7 @@ function createUser({ id, name, password, role, dingtalkId, initialPassword }) {
   return findUser(id);
 }
 
-/** 改口令。默认清掉「初始口令」标记——用户自己改过就不该再提示。 */
+/** 改密码。默认清掉「初始密码」标记——用户自己改过就不该再提示。 */
 function setPassword(id, plain, opts) {
   const keepInitial = !!(opts && opts.keepInitial);
   get().prepare('UPDATE users SET password_hash = ?, pwd_is_initial = ?, updated_at = ? WHERE id = ?')

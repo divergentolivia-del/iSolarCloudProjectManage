@@ -3,10 +3,10 @@
    浏览器只拿一个不透明的 token 放在 HttpOnly Cookie 里。
 
    端点：
-     POST /api/auth/login    {账号, 口令}          → 种 Cookie，返回用户信息
+     POST /api/auth/login    {账号, 密码}          → 种 Cookie，返回用户信息
      POST /api/auth/logout                          → 清 Cookie + 删会话
      GET  /api/auth/me                              → 当前用户（未登录返回 {user:null}）
-     POST /api/auth/password {旧口令, 新口令}       → 改自己的口令
+     POST /api/auth/password {旧密码, 新密码}       → 改自己的密码
      GET  /api/auth/users                           → 用户列表（仅 admin）
      POST /api/auth/users    {id,name,role,password}→ 建用户（仅 admin）
      POST /api/auth/users/role    {id, role}        → 改角色（仅 admin）
@@ -86,9 +86,9 @@ function can(user, resource) {
 
 /* ---------- 登录节流（纯内存，不落库） ----------
 
-   为什么要有：批量建号的初始口令是【同一批次规则相同】的，而登录接口原本
+   为什么要有：批量建号的初始密码是【同一批次规则相同】的，而登录接口原本
    无限次可试。scryptSync 单次 69ms（实测），单核约 14.5 次/秒 —— 6 位纯数字
-   口令单核跑 19 小时就能撞开，成本太低。
+   密码单核跑 19 小时就能撞开，成本太低。
 
    为什么放内存而不是 SQLite 表：
      1. 这是瞬时限流，不是业务数据，重启即清空是可以接受的（甚至更好：重启后
@@ -167,9 +167,9 @@ async function handle(req, res, url) {
     const b = await readBody(req);
     const id = String(b.id || b.name || '').trim();
     const pwd = String(b.password || '');
-    if (!id || !pwd) return sendJson(res, 400, { error: '请填写账号和口令' });
+    if (!id || !pwd) return sendJson(res, 400, { error: '请填写账号和密码' });
 
-    /* 节流先于任何查库/验口令的动作 —— 被锁时一个字符都不该再算 */
+    /* 节流先于任何查库/验密码的动作 —— 被锁时一个字符都不该再算 */
     const left = lockRemaining(id);
     if (left > 0) {
       return sendJson(res, 429, {
@@ -181,21 +181,21 @@ async function handle(req, res, url) {
     }
 
     const u = db.findUser(id);
-    /* 用户不存在 / 口令错 / 被停用，统一回同一句话，不泄露哪个环节错 */
+    /* 用户不存在 / 密码错 / 被停用，统一回同一句话，不泄露哪个环节错 */
     if (!u || !u.enabled || !db.verifyPassword(pwd, u.password_hash)) {
       recordFail(id);
       /* 这一次失败刚好触发了锁定 —— 必须明说「等一会」，不能照旧回
-         「账号或口令不正确」。否则用户以为自己记错了口令，会在这个 60 秒
+         「账号或密码不正确」。否则用户以为自己记错了密码，会在这个 60 秒
          里反复重试，每次都撞在同一堵墙上，只会更困惑。
          这不算账号枚举：走到这一句的人，必然是已经把这个 id 试错过 5 次的人，
          而在此之前任何 id 的返回都是一模一样的。 */
       const nowLeft = lockRemaining(id);
       if (nowLeft > 0) {
         return sendJson(res, 429, {
-          error: '口令连续输错，账号已临时锁定，请 ' + Math.ceil(nowLeft / 60000) + ' 分钟后再试'
+          error: '密码连续输错，账号已临时锁定，请 ' + Math.ceil(nowLeft / 60000) + ' 分钟后再试'
         });
       }
-      return sendJson(res, 401, { error: '账号或口令不正确' });
+      return sendJson(res, 401, { error: '账号或密码不正确' });
     }
 
     /* 登录成功 → 清掉这个账号的失败记录，不给「再错几次就被锁」留隐患 */
@@ -210,7 +210,7 @@ async function handle(req, res, url) {
     return sendJson(res, 200, {
       ok: true,
       user: { id: u.id, name: u.name, role: u.role },
-      isInitialPwd: !!u.pwd_is_initial,   // 还在用批量建号发的初始口令 → 前端给可关闭的提示条
+      isInitialPwd: !!u.pwd_is_initial,   // 还在用批量建号发的初始密码 → 前端给可关闭的提示条
       permissions: db.listPermissions(u.role)
     });
   }
@@ -237,19 +237,19 @@ async function handle(req, res, url) {
     });
   }
 
-  /* ---- 改自己的口令 ---- */
+  /* ---- 改自己的密码 ---- */
   if (p === '/api/auth/password' && method === 'POST') {
     const me = currentUser(req);
     if (!me) return sendJson(res, 401, { error: '请先登录' });
     const b = await readBody(req);
     const u = db.findUser(me.id);
     if (!db.verifyPassword(String(b.oldPassword || ''), u.password_hash)) {
-      return sendJson(res, 400, { error: '原口令不正确' });
+      return sendJson(res, 400, { error: '原密码不正确' });
     }
     const np = String(b.newPassword || '');
-    if (np.length < 6) return sendJson(res, 400, { error: '新口令至少 6 位' });
+    if (np.length < 6) return sendJson(res, 400, { error: '新密码至少 6 位' });
     db.setPassword(me.id, np);
-    db.logAudit({ user_id: me.id, user: me.name, module: 'auth', action: '改口令' });
+    db.logAudit({ user_id: me.id, user: me.name, module: 'auth', action: '改密码' });
     return sendJson(res, 200, { ok: true });
   }
 
@@ -316,10 +316,10 @@ async function handle(req, res, url) {
       const target = String(b.id || '');
       if (!db.findUser(target)) return sendJson(res, 404, { error: '用户不存在' });
       const np = String(b.password || '');
-      if (np.length < 6) return sendJson(res, 400, { error: '口令至少 6 位' });
+      if (np.length < 6) return sendJson(res, 400, { error: '密码至少 6 位' });
       db.setPassword(target, np);
       db.logAudit({
-        user_id: me.id, user: me.name, module: 'auth', action: '重置口令', details: target
+        user_id: me.id, user: me.name, module: 'auth', action: '重置密码', details: target
       });
       return sendJson(res, 200, { ok: true });
     }

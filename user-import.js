@@ -1,19 +1,19 @@
 /* user-import.js — 批量建号（几百人规模用）
 
    为什么需要它：部门几百人时，一个个在界面上建账号不现实；
-   而账号就是工号、口令是「姓名缩写 + 固定后缀」，规则固定，适合一次性批量导入。
+   而账号就是工号、密码是「姓名缩写 + 固定后缀」，规则固定，适合一次性批量导入。
 
    设计要点：
-     - 口令规则从 data/auth-config.json 读，不写死在代码里（见 docs/plan-dingtalk-sso.md D4）
-     - 程序不做拼音转换（零依赖是本项目的硬约束），姓名缩写出 CSV 的「口令前缀」列带进来
-     - 已存在的工号一律跳过，绝不覆盖口令和角色（重跑安全）
+     - 密码规则从 data/auth-config.json 读，不写死在代码里（见 docs/plan-dingtalk-sso.md D4）
+     - 程序不做拼音转换（零依赖是本项目的硬约束），姓名缩写出 CSV 的「密码前缀」列带进来
+     - 已存在的工号一律跳过，绝不覆盖密码和角色（重跑安全）
 
    用法:
      node user-import.js --dry-run docs/samples/员工名单.csv   → 只看会建哪些号，不写库
      node user-import.js docs/samples/员工名单.csv             → 正式导入
 
    名单格式（CSV，首行表头，UTF-8）:
-     工号,姓名,口令前缀[,角色]
+     工号,姓名,密码前缀[,角色]
      10017xxx,张三,zs
      10018xxx,李四,ls,pm
 
@@ -28,7 +28,7 @@ const db = require('./db');
 
 const ROLES = ['admin', 'pm', 'dev', 'viewer'];
 
-/* 口令规则配置：与 db.js 同源，落在 data 目录下（已 gitignore） */
+/* 密码规则配置：与 db.js 同源，落在 data 目录下（已 gitignore） */
 const CONFIG_FILE = path.join(
   process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, 'data'),
   'auth-config.json'
@@ -55,7 +55,7 @@ function usage(code) {
 
 /* ---------- 配置 ---------- */
 
-/** 读口令规则。读不到（或坏了）用内置默认值并提示，绝不因此中断导入。 */
+/** 读密码规则。读不到（或坏了）用内置默认值并提示，绝不因此中断导入。 */
 function loadConfig() {
   let cfg = DEFAULT_CONFIG;
   try {
@@ -74,7 +74,7 @@ function loadConfig() {
   return cfg;
 }
 
-/** 拼口令。前缀由名单带进来（程序不做拼音转换），这里只负责「前缀 + 后缀」。 */
+/** 拼密码。前缀由名单带进来（程序不做拼音转换），这里只负责「前缀 + 后缀」。 */
 function buildPassword(prefix, cfg) {
   return String(prefix || '') + String(cfg.defaultPasswordSuffix || '');
 }
@@ -125,9 +125,17 @@ function readRoster(file) {
 
   const header = parseCsvLine(lines[0]);
   function col(name) { return header.indexOf(name); }
-  const ci = { id: col('工号'), name: col('姓名'), prefix: col('口令前缀'), role: col('角色') };
+  /* 「密码前缀」原名「口令前缀」。2026-09-22 统一术语时改了列头，
+     但**已经发出去的老名单表还在用旧列头** —— 只认新名字的话，
+     那些表明了却没有被覆盖，会直接报「表头不对」。所以旧名继续认。
+     新名优先：两个都在时以新名为准。 */
+  function colPrefix() {
+    const i = col('密码前缀');
+    return i >= 0 ? i : col('口令前缀');
+  }
+  const ci = { id: col('工号'), name: col('姓名'), prefix: colPrefix(), role: col('角色') };
   if (ci.id < 0 || ci.name < 0 || ci.prefix < 0) {
-    fail('表头至少要有「工号,姓名,口令前缀」三列。实际读到：' + header.join(','));
+    fail('表头至少要有「工号,姓名,密码前缀」三列。实际读到：' + header.join(','));
   }
 
   const rows = [];
@@ -142,7 +150,7 @@ function readRoster(file) {
     if (!id && !name) continue;                                  // 整行空，跳过
     if (!id) { rows.push({ lineNo: lineNo, bad: '缺工号' }); continue; }
     if (!name) { rows.push({ lineNo: lineNo, id: id, bad: '缺姓名' }); continue; }
-    if (!prefix) { rows.push({ lineNo: lineNo, id: id, name: name, bad: '缺口令前缀' }); continue; }
+    if (!prefix) { rows.push({ lineNo: lineNo, id: id, name: name, bad: '缺密码前缀' }); continue; }
     if (role && ROLES.indexOf(role) < 0) {
       rows.push({ lineNo: lineNo, id: id, name: name, bad: '角色非法：' + role + '，可选 ' + ROLES.join('/') });
       continue;
@@ -165,7 +173,7 @@ function main() {
 
   console.log('账号库：  ' + DB_DESC);
   console.log('名单：    ' + file);
-  console.log('口令规则：前缀 + 后缀「' + cfg.defaultPasswordSuffix + '」'
+  console.log('密码规则：前缀 + 后缀「' + cfg.defaultPasswordSuffix + '」'
     + (cfg.forceChangeOnFirstLogin ? '，要求首次改密' : '，不强制改密仅提示'));
   console.log('模式：    ' + (dryRun ? '干跑，不写库' : '正式导入'));
   console.log('');
@@ -209,11 +217,11 @@ function main() {
   if (dryRun) {
     console.log('将要新建 ' + toCreate.length + ' 个账号：');
     toCreate.forEach(function (r) {
-      console.log('  ' + r.id.padEnd(14) + r.name.padEnd(10) + r.role.padEnd(8) + '口令 ' + buildPassword(r.prefix, cfg));
+      console.log('  ' + r.id.padEnd(14) + r.name.padEnd(10) + r.role.padEnd(8) + '密码 ' + buildPassword(r.prefix, cfg));
     });
     if (skipped.length) {
       console.log('');
-      console.log('库中已存在、将跳过 ' + skipped.length + ' 个（不覆盖其口令与角色）：');
+      console.log('库中已存在、将跳过 ' + skipped.length + ' 个（不覆盖其密码与角色）：');
       console.log('  ' + skipped.map(function (r) { return r.id; }).join('、'));
     }
     console.log('');
@@ -240,7 +248,7 @@ function main() {
         user: r.name,
         module: 'auth',
         action: '批量建号',
-        details: '角色 ' + r.role + '，初始口令'
+        details: '角色 ' + r.role + '，初始密码'
       });
       created++;
     } catch (e) {
@@ -260,9 +268,9 @@ function main() {
   if (created) {
     console.log('');
     console.log('接下来：');
-    console.log('  1. 起服务并设 AUTH_REQUIRED=1，用工号加初始口令登一次');
-    console.log('  2. 确认顶部出现「你还在使用初始口令」提示条');
-    console.log('  3. 各账号自行到「修改口令」改掉即可，不强制');
+    console.log('  1. 起服务并设 AUTH_REQUIRED=1，用工号加初始密码登一次');
+    console.log('  2. 确认顶部出现「你还在使用初始密码」提示条');
+    console.log('  3. 各账号自行到「修改密码」改掉即可，不强制');
     console.log('  4. 要核对全部账号：node user-cli.js list');
   }
 }

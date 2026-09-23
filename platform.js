@@ -356,9 +356,15 @@ const Platform = (() => {
     if (logout) {
       logout.addEventListener('click', () => {
         if (!window.confirm('确定退出登录？')) return;
+        /* 是否一并通知 SSO 登出，取决于【本次是不是用 SSO 登录的】。
+           本地账号密码登录的人不能走这条 —— 那会把他其他系统的登录态一起退掉。
+           标记由服务端在 SSO 回调成功时种下（modules/sso/routes.js 的 setSessionCookie）。 */
+        const viaSso = document.cookie.split('; ').some(c => c === 'wb_auth_src=sso');
         fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
-          .catch(() => { /* 请求失败也照常回登录页：本地没有可清的东西 */ })
-          .then(() => { window.location.href = '/login.html'; });
+          .catch(() => { /* 请求失败也照常走：本地会话清不掉也不该卡住用户 */ })
+          .then(() => {
+            window.location.href = viaSso ? '/sso/logout' : '/login.html';
+          });
       });
     }
   }

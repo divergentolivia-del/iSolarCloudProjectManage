@@ -22,6 +22,9 @@
 const db = require('../../db');
 
 const COOKIE = 'wb_session';
+/* 登录来源标记，与 modules/sso/routes.js 里同名同属性。取值 sso | local。
+   前端退出时据此判断要不要通知 SSO 登出 —— 两处常量必须一致。 */
+const SRC_COOKIE = 'wb_auth_src';
 
 /* ---------- 小工具 ---------- */
 
@@ -55,13 +58,23 @@ function tokenOf(req) {
 
 /** 种会话 Cookie。HttpOnly 防脚本读取；SameSite=Lax 防跨站带票 */
 function setCookie(res, token, maxAgeSec) {
-  res.setHeader('Set-Cookie',
+  res.setHeader('Set-Cookie', [
     COOKIE + '=' + encodeURIComponent(token) +
-    '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' + maxAgeSec);
+      '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' + maxAgeSec,
+    /* 显式声明「本次是本地账号登录」。SSO 模块登录时会把同一个 Cookie 写成 sso，
+       退出时前端据此决定要不要通知 SSO 登出 —— 本地登录的人不该被扔去 SSO 登出页，
+       否则会把他【其他系统】的登录态一起退掉。 */
+    SRC_COOKIE + '=local; Path=/; SameSite=Lax; Max-Age=' + maxAgeSec
+  ]);
 }
 
 function clearCookie(res) {
-  res.setHeader('Set-Cookie', COOKIE + '=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+  res.setHeader('Set-Cookie', [
+    COOKIE + '=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0',
+    /* 标记必须跟着一起清。否则：SSO 登录 → 退出（标记残留）→ 本地登录 → 再退出，
+       第二次退出会误判成 SSO 登录，把用户扔去 SSO 登出页。 */
+    SRC_COOKIE + '=; Path=/; SameSite=Lax; Max-Age=0'
+  ]);
 }
 
 /* ---------- 身份解析（server.js 也用它做权限门禁）---------- */

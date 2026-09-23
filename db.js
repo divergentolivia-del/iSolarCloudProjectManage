@@ -238,10 +238,19 @@ function setRole(id, role) {
 
 const SESSION_DAYS = 30;
 
-function createSession(userId) {
+/**
+ * 建会话。
+ * @param {string} userId
+ * @param {number} [ttlSec] 有效期（秒）。不传按本地会话默认 30 天。
+ *   为什么留这个口子：SSO 登录时有效期必须用平台返回的 expires_in，
+ *   不能再用本地默认值 —— 否则 SSO 那边 token 3 天过期了，
+ *   这边还留着 30 天的会话，用户可以不经过 SSO 直接进平台。
+ */
+function createSession(userId, ttlSec) {
   const token = crypto.randomBytes(32).toString('base64url');
   const now = new Date();
-  const exp = new Date(now.getTime() + SESSION_DAYS * 86400000);
+  const ms = ttlSec > 0 ? ttlSec * 1000 : SESSION_DAYS * 86400000;
+  const exp = new Date(now.getTime() + ms);
   get().prepare('INSERT INTO sessions(token, user_id, created_at, expires_at) VALUES(?,?,?,?)')
     .run(token, String(userId), now.toISOString(), exp.toISOString());
   return { token, expiresAt: exp.toISOString() };

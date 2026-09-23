@@ -26,10 +26,17 @@ function ck(n, c, extra) {
 }
 
 console.log('\n[输入采集 · 注册表]');
-ck('注册了 5 个 provider', inputs.REGISTRY.length === 5, inputs.REGISTRY.length);
+/* 数量断言一律跟着 REGISTRY.length 走，不写死数字 ——
+   这个注册表的设计目的就是「加数据源只改 inputs.js 一处」，
+   写死数字会让每次加源都变成一次假失败（SGAI+ 加 meeting 源就踩过）。 */
+ck('注册表非空', inputs.REGISTRY.length > 0, inputs.REGISTRY.length);
 ck('每个 provider 都有 id / label / load',
   inputs.REGISTRY.every(p => p.id && p.label && typeof p.load === 'function'));
 ck('id 不重复', new Set(inputs.REGISTRY.map(p => p.id)).size === inputs.REGISTRY.length);
+ck('已知数据源都在册（代码仓库/偏差/历史/计划/知识沉淀）',
+  ['repos', 'deviations', 'history', 'plans', 'knowledge']
+    .every(id => inputs.REGISTRY.some(p => p.id === id)),
+  inputs.REGISTRY.map(p => p.id));
 
 console.log('\n[输入采集 · 空数据不报错]');
 /* 注意：SKILL_DATA_DIR 只影响知识库（data/skill），迭代偏差读的是仓库真实路径
@@ -57,14 +64,15 @@ ck('skipped 也会带出来（能区分「跳过」和「失败」）',
 
 console.log('\n[输入采集 · 只有指定 provider 跑]');
 const only = inputs.collect({ only: ['plans'] });
-ck('only 限制后其余都进 skipped', only.skipped.length === 4, only.skipped.map(s => s.id));
+ck('only 限制后其余都进 skipped',
+  only.skipped.length === inputs.REGISTRY.length - 1, only.skipped.map(s => s.id));
 ck('only 指定的那个不在 skipped 里', !only.skipped.some(s => s.id === 'plans'), only.skipped);
 ck('only 下仍返回完整空壳形状（下游取值不会 undefined 报错）',
   Array.isArray(only.inputs.deviations), only.inputs.deviations);
 
 console.log('\n[输入采集 · 自检接口]');
 const st = inputs.status();
-ck('status 列出全部 provider', st.providers.length === 5, st.providers.length);
+ck('status 列出全部 provider', st.providers.length === inputs.REGISTRY.length, st.providers.length);
 ck('status 报出数据目录', st.dataPath === TMP, st.dataPath);
 ck('status 默认无禁用项', st.disabled.length === 0, st.disabled);
 ck('status 默认 live 模式', st.mode === 'live', st.mode);

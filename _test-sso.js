@@ -95,7 +95,12 @@ ck('默认授权端点非空', !!sso.CONFIG.authorizeUrl, sso.CONFIG.authorizeUr
 ck('默认 debug 关闭（生产不能默认放人进来）', sso.CONFIG.debug === false);
 
 console.log('\n[SSO · 路由挂载]');
-ck('导出三个路径', Array.isArray(sso.paths) && sso.paths.length === 3, sso.paths);
+/* 断言「哪些路径必须在册」，不写死总数 —— 加一个端点（如 /sso/logout）
+   不该让测试变红。真正要守住的是这几个端点一个都不能少。 */
+ck('四个必需路径都在册',
+  Array.isArray(sso.paths) &&
+  ['/sso/login', '/sso/callback', '/sso/status', '/sso/logout'].every(p => sso.paths.includes(p)),
+  sso.paths);
 ck('路径都在站点根下（非 /api）', sso.paths.every(p => p.indexOf('/sso/') === 0), sso.paths);
 ck('handle 是函数', typeof sso.handle === 'function');
 

@@ -64,6 +64,12 @@ const DEFAULTS = {
   nameField: 'name',
   /* 回调地址必须与申请时登记的一字不差，见 docs/plan-identity-and-dingtalk.md */
   redirectUri: 'http://10.63.139.103:9680/sso/callback',
+  /* 平台登出端点。规范 2.6：只有用户【主动退出】才调，业务系统自己过期不要调
+     （过期要重新走授权拿 code）。留空则退出时不通知 SSO。
+     ★ 上线前必须确认：这个默认值指向的是哪套环境。授权/换 token 走哪套，
+       登出就必须走哪套 —— 混用会出现「SIT 登录、生产登出」，两边都没退干净。
+       要换环境改 secret.json 的 logoutUrl，不用改代码。 */
+  logoutUrl: 'https://sso.sungrow.cn/uaa/logout',
   /* 只读诊断模式：拿到 code 后不换工号建会话，只把结果打日志/页面。
      联调期用来定位接口问题，避免用错配置把人放进平台。 */
   debug: false
@@ -87,7 +93,8 @@ const CONFIG = (function load() {
     userInfoUrl: 'SSO_USER_INFO_URL',
     nameField: 'SSO_NAME_FIELD',
     responseType: 'SSO_RESPONSE_TYPE',
-    scope: 'SSO_SCOPE'
+    scope: 'SSO_SCOPE',
+    logoutUrl: 'SSO_LOGOUT_URL'
   };
   Object.keys(ENV_MAP).forEach(k => {
     const v = env[ENV_MAP[k]];
@@ -301,9 +308,16 @@ async function exchangeCode(code) {
     throw err;
   }
   const nm = dig(payload, CONFIG.nameField, 0);
+  /* token 有效期（秒）。规范明确要求「接入系统自己的有效期必须设置为 SSO 返回的
+     token 有效期」，所以这里必须带出去，不能让人家过期了我们还留着会话。
+     注意只在 token 响应体（r.json）里找，不合并 userinfo 的返回 ——
+     避免 userinfo 里碰巧也有个 expires_in 把真实值覆盖掉。 */
+  const expRaw = dig(r.json, 'expires_in', 0) || dig(r.json, 'expiresIn', 0);
+  const expNum = Number(expRaw);
   return {
     empNo: String(empNo).trim(),
     name: nm === undefined ? '' : String(nm).trim(),
+    expiresIn: expNum > 0 ? Math.floor(expNum) : 0,
     raw: payload
   };
 }
@@ -316,10 +330,16 @@ async function exchangeCode(code) {
  * 若将来 Cookie 属性要改，**两处必须同时改**（另一处见 modules/auth/routes.js）。 */
 const COOKIE = 'wb_session';
 
+/* 「本次登录来自 SSO」的标记。非 HttpOnly —— 前端退出时要读它决定跳不跳 SSO 登出页。
+   它不是凭证（只存一个固定串），读到也换不来任何权限，所以不需要藏。 */
+const SRC_COOKIE = 'wb_auth_src';
+
 function setSessionCookie(res, token, maxAgeSec) {
-  res.setHeader('Set-Cookie',
+  res.setHeader('Set-Cookie', [
     COOKIE + '=' + encodeURIComponent(token) +
-    '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' + maxAgeSec);
+      '; Path=/; HttpOnly; SameSite=Lax; Max-Age=' + maxAgeSec,
+    SRC_COOKIE + '=sso; Path=/; SameSite=Lax; Max-Age=' + maxAgeSec
+  ]);
 }
 
 /* ---------- 路由 ---------- */
@@ -433,12 +453,26 @@ async function handleCallback(req, res, u) {
     return deny('账号已停用', '你的账号已被管理员停用，请联系管理员。');
   }
 
-  const { token } = db.createSession(user.id);
-  setSessionCookie(res, token, 30 * 86400);
-  db.logAudit({
-    user_id: user.id, user: user.name, module: 'auth', action: '登录',
-    details: 'SSO（角色 ' + user.role + '）'
-  });
+  /* 会话有效期跟 SSO 返回的 token 有效期一致（规范硬要求）。
+     拿不到 expires_in 时回退 8 小时 —— 宁可让用户重新登录，也不能留一个
+     比 SSO 长得多的会话：那等于绕过了统一认证。 */
+  const ttl = exchanged.expiresIn > 0 ? exchanged.expiresIn : 8 * 3600;
+  const { token } = db.createSession(user.id, ttl);
+  setSessionCookie(res, token, ttl);
+  if (exchanged.expiresIn > 0) {
+    db.logAudit({
+      user_id: user.id, user: user.name, module: 'auth', action: '登录',
+      details: 'SSO（角色 ' + user.role + '，会话 ' + ttl + 's 取自 expires_in）'
+    });
+  } else {
+    /* 没拿到 expires_in 不静默：这类「配置/接口与预期不符」的事必须留痕，
+       否则只会在几天后表现为「用户莫名其妙被登出」，查不到原因。 */
+    console.warn('[sso] 返回体里没有 expires_in，会话回退 ' + ttl + 's');
+    db.logAudit({
+      user_id: user.id, user: user.name, module: 'auth', action: '登录',
+      details: 'SSO（角色 ' + user.role + '，⚠ 未取到 expires_in，会话回退 ' + ttl + 's）'
+    });
+  }
 
   res.writeHead(302, { Location: chk.next, 'Cache-Control': 'no-store' });
   res.end();
@@ -450,8 +484,33 @@ function handleStatus(req, res) {
     configured: isConfigured(),
     missing: missingConfig(),
     redirectUri: CONFIG.redirectUri,
-    debug: !!CONFIG.debug
+    debug: !!CONFIG.debug,
+    /* 退出登录时要不要一并通知 SSO。前端据此决定跳不跳平台的登出页 */
+    logoutConfigured: !!CONFIG.logoutUrl
   });
+}
+
+/** GET /sso/logout —— 退出时通知 SSO，然后回登录页
+ *
+ * 为什么单独一个端点、而不是让前端直接跳 SSO：
+ *   只读性上这是浏览器跳转、没有秘密，但把 URL 拼装留在服务端，
+ *   换环境（sit → 生产）时只改 secret.json 一处，前端不用动。
+ *
+ * ⚠ 只有「本次是用 SSO 登录的」才该走到这里。本地账号密码登录的人如果也被
+ *   扔去 SSO 登出，会把他【其他系统】的登录态一起退掉 —— 那是别人的会话，
+ *   不归我们管。判断依据是登录时种下的 wb_auth_src Cookie（见 handleCallback）。
+ */
+function handleLogout(req, res, u) {
+  if (!CONFIG.logoutUrl) {
+    /* 没配就安静回登录页：退出本地会话这件事 auth 模块已经做完了 */
+    res.writeHead(302, { Location: '/login.html', 'Cache-Control': 'no-store' });
+    return res.end();
+  }
+  const sep = CONFIG.logoutUrl.indexOf('?') >= 0 ? '&' : '?';
+  /* Referer 用登记过的回调地址 —— 规范 2.6 要求与授权码/token 两处一致 */
+  const target = CONFIG.logoutUrl + sep + 'Referer=' + encodeURIComponent(CONFIG.redirectUri);
+  res.writeHead(302, { Location: target, 'Cache-Control': 'no-store' });
+  return res.end();
 }
 
 /**
@@ -464,13 +523,14 @@ function handle(req, res, u) {
   if (p === '/sso/login') return handleLogin(req, res, u);
   if (p === '/sso/callback') return handleCallback(req, res, u);
   if (p === '/sso/status') return handleStatus(req, res, u);
+  if (p === '/sso/logout') return handleLogout(req, res, u);
   sendJson(res, 404, { error: 'Not Found' });
   return undefined;
 }
 
 module.exports = {
   id: 'sso',
-  paths: ['/sso/login', '/sso/callback', '/sso/status'],
+  paths: ['/sso/login', '/sso/callback', '/sso/status', '/sso/logout'],
   handle,
   /* 供测试与运维使用 */
   CONFIG: CONFIG,

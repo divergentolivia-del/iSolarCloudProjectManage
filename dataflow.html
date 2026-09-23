@@ -41,6 +41,12 @@
   .wl-summary { display:flex; flex-wrap:wrap; gap:12px; align-items:center; padding:8px 2px 10px; font-size:13px; }
   .wl-bar { display:inline-block; width:110px; height:9px; background:#e2e8f0; border-radius:5px; margin-right:8px; vertical-align:middle; }
   .wl-fill { height:9px; border-radius:5px; }
+  /* WBS 大纲树 */
+  .wbs-tree { border:1px solid var(--line); border-radius:8px; padding:10px 14px; background:#f8fafc; font-size:13px; }
+  .wbs-tree .wbs-l1 { font-size:14px; font-weight:650; margin-bottom:8px; }
+  .wbs-tree .wbs-l2 { padding:3px 0 3px 6px; font-weight:600; }
+  .wbs-tree .wbs-l3 { padding:1px 0 1px 22px; color:var(--fg); }
+  .wbs-tree .wbs-sep { margin-top:8px; padding-top:6px; border-top:1px dashed var(--line); font-weight:600; color:var(--sub); }
   .stat { display:inline-flex; gap:16px; color:var(--sub); font-size:13px; margin-top:10px; }
   .stat b { color:var(--ink); }
   .empty { color:var(--sub); font-size:13px; padding:8px 2px; }
@@ -254,6 +260,31 @@ async function showLatest(id) {
         }).join('')) + '</table>';
       html += '<div style="margin-top:10px">' + ((out.suggestions || []).map(s =>
         '<div class="risk"><span class="sev sev-' + esc(s.severity) + '">' + esc(s.severity) + '</span><span class="t">' + esc(s.text) + '</span></div>').join('') || '') + '</div>';
+      html += '<div style="margin-top:10px">' + (r.items || []).map(i => confirmRow(i)).join('') + '</div>';
+    } else if (id === 'wbs') {
+      const out = r.output || {};
+      html += '<div class="wbs-tree">' + (out.outline || []).map(x => {
+        if (x.level === 1) return '<div class="wbs-l1">' + esc(x.name) + ' <span style="color:var(--sub)">' + x.workload + ' 人日</span></div>';
+        if (x.level === 2 && x.rows != null) return '<div class="wbs-l2">' + esc(x.name) + ' <span style="color:var(--sub)">' + x.rows + ' 行' + (x.est ? ' / est ' + x.est + ' 人日' : '') + (x.teams && x.teams.length ? '<br><span style="color:var(--sub);font-size:12px">涉及：' + x.teams.map(esc).join('、') + '</span>' : '') + '</div>';
+        if (x.level === 2) return '<div class="wbs-sep">' + esc(x.name) + '</div>';
+        return '<div class="wbs-l3">' + esc(x.name) + ' <span style="color:var(--sub)">' + x.workload + ' 人日 / ' + x.head + ' 人</span></div>';
+      }).join('') + '</div>';
+      if ((out.milestones || []).length) {
+        html += '<div style="margin-top:10px"><b>里程碑：</b>' + out.milestones.map(m => '<span class="badge ' + (m.active ? 'b-green' : 'b-gray') + '" style="margin-right:6px">' + esc(m.name) + (m.active ? '（当前）' : '') + ' 封版' + esc(m.seal || '—') + ' 上线' + esc(m.online || '—') + '</span>').join('') + '</div>';
+      }
+      if (out.note) html += '<div style="margin-top:8px;color:var(--sub);font-size:12px">' + esc(out.note) + '</div>';
+      html += '<div style="margin-top:10px">' + (r.items || []).map(i => confirmRow(i)).join('') + '</div>';
+    } else if (id === 'knowledge') {
+      const out = r.output || {};
+      html += '<table><tr><th>Skill</th><th>运行次数</th><th>采纳</th><th>驳回</th><th>待确认</th><th>采纳率</th></tr>' +
+        ((out.cards || []).map(c => '<tr><td>' + esc(c.skill) + '</td><td>' + c.runCount + '</td><td>' + c.adoptCount + '</td><td>' + c.rejectCount + '</td><td>' + c.pendingCount + '</td><td>' + (c.adoptRate == null ? '—' : c.adoptRate + '%') + '</td></tr>').join('')) + '</table>';
+      if ((out.topCategories || []).length) {
+        html += '<div style="margin-top:10px"><b>高频类目：</b>' + out.topCategories.map(c => '<span class="badge b-gray" style="margin-right:6px">' + esc(c.category) + ' ' + c.count + '</span>').join('') + '</div>';
+      }
+      if ((out.backlog || []).length) {
+        html += '<div style="margin-top:8px"><span class="b-orange">积压提示</span> ' + out.backlog.map(b => esc(b.skill) + ' 待确认 ' + b.pending + ' 条').join('、') + '</div>';
+      }
+      if (out.note) html += '<div style="margin-top:8px;color:var(--sub);font-size:12px">' + esc(out.note) + '</div>';
       html += '<div style="margin-top:10px">' + (r.items || []).map(i => confirmRow(i)).join('') + '</div>';
     }
     $('#skillOut').innerHTML = html;

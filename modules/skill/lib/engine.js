@@ -15,6 +15,8 @@ const reportSkill = require('../skills/report');
 const healthSkill = require('../skills/health');
 const gitsignalsSkill = require('../skills/gitsignals');
 const workloadSkill = require('../skills/workload');
+const wbsSkill = require('../skills/wbs');
+const knowledgeSkill = require('../skills/knowledge');
 
 const DATA_DIR = process.env.SKILL_DATA_DIR || path.join(__dirname, '..', '..', '..', 'data', 'skill');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
@@ -45,7 +47,7 @@ function readJson(file) {
 
 function collectInputs() {
   const root = path.join(__dirname, '..', '..', '..');
-  const inputs = { now: Date.now(), repos: [], deviations: [], reconcile: [], plans: [], history: [], evidence: {} };
+  const inputs = { now: Date.now(), repos: [], deviations: [], reconcile: [], plans: [], history: [], evidence: {}, plan: { productLines: [], otherCategories: [], cycles: [], board: [] } };
 
   /* pradapter：仓库统计特征（L3，不含提交原文） */
   const pr = readJson(path.join(root, 'data', 'pradapter', 'state.json'));
@@ -90,6 +92,13 @@ function collectInputs() {
       }));
       inputs.reconcile = computed.reconcile || [];
       inputs.iterations = it.iterations || [];
+      /* plan 块（Skill WBS 生成用）：产品线×团队规划行 + 周期里程碑（共享团队会跨产品线，不强行拆树） */
+      inputs.plan = {
+        productLines: (global.PRODUCT_LINES || []).slice(),
+        otherCategories: ((global.OTHER_CATEGORIES) || []).map(c => c.key),
+        cycles: (it.cycles || []).map(c => ({ name: c.name, seal: c.seal, online: c.online, active: c.active })),
+        board: (it.board || []).map(b => ({ line: b.productLine || '', team: b.team || '', est: b.est || 0 }))
+      };
       /* 趋势：最近 2 期历史快照的偏差（存档在 data/iteration/history/） */
       const histDir = path.join(root, 'data', 'iteration', 'history');
       try {
@@ -124,6 +133,26 @@ function collectInputs() {
     }));
   }
 
+  /* knowledge 块（Skill 知识沉淀用）：各 Skill 采纳率 + 历史产出类目分布（只取统计特征） */
+  try {
+    const sk = readJson(path.join(STATE_FILE));
+    const catCount = {};
+    for (const r of (sk && sk.results) || []) {
+      for (const i of (r && r.items) || []) {
+        if (i && i.category) catCount[i.category] = (catCount[i.category] || 0) + 1;
+        else if (i) catCount['综合'] = (catCount['综合'] || 0) + 1;   // 旧格式 items 无 category，归入综合（不丢数据也不虚构类目）
+      }
+    }
+    inputs.knowledge = {
+      stats: (sk && sk.stats) || {},
+      categoryCount: catCount,
+      resultCount: ((sk && sk.results) || []).length
+    };
+  } catch (e) {
+    console.warn('[skill] knowledge 块读取失败（知识沉淀 Skill 将无数据）：' + ((e && e.message) || e));
+    inputs.knowledge = { stats: {}, categoryCount: {}, resultCount: 0 };
+  }
+
   return inputs;
 }
 
@@ -135,7 +164,9 @@ const SKILLS = {
   report: { meta: { id: 'report', name: reportSkill.name, desc: reportSkill.desc }, run: reportSkill.generate },
   health: { meta: { id: 'health', name: healthSkill.name, desc: healthSkill.desc }, run: healthSkill.assess },
   gitsignals: { meta: { id: 'gitsignals', name: gitsignalsSkill.name, desc: gitsignalsSkill.desc }, run: gitsignalsSkill.analyze },
-  workload: { meta: { id: 'workload', name: workloadSkill.name, desc: workloadSkill.desc }, run: workloadSkill.analyze }
+  workload: { meta: { id: 'workload', name: workloadSkill.name, desc: workloadSkill.desc }, run: workloadSkill.analyze },
+  wbs: { meta: { id: 'wbs', name: wbsSkill.name, desc: wbsSkill.desc }, run: wbsSkill.generate },
+  knowledge: { meta: { id: 'knowledge', name: knowledgeSkill.name, desc: knowledgeSkill.desc }, run: knowledgeSkill.accumulate }
 };
 
 function listSkills() {
@@ -276,8 +307,8 @@ function normalizeItems(skillId, output, resultId) {
   if (skillId === 'risk') (output.items || []).forEach(o => push(o));
   if (skillId === 'variance') (output.suggestions || []).forEach(o => push(o));
   if (skillId === 'report') (output.pendingConfirm || []).forEach(o => push(o));
-  /* health / gitsignals / workload 直接输出 items 字段（新增 Skill 时记得在这里注册） */
-  if (skillId === 'health' || skillId === 'gitsignals' || skillId === 'workload') (output.items || []).forEach(o => push(o));
+  /* health / gitsignals / workload / wbs / knowledge 直接输出 items 字段（新增 Skill 时记得在这里注册；ref:true 的佐证项自动跳过） */
+  if (['health', 'gitsignals', 'workload', 'wbs', 'knowledge'].includes(skillId)) (output.items || []).forEach(o => push(o));
   return items;
 }
 

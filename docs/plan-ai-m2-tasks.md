@@ -60,11 +60,13 @@ M2 的目标是**数据不再靠人手工录**：Git 仓库、团队工作台、
 | B6 | 健康度评估 Skill（master §7 Skill 4） | 四维得分卡（进度/人力/代码/风险）+ 红黄绿灯 + 异常摘要；非绿灯维度落待确认项 | ✅ `modules/skill/skills/health.js`（真实数据实测：综合 15 分红灯，进度 0/人力 0/代码 100/风险 0，3 条待确认） |
 | B7 | Git/PR 信号分析 Skill（master §7 Skill 5） | 任务-代码关联表（L1-L4）+ 仓库停滞/采集异常/关联缺口/确认积压信号 | ✅ `modules/skill/skills/gitsignals.js`（诚实声明：评审阻塞/CI 信号依赖 PR 系统数据，M2-C 接真实仓库时补） |
 | B8 | 资源负载分析 Skill（master §7 Skill 10） | 按团队负载率分级（过载/超载/健康/富余）+ 产能缺口 + 逐队建议 | ✅ `modules/skill/skills/workload.js`（真实数据实测：平均负载 63%、过载 4/超载 3/缺人头 2、缺口 461 人日、9 条待确认） |
+| B9 | WBS 生成 Skill（master §7 Skill 6） | 从迭代规划表生成 WBS 大纲（产品线分布 + 团队工作量 + 里程碑）；共享团队不拆树 | ✅ `modules/skill/skills/wbs.js`（真实数据实测：7 产品线 / 18 团队 / 2219 人日） |
+| B10 | 知识沉淀 Skill（master §7 Skill 12） | 各 Skill 采纳率 + 高频类目 + 待确认积压 → 知识卡（佐证型，不进待确认队列） | ✅ `modules/skill/skills/knowledge.js`（真实数据实测：8 Skill 卡片、variance 积压 28 条提醒） |
 
 **实现要点**：
 - 运行时 `modules/skill/lib/engine.js`：数据注入（iteration calc / pradapter / plan，全部脱敏口径）→ 规则执行 → 输出统一落成「待确认项」→ 人工确认回灌采纳率（决策 3/7）。
 - 权限：`skill:read`（pm/dev/viewer）、`skill:write`（pm）。
-- 评测集 `_test-skill.js`：现 81 项断言（risk / variance / report / engine 运行时 / health 9 / gitsignals 9 / workload 8 / 新 Skill 待确认接通 2）。
+- 评测集 `_test-skill.js`：现 93 项断言（risk / variance / report / engine 运行时 / health 9 / gitsignals 9 / workload 8 / wbs 6 / knowledge 5 / 新 Skill 待确认接通 2）。
 - 模型可插拔：当前为**规则引擎版**（确定性、可测、内网可用）；接外部模型时只需给每个 Skill 加一个 AI 后处理层（master 决策 6）。
 
 **2026-09-22 修复（外部 review 发现，均已回归测试）**：
@@ -95,6 +97,11 @@ M2 的目标是**数据不再靠人手工录**：Git 仓库、团队工作台、
 **2026-09-23（B8 资源负载 Skill 落地）**：
 15. 负载率分级规则：>1.2 过载（高）、>1.0 超载（中）、<0.8 富余（只展示）、缺人头（有工时无人头，高）、本期无工时=健康不误报富余。
 16. 产能缺口 = Σ max(0, over)，含超载溢出与缺人头团队工时（真实缺口口径）。
+
+**2026-09-23 第二批（B9/B10 落地 + 测试稳定性）**：
+17. `_test-server.js` 端口硬编码 8791 与 sgclaw 客户端进程冲突（EADDRINUSE）→ 动态空闲端口（listen(0)）；重启场景固定 sleep(1200) 并发抖动用 waitReady 轮询替代（Claudecode 接力重构，提交 76af2b2）。
+18. WBS 不拆树：实测 17 个团队中 10 个跨多产品线共享，强行拆树会重复计算工作量 → 产品线看规划行分布、团队看平台核算，双视图并列。
+19. 知识沉淀兼容旧格式：历史 1012 条 items 无 category 字段 → 归入「综合」类目（不丢数据不虚构）；佐证型项（ref:true）不进待确认队列。
 
 ## 4. M2-C（待用户输入）
 

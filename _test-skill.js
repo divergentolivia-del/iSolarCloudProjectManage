@@ -377,5 +377,43 @@ console.log('\n[Skill6 资源负载分析器 · 负载率分级]');
   ck('run(workload) 过载项进待确认队列', rw.ok && rw.result.items.length === 1, rw.result.items);
 }
 
+console.log('\n[Skill7 WBS 生成器 · 产品线×团队大纲]');
+{
+  const wbsSkill = require('./modules/skill/skills/wbs');
+  const plan = { productLines: ['PL-A', 'PL-B'], otherCategories: ['ECO'],
+    cycles: [{ name: '9月迭代', seal: '10.26', online: '10.29', active: true }],
+    board: [{ line: 'PL-A', team: 'T1', est: 10 }, { line: 'PL-A', team: 'T2', est: 5 }, { line: 'ECO', team: 'T1', est: 0 }] };
+  const devs = [{ team: 'T1', workload: 100, head: 2, capacity: 120 }, { team: 'T2', workload: 60, head: 1, capacity: 60 }];
+
+  const w = wbsSkill.generate({ plan, deviations: devs });
+  ck('L1 总工作量 = 160 人日', w.outline[0].level === 1 && w.outline[0].workload === 160, w.outline[0]);
+  ck('产品线视图：PL-A 2 行 / ECO 1 行（按行数降序）', w.outline.find(x => x.name === 'PL-A').rows === 2 && w.outline.find(x => x.name === 'ECO').rows === 1, w.outline);
+  ck('团队视图按工作量降序 T1→T2', w.outline.filter(x => x.level === 3).map(x => x.name).join(',') === 'T1,T2', w.outline);
+  ck('空产品线 PL-B → 中严重度提示项', w.items.some(i => i.id === 'wbs-empty-PL-B' && i.severity === '中'), w.items);
+  ck('markdown 含产品线/团队/里程碑三节', w.markdown.indexOf('产品线分布') >= 0 && w.markdown.indexOf('团队工作量') >= 0 && w.markdown.indexOf('里程碑') >= 0, w.markdown.slice(0, 80));
+
+  const w0 = wbsSkill.generate({ plan: { productLines: [], otherCategories: [], cycles: [], board: [] }, deviations: [] });
+  ck('空输入不崩溃：0 产品线 0 团队', w0.outline[0].workload === 0 && !w0.items.some(i => i.severity === '中'), w0.outline);
+
+  const rw = engine.run('wbs', { now, repos: [], deviations: devs, plan, reconcile: [], history: [], plans: [], evidence: {} });
+  ck('run(wbs) 大纲项进待确认队列', rw.ok && rw.result.items.length >= 1, rw.result.items);
+}
+
+console.log('\n[Skill8 知识沉淀器 · 采纳率与高频类目]');
+{
+  const knowledgeSkill = require('./modules/skill/skills/knowledge');
+  const kIn = { knowledge: { stats: { risk: { runCount: 10, adoptCount: 4, rejectCount: 1, pendingCount: 12 }, wbs: { runCount: 1 } },
+    categoryCount: { 风险: 5, 产能: 3 }, resultCount: 11 } };
+
+  const kn = knowledgeSkill.accumulate(kIn);
+  ck('cards 按运行次数降序，risk 采纳率 80%', kn.cards[0].skill === 'risk' && kn.cards[0].adoptRate === 80, kn.cards);
+  ck('待确认 12 > 10 → 积压提示', kn.backlog.some(b => b.skill === 'risk' && b.pending === 12), kn.backlog);
+  ck('高频类目 top：风险 5 > 产能 3', kn.topCategories[0].category === '风险' && kn.topCategories[0].count === 5, kn.topCategories);
+  ck('知识卡为佐证型（ref:true，不进待确认队列）', kn.items[0].ref === true, kn.items[0]);
+
+  const rk = engine.run('knowledge', { now, repos: [], deviations: [], knowledge: kIn.knowledge, reconcile: [], history: [], plans: [], evidence: {} });
+  ck('run(knowledge) ref 项被滤掉 → 0 待确认', rk.ok && rk.result.items.length === 0, rk.result.items);
+}
+
 console.log('\n结果：' + pass + ' 通过，' + fail + ' 失败');
 process.exit(fail ? 1 : 0);

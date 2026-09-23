@@ -1047,7 +1047,13 @@ body.readonly-mode .btn.primary, body.readonly-mode .btn.danger { pointer-events
 .text-ok { color: var(--ok); }
 
 /* ══════════ Iframe (iteration module) ══════════ */
-.iteration-iframe { border-radius: var(--radius); border: 1px solid var(--line) !important; box-shadow: var(--shadow); }
+/* 高度不用 calc(100vh - 常数)：那个常数是拍脑袋的，视口/面包屑一变就露白边。
+   改为让 main-content 变成纵向 flex，iframe 用 flex:1 吃掉剩下的高度 ——
+   导航 56px、主区内边距、面包屑都被自动扣除，改版时不用再来调这个数。 */
+.main-content { display: flex; flex-direction: column; }
+.module-view.active { flex: 1; min-height: 0; }
+.iteration-module { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.iteration-iframe { flex: 1; min-height: 0; width: 100%; border-radius: var(--radius); border: 1px solid var(--line) !important; box-shadow: var(--shadow); }
 
 /* ══════════ Responsive ══════════ */
 @media (min-width: 1200px) { .hamburger-btn { display: none; } }

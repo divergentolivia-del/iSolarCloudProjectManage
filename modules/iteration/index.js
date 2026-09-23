@@ -36,7 +36,7 @@ const IterationModule = (() => {
     id: 'iteration',
     name: '阳光云迭代项目',
     icon: '📚',
-    order: 1,
+    order: 2,
     sidebar: true,
 
     /**

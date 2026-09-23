@@ -135,7 +135,7 @@ const TokenModule = (() => {
     id: 'token',
     name: 'AI/Token 使用记录',
     icon: '🤖',
-    order: 4,
+    order: 6,
     sidebar: false, // 不在侧边栏显示，作为仪表盘子页面
 
     render: render, // 暴露给 DashboardModule 调用

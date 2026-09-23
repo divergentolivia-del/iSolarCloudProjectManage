@@ -3332,7 +3332,7 @@ const PlanModule = (() => {
     id: 'plan',
     name: '项目计划',
     icon: '🗓️',
-    order: 3,
+    order: 4,
     sidebar: true,
     init,
     enter,

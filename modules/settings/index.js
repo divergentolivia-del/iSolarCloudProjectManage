@@ -472,7 +472,7 @@ const SettingsModule = (() => {
     id: 'settings',
     name: '系统设置',
     icon: '⚙',
-    order: 99,
+    order: 8,
     sidebar: false, // 不在侧边栏主导航显示，作为仪表盘子页面
 
     render: render,

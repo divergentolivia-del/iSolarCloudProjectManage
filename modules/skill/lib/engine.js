@@ -17,6 +17,8 @@ const gitsignalsSkill = require('../skills/gitsignals');
 const workloadSkill = require('../skills/workload');
 const wbsSkill = require('../skills/wbs');
 const knowledgeSkill = require('../skills/knowledge');
+const charterSkill = require('../skills/charter');
+const stakeholderSkill = require('../skills/stakeholder');
 
 const DATA_DIR = process.env.SKILL_DATA_DIR || path.join(__dirname, '..', '..', '..', 'data', 'skill');
 const STATE_FILE = path.join(DATA_DIR, 'state.json');
@@ -99,6 +101,9 @@ function collectInputs() {
         cycles: (it.cycles || []).map(c => ({ name: c.name, seal: c.seal, online: c.online, active: c.active })),
         board: (it.board || []).map(b => ({ line: b.productLine || '', team: b.team || '', est: b.est || 0 }))
       };
+      /* headcount：团队人头与负责人（charter / stakeholder 用；owner 只取人名，脱敏口径） */
+      inputs.plan.headcount = (it.headcount || {});
+
       /* 趋势：最近 2 期历史快照的偏差（存档在 data/iteration/history/） */
       const histDir = path.join(root, 'data', 'iteration', 'history');
       try {
@@ -166,7 +171,9 @@ const SKILLS = {
   gitsignals: { meta: { id: 'gitsignals', name: gitsignalsSkill.name, desc: gitsignalsSkill.desc }, run: gitsignalsSkill.analyze },
   workload: { meta: { id: 'workload', name: workloadSkill.name, desc: workloadSkill.desc }, run: workloadSkill.analyze },
   wbs: { meta: { id: 'wbs', name: wbsSkill.name, desc: wbsSkill.desc }, run: wbsSkill.generate },
-  knowledge: { meta: { id: 'knowledge', name: knowledgeSkill.name, desc: knowledgeSkill.desc }, run: knowledgeSkill.accumulate }
+  knowledge: { meta: { id: 'knowledge', name: knowledgeSkill.name, desc: knowledgeSkill.desc }, run: knowledgeSkill.accumulate },
+  charter: { meta: { id: 'charter', name: charterSkill.name, desc: charterSkill.desc }, run: charterSkill.generate },
+  stakeholder: { meta: { id: 'stakeholder', name: stakeholderSkill.name, desc: stakeholderSkill.desc }, run: stakeholderSkill.analyze }
 };
 
 function listSkills() {
@@ -308,7 +315,7 @@ function normalizeItems(skillId, output, resultId) {
   if (skillId === 'variance') (output.suggestions || []).forEach(o => push(o));
   if (skillId === 'report') (output.pendingConfirm || []).forEach(o => push(o));
   /* health / gitsignals / workload / wbs / knowledge 直接输出 items 字段（新增 Skill 时记得在这里注册；ref:true 的佐证项自动跳过） */
-  if (['health', 'gitsignals', 'workload', 'wbs', 'knowledge'].includes(skillId)) (output.items || []).forEach(o => push(o));
+  if (['health', 'gitsignals', 'workload', 'wbs', 'knowledge', 'charter', 'stakeholder'].includes(skillId)) (output.items || []).forEach(o => push(o));
   return items;
 }
 

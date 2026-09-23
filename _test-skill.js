@@ -417,3 +417,69 @@ console.log('\n[Skill8 知识沉淀器 · 采纳率与高频类目]');
 
 console.log('\n结果：' + pass + ' 通过，' + fail + ' 失败');
 process.exit(fail ? 1 : 0);
+
+console.log('\n[Skill9 项目章程生成器 · 纯函数]');
+{
+  const charter = require('./modules/skill/skills/charter');
+  const base = {
+    now: Date.now(),
+    plan: {
+      cycles: [{ name: 'V9', seal: '10.26', online: '10.29', active: true }],
+      board: [
+        { line: 'L1', team: 'TA', est: 10 },
+        { line: 'L1', team: 'TA', est: 5 },
+        { line: 'L2', team: 'TB', est: 3 }
+      ],
+      headcount: { TA: { owner: '王亚-2026-08-17 14:24' }, TB: { owner: '方德财' } }
+    },
+    deviations: [
+      { team: 'TA', workload: 90, head: 5, verdict: '产能不足' },
+      { team: 'TB', workload: 20, head: 4, verdict: '产能富余' }
+    ]
+  };
+  const r = charter.generate(base);
+  ck('章程聚合 2 条产品线 / 3 行规划', r.charter.lines === 2 && r.charter.rows === 3, r.charter);
+  ck('产能不足团队进风险确认项', r.items.some(i => i.id === 'charter-risk-capacity' && i.severity === '中'), r.items);
+  ck('里程碑章节与封版天数', r.markdown.includes('## 三、里程碑') && r.charter.daysToSeal !== null, '');
+  ck('章程 7 个章节齐全', ['## 一、项目概述', '## 二、目标与范围', '## 三、里程碑', '## 四、资源', '## 五、风险', '## 六、干系人', '## 七、验收口径'].every(h => r.markdown.includes(h)), '');
+  ck('封版临近（≤14 天）升级高风险', charter.generate(Object.assign({}, base, { now: Date.parse('2026-10-20') })).items.some(i => i.id === 'charter-risk-capacity' && i.severity === '高'), '');
+}
+
+console.log('\n[Skill10 干系人分析器 · 纯函数]');
+{
+  const stakeholder = require('./modules/skill/skills/stakeholder');
+  const base = {
+    plan: {
+      cycles: [{ name: 'V9', seal: '10.26', online: '10.29', active: true }],
+      board: [
+        { line: 'L1', team: 'TA', est: 10 },
+        { line: 'L1', team: 'TA', est: 5 },
+        { line: 'L2', team: 'TB', est: 3 },
+        { line: 'L2', team: 'TC', est: 2 }
+      ],
+      headcount: { TA: { owner: '王亚-2026-08-17 14:24' }, TB: { owner: '方德财' } }
+    },
+    deviations: [
+      { team: 'TA', workload: 90, head: 5, verdict: '产能不足' },
+      { team: 'TB', workload: 20, head: 4, verdict: '产能富余' },
+      { team: 'TC', workload: 10, head: 2, verdict: '产能富余' }
+    ]
+  };
+  const r = stakeholder.analyze(base);
+  ck('登记册含产品线 + 团队 + 版本', r.register.length >= 6 && r.register.some(x => x.type === '版本'), r.register);
+  ck('产能不足团队 → 高关注 + 关键干系人', r.key.teams.some(t => t.name === 'TA' && t.attention === '高'), r.key.teams);
+  ck('负责人解析（王亚-日期 → 王亚）', r.register.some(x => x.name === 'TA' && x.owner === '王亚'), r.register);
+  ck('未登记负责人团队进联系缺口', r.key.missingOwner.some(t => t.name === 'TC') && r.items.some(i => i.id === 'stk-owner-gap'), r.key.missingOwner);
+  ck('markdown 含登记册章节', r.markdown.includes('# 干系人登记册') && r.markdown.includes('## 四、联系缺口'), '');
+}
+
+console.log('\n[Skill9/10 · engine 注册与落库]');
+{
+  const empty = { plan: { cycles: [], board: [], headcount: {} }, deviations: [] };
+  const ch = engine.run('charter', empty);
+  ck('run(charter) 空输入也产出章程确认项', ch.ok && ch.result.items.length >= 1, ch.result.items);
+  const st = engine.run('stakeholder', empty);
+  ck('run(stakeholder) 空输入不报错', st.ok && Array.isArray(st.result.items), st.result.items);
+  const ids = engine.listSkills().map(x => x.id);
+  ck('listSkills 含 charter/stakeholder', ids.includes('charter') && ids.includes('stakeholder'), ids);
+}

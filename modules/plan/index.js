@@ -897,38 +897,41 @@ const PlanModule = (() => {
     </div>`;
   }
 
-  /* ---------- Tab 6：AI 规则（本地规则生成，预留 AI 入口） ---------- */
+  /* ---------- Tab 6：AI 能力（本地规则 + Skill 真实入口） ---------- */
   function renderAiTab(plan) {
     const rules = generateRules(plan);
     return `
     <div class="pl-wrap">
-      <div class="pl-sect-head"><h4>AI 智能规则 <span class="pl-count-pill">本地规则</span></h4>
-        <span class="pl-hint">当前为本地规则引擎生成，预留 AI 接入位</span></div>
+      <div class="pl-sect-head"><h4>AI 能力 <span class="pl-count-pill">12 个 Skill</span></h4>
+        <span class="pl-hint">自动类（风险/偏差/健康/负载/PR 信号）随数据批次运行，结果在各业务页与「今日待确认」；生成类需要你点一下</span></div>
       <div class="pl-ai-cards">
         <div class="cs-panel pl-ai-card">
-          <div class="pl-ai-card-head"><span class="pl-ai-icon">🧩</span><h4>WBS 任务模板</h4><span class="badge status-active">规则</span></div>
+          <div class="pl-ai-card-head"><span class="pl-ai-icon">🧩</span><h4>WBS 任务模板</h4><span class="badge status-active">本地规则</span></div>
           <div class="pl-ai-body">${rules.wbs}</div>
+          <button class="btn primary pl-skill-btn" data-skill-run="wbs" data-skill-label="WBS 草稿">✨ 用 Skill 生成 WBS 草稿</button>
         </div>
         <div class="cs-panel pl-ai-card">
-          <div class="pl-ai-card-head"><span class="pl-ai-icon">📉</span><h4>资源缺口分析</h4><span class="badge status-active">规则</span></div>
+          <div class="pl-ai-card-head"><span class="pl-ai-icon">📉</span><h4>资源缺口分析</h4><span class="badge status-active">自动</span></div>
           <div class="pl-ai-body">${rules.resource}</div>
+          <div class="pl-ai-auto-hint">由资源负载 Skill 随批次自动核算，无需手动触发</div>
         </div>
         <div class="cs-panel pl-ai-card">
-          <div class="pl-ai-card-head"><span class="pl-ai-icon">📝</span><h4>周报模板</h4><span class="badge status-active">规则</span></div>
+          <div class="pl-ai-card-head"><span class="pl-ai-icon">📝</span><h4>周报模板</h4><span class="badge status-active">本地规则</span></div>
           <div class="pl-ai-body">${rules.report}</div>
+          <button class="btn primary pl-skill-btn" data-skill-run="report" data-skill-label="本周周报">✨ 生成本周周报</button>
         </div>
       </div>
-      <div class="pl-ai-reserved">
-        <div class="pl-ai-reserved-icon">🤖</div>
-        <div class="pl-ai-reserved-body">
-          <h4>AI 智能助手（预留）</h4>
-          <p>此入口预留给 AI 生成 / 优化计划：自动生成 WBS 分解、识别资源瓶颈、生成周报摘要。当前为本地规则计算结果，接入 AI 后可切换为模型生成。</p>
-          <div class="pl-ai-reserved-tags"><span class="pl-chip">即将上线</span><span class="pl-chip">预留接口</span></div>
+      <div class="pl-skill-workbench">
+        <div class="pl-sect-head"><h4>其他生成类 Skill</h4><span class="pl-hint">点按钮生成草稿，可复制；确认项统一进「今日待确认」</span></div>
+        <div class="pl-skill-btns">
+          <button class="btn pl-skill-btn" data-skill-run="charter" data-skill-label="项目章程">📜 生成项目章程</button>
+          <button class="btn pl-skill-btn" data-skill-run="retro" data-skill-label="复盘草稿">🔄 生成复盘草稿</button>
+          <button class="btn pl-skill-btn" data-skill-run="stakeholder" data-skill-label="干系人分析">👥 干系人分析</button>
         </div>
       </div>
+      <div id="plSkillResult" class="pl-skill-result"></div>
     </div>`;
   }
-
   /* ---------- 本地规则生成 ---------- */
   function generateRules(plan) {
     const tasks = plan.tasks || [];
@@ -3176,6 +3179,20 @@ const PlanModule = (() => {
       if (expandedWbs.has(id)) expandedWbs.delete(id); else expandedWbs.add(id);
       renderTabBody();
     }));
+
+    /* Skill 真实入口：运行并展示结果（modules/skill/client.js） */
+    el.querySelectorAll('[data-skill-run]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-skill-run');
+        const label = btn.getAttribute('data-skill-label') || id;
+        if (typeof SkillClient !== 'undefined') {
+          SkillClient.runAndShow(id, { target: '#plSkillResult', btn, label }).catch(() => { });
+        } else {
+          const t = el.querySelector('#plSkillResult');
+          if (t) t.innerHTML = '<p class="sc-error">⚠ Skill 前端客户端未加载（检查 platform.html 的 client.js 引用）</p>';
+        }
+      });
+    });
 
   }
 

@@ -1,71 +1,33 @@
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   iSolarCloud Project Manage â€” Platform Stylesheet v2
-   OliviaWorkPlantform Design System Â· Full Light/Dark Theme
-   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
-/* â•â• Light Theme â•â• */
-:root {
-  --bg: #f5f6f8;
-  --panel: #ffffff;
-  --panel-soft: #f7f9fc;
-  --panel-tint: #eef6f4;
-  --line: #e6ecf2;
-  --line-strong: #d4dce4;
-  --text: #1d2129;
-  --muted: #6e7a8a;
-  --accent: #52c41a;
-  --accent-strong: #389e0d;
-  --accent-soft: #e8f8e0;
-  --blue: #5277ff;
-  --blue-soft: #eaf0ff;
-  --purple: #8b6cff;
-  --purple-soft: #f1edff;
-  --orange: #f5a524;
-  --orange-soft: #fff4db;
-  --pink: #f071a8;
-  --pink-soft: #fff0f6;
-  --warn: #f5222d;
-  --warn-soft: #fff1f0;
-  --ok: #52c41a;
-  --ok-soft: #f6ffed;
-  --hold: #fa8c16;
-  --hold-soft: #fff7e6;
-  --shadow: 0 2px 8px rgba(0,0,0,0.06);
-  --shadow-lg: 0 6px 20px rgba(0,0,0,0.07);
-  --shadow-xl: 0 16px 48px rgba(0,0,0,0.10);
-  --radius: 14px;
-  --radius-sm: 8px;
-  --radius-lg: 20px;
-  --navbar-height: 56px;
-  --sidebar-width: 220px;
-  --sidebar-collapsed-width: 60px;
-  --sidebar-transition: width 0.25s cubic-bezier(0.4,0,0.2,1);
-}
+/* ============ AI å¿«æ·èƒ½åŠ›ï¼ˆé¦–é¡µï¼‰ + SkillClient ç»“æœæ¸²æŸ“ ============ */
+.ai-quick-panel { background: linear-gradient(135deg, #f0f5ff, #fafbff); border: 1px solid #d8e2f5; border-radius: 10px; padding: 14px 18px; margin: 14px 0 6px; }
+.ai-quick-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.ai-quick-title { font-size: 15px; font-weight: 600; color: #1f2937; }
+.ai-quick-sub { font-size: 12px; color: #6b7280; }
+.ai-quick-actions { display: flex; align-items: center; gap: 14px; margin-top: 10px; flex-wrap: wrap; }
+.ai-quick-link { font-size: 13px; color: #2f6fed; text-decoration: none; font-weight: 500; }
+.ai-quick-link:hover { text-decoration: underline; }
+.ai-quick-result { margin-top: 12px; }
 
-/* â•â• Dark Theme â•â• */
-body.dark-theme,
-[data-theme="dark"] {
-  --bg: #0f1117;
-  --panel: #1a1d28;
-  --panel-soft: #1e2230;
-  --panel-tint: #1b2e2a;
-  --line: #2d3142;
-  --line-strong: #3d4256;
-  --text: #e4e6eb;
-  --muted: #8b8f9a;
-  --accent: #73d13d;
-  --accent-strong: #95de64;
-  --accent-soft: rgba(115,209,61,0.12);
-  --blue: #85a5ff;
-  --blue-soft: rgba(133,165,255,0.12);
-  --purple: #b197fc;
-  --purple-soft: rgba(177,151,252,0.12);
-  --orange: #ffc069;
-  --orange-soft: rgba(255,192,105,0.12);
-  --pink: #ff85c0;
-  --pink-soft: rgba(255,133,192,0.12);
-  --warn: #ff7875;
-  --warn-soft: rgba(255,120,117,0.12);
+/* SkillClient ç»“æœåŒºï¼ˆsc-*ï¼‰ */
+.sc-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.sc-badge { background: #2f6fed; color: #fff; font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 10px; }
+.sc-meta { font-size: 12px; color: #6b7280; }
+.sc-meta a { color: #2f6fed; text-decoration: none; }
+.sc-markdown { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 16px; max-height: 420px; overflow: auto; font-size: 13px; line-height: 1.65; color: #1f2937; }
+.sc-markdown h4 { margin: 10px 0 6px; font-size: 14px; }
+.sc-markdown h5 { margin: 8px 0 4px; font-size: 13px; }
+.sc-markdown ul { margin: 4px 0 8px; padding-left: 20px; }
+.sc-markdown li { margin: 2px 0; }
+.sc-markdown blockquote { margin: 6px 0; padding: 6px 10px; background: #f9fafb; border-left: 3px solid #d1d5db; color: #6b7280; font-size: 12px; }
+.sc-markdown code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+.sc-copy { margin-top: 8px; font-size: 12px; padding: 4px 12px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; cursor: pointer; color: #374151; }
+.sc-copy:hover { background: #f3f4f6; }
+.sc-hidden { display: none; }
+.sc-loading { color: #6b7280; font-size: 13px; padding: 8px 0; }
+.sc-error { color: #dc2626; font-size: 13px; padding: 8px 0; }
+.sc-empty { color: #9ca3af; font-size: 13px; padding: 8px 0; }
+17,0.12);
   --ok: #73d13d;
   --ok-soft: rgba(115,209,61,0.12);
   --hold: #ffc069;
@@ -1093,3 +1055,28 @@ body.readonly-mode .btn.primary, body.readonly-mode .btn.danger { pointer-events
   .main-content { margin-left: 0 !important; padding: 0; }
   .metric-card, .entry-card, .card { box-shadow: none; border: 1px solid #ddd; }
 }
+tÉÍB-1rñ÷h^ì)ß¨õ…¸=Ò¿,}“v\¢ZXüì;mr›4õgt¥u‘3)fxµò÷O@m¸ÑÙ”tæ2¹ŸfjHÜ*‘;ìlBÜã»xñ¨6ö©­+p¢"’0`³köF/Ù¢ØOşÃı°/‰W¼<~z, ‡ÀI-ª©ÓØõ†J7)_¥×sF/XÇm¥äì¢áÒ¡Îh³<„Şï>'çÈßt4TüĞG‘1&¯ˆ#ì¨Ÿ-êABŸ®{P%ß‚N¤îğ2¼{_:ZB0Æ³¿l>¸P[qP¡$Ÿ7²‹k8û•‹Êóh—èœ·¹YEÏ¿ìÕöİ¤FzĞ×AöèÓğ0"Ùš˜jÌ7
+-°ğgQÖsÇ4¥•A^!•WøÅ‚$;åflåNÜm˜ŸÓª—¤˜¥ZÉKĞºëçàWOËÚºLªBA›¨IóøïûDP ‹Í¯z|›œP":¸(o%'±ÆŠ
+
+€âÜÖœ¿˜ÔµH{;Ş
+!)‘ÿråùW×ÿIÃâøgÌ˜¾7ÌBˆò—k„õØÇ,ªuÿtóÿô¦?_K £U
+>á­9èƒ¦§iéK°±9¤7–Ÿtk¹O#^)zœ´øA×¡*Òu}ôyìï”r·¥0Ê0
+´¿+5•j‡ËëŸtÉÍB-1rñ÷h^ì)ß¨õ…¸=Ò¿,}“v\¢ZXüì;mr›4õgt¥u‘3)fxµò÷O@m¸ÑÙ”tæ2¹ŸfjHÜ*‘;ìlBÜã»xñ¨6ö©­+p¢"’0`³köF/Ù¢ØOşÃı°/‰W¼<~z, ‡ÀI-ª©ÓØõ†J7)_¥×sF/XÇm¥äì¢áÒ¡Îh³<„Şï>'çÈßt4TüĞG‘1&¯ˆ#ì¨Ÿ-êABŸ®{P%ß‚N¤îğ2¼{_:ZB0Æ³¿l>¸P[qP¡$Ÿ7²‹k8û•‹Êóh—èœ·¹YEÏ¿ìÕöİ¤FzĞ×AöèÓğ0"Ùš˜jÌ7
+-°ğgQÖsÇ4¥•A^!•WøÅ‚$;åflåNÜm˜ŸÓª—¤˜¥ZÉKĞºëçàWOËÚºLªBA›¨IóøïûDP ‹Í¯z|›œP":¸(o%'±ÆŠ
+
+€âÜÖœ¿˜ÔµH{;Ş
+!)‘ÿråùW×ÿIÃâøgÌ˜¾7ÌBˆò—k„õØÇ,ªuÿtóÿô¦?_K £U
+>á­9èƒ¦§iéK°±9¤7–Ÿtk¹O#^)zœ´øA×¡*Òu}ôyìï”r·¥0Ê0
+´¿+5•j‡ËëŸtÉÍB-1rñ÷h^ì)ß¨õ…¸=Ò¿,}“v\¢ZXüì;mr›4õgt¥u‘3)fxµò÷O@m¸ÑÙ”tæ2¹ŸfjHÜ*‘;ìlBÜã»xñ¨6ö©­+p¢"’0`³köF/Ù¢ØOşÃı°/‰W¼<~z, ‡ÀI-ª©ÓØõ†J7)_¥×sF/XÇm¥äì¢áÒ¡Îh³<„Şï>'çÈßt4TüĞG‘1&¯ˆ#ì¨Ÿ-êABŸ®{P%ß‚N¤îğ2¼{_:ZB0Æ³¿l>¸P[qP¡$Ÿ7²‹k8û•‹Êóh—èœ·¹YEÏ¿ìÕöİ¤FzĞ×AöèÓğ0"Ùš˜jÌ7
+-°ğgQÖsÇ4¥•A^!•WøÅ‚$;åflåNÜm˜ŸÓª—¤˜¥ZÉKĞºëçàWOËÚºLªBA›¨IóøïûDP ‹Í¯z|›œP":¸(o%'±ÆŠ
+
+€âÜÖœ¿˜ÔµH{;Ş
+!)‘ÿråùW×ÿIÃâøgÌ˜¾7ÌBˆò—k„õØÇ,ªuÿtóÿô¦?_K £U
+>á­9èƒ¦§iéK°±9¤7–Ÿtk¹O#^)zœ´øA×¡*Òu}ôyìï”r·¥0Ê0
+´¿+5•j‡ËëŸtÉÍB-1rñ÷h^ì)ß¨õ…¸=Ò¿,}“v\¢ZXüì;mr›4õgt¥u‘3)fxµò÷O@m¸ÑÙ”tæ2¹ŸfjHÜ*‘;ìlBÜã»xñ¨6ö©­+p¢"’0`³köF/Ù¢ØOşÃı°/‰W¼<~z, ‡ÀI-ª©ÓØõ†J7)_¥×sF/XÇm¥äì¢áÒ¡Îh³<„Şï>'çÈßt4TüĞG‘1&¯ˆ#ì¨Ÿ-êABŸ®{P%ß‚N¤îğ2¼{_:ZB0Æ³¿l>¸P[qP¡$Ÿ7²‹k8û•‹Êóh—èœ·¹YEÏ¿ìÕöİ¤FzĞ×AöèÓğ0"Ùš˜jÌ7
+-°ğgQÖsÇ4¥•A^!•WøÅ‚$;åflåNÜm˜ŸÓª—¤˜¥ZÉKĞºëçàWOËÚºLªBA›¨IóøïûDP ‹Í¯z|›œP":¸(o%'±ÆŠ
+
+€âÜÖœ¿˜ÔµH{;Ş
+!)‘ÿråùW×ÿIÃâøgÌ˜¾7ÌBˆò—k„õØÇ,ªuÿtóÿô¦?_K £U
+>á­9èƒ¦§iéK°±9¤7–Ÿtk¹O#^)zœ´øA×¡*Òu}ôyìï”r·¥0Ê0
+´¿+5•j‡ËëŸtÉÍB-1rñ÷h^ì)ß¨õ…¸=Ò¿,}“v\¢ZXüì;mr›4õgt¥u‘3)fxµò÷O@m¸ÑÙ”tæ2¹ŸfjHÜ*‘;ìlBÜã»xñ¨6ö©­+p¢"’0`³köF/Ù¢ØOşÃı°/‰W¼<~z, ‡ÀI-ª©ÓØõ†J7)_¥×sF/XÇ

@@ -97,6 +97,21 @@ const DashboardModule = (() => {
       </div>
     `;
 
+    // AI 快捷能力（周报是日常动作，放首页最显眼处）
+    const aiHtml = `
+      <div class="ai-quick-panel">
+        <div class="ai-quick-head">
+          <span class="ai-quick-title">🤖 AI 快捷能力</span>
+          <span class="ai-quick-sub">自动类 Skill 随数据批次运行；这里放需要你点一下的</span>
+        </div>
+        <div class="ai-quick-actions">
+          <button class="btn primary" id="dashRunReport">📝 生成本周周报</button>
+          <a class="ai-quick-link" id="dashInboxLink" href="#/dashboard/inbox">今日待确认（加载中…）→</a>
+        </div>
+        <div id="dashSkillResult" class="ai-quick-result"></div>
+      </div>
+    `;
+
     // 快速访问区：告警
     let alertsHtml = '';
     const alertSourceNote = '来源：项目里程碑逾期、预算超支、Token超限';
@@ -165,6 +180,7 @@ const DashboardModule = (() => {
         </div>
         ${metricsHtml}
         ${entriesHtml}
+        ${aiHtml}
         <div class="quick-access-row">
           ${alertsHtml}
           ${deviationHtml}
@@ -172,6 +188,23 @@ const DashboardModule = (() => {
         ${archivesHtml}
       </div>
     `;
+
+    // AI 快捷能力：周报生成按钮 + 预载最近结果 + 待确认数
+    const runBtn = document.getElementById('dashRunReport');
+    if (runBtn) runBtn.addEventListener('click', () => {
+      if (typeof SkillClient !== 'undefined') {
+        SkillClient.runAndShow('report', { target: '#dashSkillResult', btn: runBtn, label: '本周周报' }).catch(() => { });
+      }
+    });
+    if (typeof SkillClient !== 'undefined') SkillClient.preload('report', '#dashSkillResult', '本周周报');
+    fetch('/api/skill', { credentials: 'same-origin' })
+      .then(r => r.json())
+      .then(dd => {
+        const total = (dd.skills || []).reduce((s, x) => s + ((x.stats && x.stats.pendingCount) || 0), 0);
+        const link = document.getElementById('dashInboxLink');
+        if (link) link.textContent = '今日待确认（' + total + ' 条）→';
+      })
+      .catch(() => { });
   }
 
   /**

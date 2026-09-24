@@ -663,3 +663,220 @@ console.log(s.includes('_nonces: _nonces'));
 钉钉没有反查接口，扫了 15252 条档案无匹配。SSO 返回的工号直接匹配 `users.id`，
 这条线对平台要解决的问题没有额外价值。详见 `docs/plan-identity-and-dingtalk.md` B1。
 
+
+# 交接文档 v8 · 批5（分支收敛 + 团队名单落库 + 三条线进度盘点）
+
+> 2026-09-24 ｜ 分支 `main`（= `origin/main` = `origin/dev/sgai` @ `c84ae2f`）
+> **接续工作只看本节。** v1~v7 保留在上方，作为历史架构与踩坑记录。
+
+---
+
+## A. 本轮做了什么
+
+### 1. 远程分支从 18 个收敛到 3 个
+
+删掉 15 个远程分支。分两批：
+
+| 批次 | 分支 | 判定依据 |
+|---|---|---|
+| 有独有提交（3 个） | `feat/csenergy-module`(6) / `feat/olivia-theme-rewrite`(3) / `feat/tb-sync-stage1`(7) | 逐个比对后确认内容已在主线，见下表 |
+| 独有提交为 0（12 个） | `codex/*`(2) / `feat/archive-*` / `feat/export-cli` / `feat/plan-excel-export` / `feat/platform-shell` / `feat/tb-app-credentials` / `feat/tb-sync-stage2` / `fix/*`(4) | `git rev-list --count origin/dev/sgai..<b>` = 0 |
+
+**那 3 个有独有提交的，为什么可以删（证据）：**
+
+- `feat/csenergy-module`：`modules/csenergy/routes.js` 和 `csenergy.css` 与 HEAD **哈希完全相同**；
+  `index.js` **只差 1 行**（`order: 2` → `order: 3`，后来菜单加了模块）。
+  内容已在 9/3 以 `e0ab925「全年度项目管理看板」全能替代版` 并入主线。
+- `feat/olivia-theme-rewrite`：**废弃的设计方向**。它 +735 / **−2055** 行重写 `platform.css`，
+  而主线那份 CSS 后来走了完全不同的路（9/8~9/24 共 8 次修改）。
+  这 3 个提交 `git merge-base --is-ancestor` 判定**不在**主线历史里 —— 合它会把现有界面整个盖掉。
+- `feat/tb-sync-stage1`：已被 stage2 取代，9/4 以 `bbea461` 重新落进主线。
+  它改的 `app.css`/`app.js`/`index.html` 是**更早那套单页应用的产物**（工作台已改用 platform.html 那套 SPA 骨架）。
+
+> 结论：**没有任何代码丢失**。三个分支的作者都不是 SGAI+（是更早一轮的 Kiro Agent）。
+
+### 2. 团队名单 → `data/dingtalk/teams.json`（新增文件）
+
+用户 2026-09-24 交付 `钉钉开发/智慧能源人员名单.csv`（372 人 / 19 个团队分类）。
+
+**数据核对结论：全对。** CSV 372 人 ↔ 通讯录在册 372 人，**双向严格比对零差异**，
+19 行「标注人数」= 实际姓名数，全部相符。
+
+> ⚠️ 中途我曾报「11 人对不上」，**那是我比对逻辑的错**（拿姓名的姓氏前缀去撞通讯录里带后缀的写法），
+> 不是名单的问题。用户这一版用的是通讯录同款写法（如 `王亚-云服务开发部`）。
+
+新增 `data/dingtalk/teams.json`（10,590 字节）：
+
+```
+teams[]   : { team, orgPath, declared, count } × 19   团队元信息
+members{} : 团队分类 → [姓名...]                       372 人归位
+total     : 372
+```
+
+**为什么放 `data/dingtalk/` 而不是 `钉钉开发/`** —— 后者是**未跟踪目录**（`git status` 显示 `?? 钉钉开发/`），
+部署到服务器时会缺文件。`teams.json` 只有姓名 + 团队分类、**不含工号**，可以进 git。
+（`org.json` 含工号，仍在 `.gitignore` 里保持本机快照。）
+
+### 3. 两处代码修复（已在 `c84ae2f`，已推 main）
+
+| 文件 | 修复 |
+|---|---|
+| `modules/notify/routes.js` | 文件头声明了 4 个端点却全部没实现（落到 404）。补齐 `POST /send`、`GET|POST /config`、`GET /resolve`，复用已有的 `saveConfig`/`checker.sendToUsers`/`resolveUsers` |
+| `db.js` `DEFAULT_PERMISSIONS` | `routes.js` 导出 `resource:'notify'` 但 `pm`/`dev`/`viewer` 都没有 `notify:*` → 除 admin 外全部 403。给 `pm` 补 `notify:read`/`notify:write`；**刻意不给 `dev`**（能改 `groupChatId`/`agentId` 就等于能以公司名义往群里发消息） |
+
+> **要重启服务才生效** —— `seedPermissions()` 只在启动时补种（`db.js:160`）。
+> 不重启的话钉钉推送配置页对 `pm` 仍是 403。
+
+### 4. 数据安全验证（每次都做）
+
+`data/iteration/state.json` —— 用户真实工时数据 —— **全程一个字节没碰**。
+推送前后做过 `cmp` 逐字节校验，235,736 字节一致，rev 506 / board 627 未变。
+
+---
+
+## B. ⚠️ 本轮最重要的发现：`plan-dingtalk-sso.md` 的 D11 已不成立
+
+`docs/plan-dingtalk-sso.md` 的 **D11** 写着：
+
+> 平台 `config.js` 的 `TEAMS[].key` ↔ 钉钉部门名 **一一对应**（用户已确认），**不需要维护对照表**
+
+**这条必须更正，两边根本不是一回事：**
+
+| | 数量 | 形态 | 用途 |
+|---|---|---|---|
+| `config.js` 的 `TEAMS[].key` | **18** | `APP开发-阳光云`、`后端开发-平台`、`中台开发-IoT中台` —— **业务线 × 部门** 二维 | 工时偏差按团队核算 |
+| 用户 CSV 的团队分类 | **19** | `App开发部`、`后端开发部`、`中台开发部` —— **纯部门** 一维 | 权限与人管 |
+
+`APP开发-阳光云` ≠ `App开发部`：前者是"App开发部里做阳光云的那批人"，后者是整个 App开发部。
+**两个正交维度，都需要，谁也替代不了谁。**
+
+**已定的处理（用户 2026-09-24 拍板「我提供的 csv 就是我想要的团队分类」）：**
+- **不动 `config.js`**（它服务的是核算，不是人管）
+- `teams.json` 作为**用户归属的唯一口径**
+- `users.department` 列存 **CSV 团队分类**（19 个值），通讯录原始部门名另存参考
+- **待办**：去 `plan-dingtalk-sso.md` 的 D11 下补一条更正说明，否则 SGAI+ 会按错假设写映射
+
+---
+
+## C. 三条线的真实进度盘点（用户本轮明确问过）
+
+### 线 1 · 登录与账号：**P0 基本完成，缺「按部门筛人」**
+
+| 项 | 状态 | 位置 |
+|---|---|---|
+| 登录 / 登出 / 改密 / 当前用户 | ✅ | `modules/auth/routes.js:179/232/241/254` |
+| 会话（Cookie + 30 天 + SSO ttl 覆盖） | ✅ | `db.js:257` `createSession(userId, ttlSec)` |
+| 密码哈希（scrypt 加盐 + `timingSafeEqual`） | ✅ | `db.js:192` |
+| 四角色权限矩阵 + 按权限点补齐 | ✅ | `db.js:88` / `db.js:160` |
+| 登录节流 + 全站熔断 | ✅ | `auth/routes.js:100-170` |
+| 批量建号 CLI（**已支持 `department` 列**） | ✅ | `user-import.js:214`、`:293` |
+| 初始密码提示条 | ✅ | `platform.html:77` |
+| **用户管理界面** | ❌ **不存在** | `modules/settings/index.js:22` 的 render 只有主题/账号/白名单/审计 |
+| **按部门查询接口** | ❌ **数据到了嘴边没人用** | `users.department` 列已建（`db.js:38`），`listUsers()` 已按它排序，但**没有接口按它过滤** |
+
+### 线 2 · SSO：**代码完整，卡在 3 个只能靠真实登录才能定的值**
+
+`modules/sso/routes.js`（485 行，`/sso/login`、`/sso/callback`、`/sso/status`、`/sso/logout`）
+已在 `server.js:354` 挂载。`data/sso/secret.json` 的 `clientId` / `clientSecret` / 各 URL **全部已填**。
+
+**卡住的三个点：**
+
+1. **`idField` 是猜的** —— `sso/routes.js:118` 注释写明「返回体里工号所在的字段名**待确认**」。
+   现填 `userNo` 一类猜测。**只有第一次真实登录才能验证**（`debug: true` 就是为了那一刻打印原始返回体）。
+2. **`logoutUrl` 环境不匹配** —— 生产 `sso.sungrow.cn` vs 配置里 `sso-sit.sungrow.cn`（SIT）。登出会跳测试环境。
+3. **从没真跑过一次 SSO 登录** —— `_test-sso.js` 是本地断言，不是端到端。
+
+> 这三条**我一个都改不了**，都需要用户在服务器上开 `AUTH_REQUIRED=1` 走一次 `/sso/login`，
+> 把控制台原始返回体给出来，才能定死 `idField`。
+
+### 线 3 · 钉钉：**四条支线进度差距很大**
+
+| 支线 | 状态 |
+|---|---|
+| **(a) 通讯录拉取** | ✅ **已完成**。`dingtalk-sync.js`/`dingtalk-roster.js` 跑通，产物全在（`org.json` 85 部门 + 372 人、`roster.csv`、`leavers.csv`、`report.txt`） |
+| **(a) 通讯录 → `users` 表对账（P1-3）** | ❌ **没写**。平台账号与钉钉通讯录是**两套并行数据，没连起来** |
+| **(b) 钉钉文档同步 2b** | ⏸ 卡在 `operatorId` / `docUrl` **两个空值**。`dingtalk-ping.js` 已就位，第 1 跳换 token **已实测通过**（出网+鉴权已证明），补齐后重跑即可，**不用改代码** |
+| **(c) 钉钉免登（扫码登录）** | ❌ 没开始（D7 定的顺序是先 P1 通讯录 → 再 P2 免登） |
+| **(d) `modules/dingtalk/` 无 `routes.js`** | ⚠️ **结构问题**。加载器扫描 `routes.js` 找不到就**静默跳过**（`module-loader.js:33`），所以钉钉**不是可访问模块**，`client.js` 只是被命令行脚本引用的库 —— **没有网页界面能看/操作通讯录** |
+
+**模块挂载现状（`routes.js` 有无）：**
+
+```
+已挂载 12 个：auth budget csenergy dashboard inbox iteration
+              notify plan pradapter project settings skill tb token
+未挂载  1 个：dingtalk（只有 client.js）
+特殊    1 个：sso（走 server.js:354 站点级路由，不走 module-loader）
+```
+
+---
+
+## D. 下一步（按优先级，接续工作从这里开始）
+
+### 第一件（立刻做）：部门筛选 + 用户管理界面
+
+这是「部门归属 + 用户管理页面还在等这个」那句话的兑现。前置条件**已全部就位**：
+`teams.json` ✅ / `users.department` 列 ✅ / `user-import.js` 支持 department ✅。
+
+要做：
+1. `auth/routes.js` 加按部门查询（`GET /api/auth/users?dept=<团队分类>`），或返回部门清单供前端下拉
+2. `modules/settings/index.js` 加「用户管理」区块：列表 + 部门筛选下拉 + 改角色 + 启停用
+3. 筛选下拉的数据源读 `data/dingtalk/teams.json` 的 `teams[].team`（19 项）
+
+### 第二件：钉钉通讯录 → `users` 表对账（P1-3）
+
+按 `plan-dingtalk-sso.md` 的**硬约束**写，一条都不能松：
+
+- 自动建号角色**一律 `viewer`**（D8）
+- **改角色永不自动** —— 钉钉里转岗了，平台只提示「建议复核」
+- **停用可自动，但必须写 `audit_log`**（记「因钉钉对账停用」）
+- 只新增，**不改已有账号的角色和密码**（否则重跑会冲掉别人改过的密码）
+- 对不上的部门**不报错、不静默忽略**，写进对账报告，分「钉钉有平台无」「平台有钉钉无」两类
+
+### 第三件：更正 `docs/plan-dingtalk-sso.md` 的 D11
+
+在 D11 那行下面加更正块，说明「一一对应」不成立，指向 `teams.json`。**不做的话 SGAI+ 会按错假设写映射。**
+
+### 第四件（可选）：给 `modules/dingtalk/` 加 `routes.js`
+
+让它成为一个真正可访问的模块（看通讯录、跑对账、看对账报告）。
+**在做完第一、二件之前不动。**
+
+---
+
+## E. 需要用户提供 / 操作的两件事（都不急）
+
+| # | 事 | 怎么做 | 卡住什么 |
+|---|---|---|---|
+| 1 | **重启服务** | `Ctrl+C` 然后 `node server.js`（**不用拉代码**，改动已在本机磁盘上） | `notify:read`/`notify:write` 才能被 `seedPermissions()` 补种进权限表；否则钉钉推送配置页对 `pm` 仍是 403 |
+| 2 | **钉钉文档的 `operatorId` + `docUrl`** | 照 `data/dingtalk/secret.example.json` 填进 `data/dingtalk/secret.json`，敲一句「填好了」 | 2b 同步。填好后 `node dingtalk-ping.js` 一次验完连通性 |
+| 3 | **一次真实 SSO 登录** | 服务器开 `AUTH_REQUIRED=1` 走一遍 `/sso/login`，把控制台**原始返回体**给出 | `idField` 定不死，SSO 就上不了线。**这条只能用户来** |
+
+> ⚠️ 重启会掐断当前连接 —— 用户明确说过「云服务迭代版本那里现在服务还在启着用着更新着呢」，
+> **所以重启时机由用户定，不要自作主张重启。**
+
+---
+
+## F. 安全铁律（未变，重申）
+
+1. **绝不 `git add .`** —— `data/iteration/state.json` 已被 git 跟踪，会一并提交
+2. 提交前 `git diff --cached --name-only | grep -c '^data/'` 必须为 **0**
+3. 密钥类值**不进聊天、不进截图、不进代码**，只进 gitignore 的配置文件
+4. `client_secret` 只存 `data/sso/secret.json`；钉钉 `appSecret` 只存 `data/dingtalk/secret.json`
+5. `AI项目管理新范式思路.txt` 和 `钉钉开发/` 保持**未跟踪**
+6. **改动一律推 `origin/dev/sgai`，验收后才合并 main**（`CLAUDE.md` 第一条）
+7. **Skill 代码属于 SGAI+**，Claude Code 不写 Skill 代码；范围是平台骨架、模块集成、版面设计、钉钉/SSO 打通、排障
+
+---
+
+## G. 本轮踩过的坑
+
+1. **比对姓名时，不要拿「姓氏前缀」去撞带后缀的通讯录写法。** 通讯录里 11 个人姓名**本身就带部门后缀**
+   （`王亚-云服务开发部`），我用前缀匹配才误报「11 人对不上」。**严格全字符串比对，双向都跑一遍。**
+2. **`钉钉开发/` 是未跟踪目录**，放进去的东西部署时会缺。要入库的数据放 `data/dingtalk/`。
+3. **删远程分支前，必须用 `git merge-base --is-ancestor` + 文件哈希双重确认**，
+   不能只看 `git rev-list --count`。`feat/olivia-theme-rewrite` 就是典型：
+   它「看起来像主题更新」，实际是把废弃方向盖回来。
+4. **`config.js` 的 `TEAMS` 和用户名单的团队分类不是一回事**，见 §B。别想当然认为"一一对应"。
+5. **`modules/*/` 只有 `client.js` 没有 `routes.js` = 静默不挂载**，加载器不报错（`module-loader.js:33`）。
+   排查"模块为什么访问不到"时先看这个。
+6. **本文件用 CRLF 换行**，追加内容时必须统一，否则 git diff 会整文件变红。

@@ -55,6 +55,17 @@ data/auth-config.json
 # 员工名单（含工号/姓名，不入库）
 docs/samples/员工名单.csv
 
+# ⚠️ 批量建号产出的初始密码表（工号 + 姓名 + 明文初始密码，373 行）
+# 2026-09-24 发现：这份表躺在 docs/samples/ 下且未被忽略，只要谁跑一次
+# `git add .` 就会把 372 人的明文初始密码提交进 GitHub。
+# 名字虽然带「.example」以外的形态，但内容绝不带 .example 后缀 —— 一律忽略。
+docs/samples/初始密码表.csv
+docs/samples/*密码*.csv
+
+# 部门归属核对表（372 人姓名 + 钉钉部门 ID，与 data/dingtalk/org.json 同口径的本机快照）
+# 口径要进库的话走 data/dingtalk/teams.json（只有团队分类，不含工号/部门 ID）
+docs/samples/部门归属核对表.csv
+
 # 平台系统库（身份/权限/审计）
 data/platform.db
 data/platform.db-wal

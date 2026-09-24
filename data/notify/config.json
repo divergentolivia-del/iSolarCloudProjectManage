@@ -1,0 +1,29 @@
+{
+  "_说明": "钉钉主动推送与智能提醒配置。改完本文件无需重启，下一次定时检查自动生效。",
+  "_群ID": "groupChatId = 钉钉企业群的 openConversationId。获取方式：把本应用机器人拉进目标群 → 在群内 @ 机器人任意消息 → 在钉钉开放平台「应用开发→事件订阅」或后台消息记录里看到该群的 openConversationId（形如 cidXXXX）；也可由管理员从后台查询。留空时推送进入 data/notify/outbox.json 待发队列，不会发出去。",
+  "_agentId": "agentId = 钉钉企业内部应用的 AgentId（应用后台「凭证与基础信息」页）。填了之后，智能提醒才会额外给责任人发工作通知（App 内单聊提醒）；留空则只发群消息。",
+  "enabled": true,
+  "groupChatId": "",
+  "agentId": "",
+  "highSeverity": {
+    "on": true,
+    "severities": ["high"],
+    "_severities说明": "推送哪些严重度的待确认项。可取值 high/medium/low。",
+    "maxPerRun": 8,
+    "_maxPerRun说明": "单次检查最多推送的条目数，防止刷屏。"
+  },
+  "reminders": {
+    "on": true,
+    "sealDays": [7, 3, 1],
+    "_sealDays说明": "距离封版（cycle.seal）还有这些天数时提醒一次。",
+    "onlineDays": [3, 1],
+    "_onlineDays说明": "距离上线（cycle.online）还有这些天数时提醒一次。",
+    "dueDays": [3, 1],
+    "_dueDays说明": "距离里程碑（plan.due）还有这些天数时提醒一次。"
+  },
+  "schedule": {
+    "intervalMinutes": 60,
+    "startupDelaySeconds": 45,
+    "_说明": "服务启动后延迟 startupDelaySeconds 秒做首次检查，之后每 intervalMinutes 分钟一次。"
+  }
+}

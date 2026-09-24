@@ -64,3 +64,7 @@ backups/
 # PR adapter（本地仓库配置含机器路径，运行快照不入库）
 data/pradapter/
 data/skill/
+
+# 钉钉主动推送运行时状态（待发队列含业务内容，不入库；config.json 是配置，要入库）
+data/notify/state.json
+data/notify/outbox.json

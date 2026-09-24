@@ -172,7 +172,13 @@ function readRoster(file) {
     const i = col('密码前缀');
     return i >= 0 ? i : col('口令前缀');
   }
-  const ci = { id: col('工号'), name: col('姓名'), prefix: colPrefix(), role: col('角色') };
+  const ci = {
+    id: col('工号'), name: col('姓名'), prefix: colPrefix(), role: col('角色'),
+    /* 部门：roster.csv 的第 5 列，列头形如「部门（仅供人工核对，导入时忽略）」。
+       2026-09-24 起不再忽略 —— 用户管理要按部门筛选、部门 admin 只看本部门，
+       都得靠这一列。所以按【前缀匹配】找列，别写死列头全名。 */
+    dept: header.findIndex(function (h) { return /^部门/.test(String(h).trim()); })
+  };
   if (ci.id < 0 || ci.name < 0 || ci.prefix < 0) {
     fail('表头至少要有「工号,姓名,密码前缀」三列。实际读到：' + header.join(','));
   }
@@ -185,6 +191,7 @@ function readRoster(file) {
     const name = (f[ci.name] || '').trim();
     const prefix = (f[ci.prefix] || '').trim();
     const role = ci.role >= 0 ? (f[ci.role] || '').trim() : '';
+    const dept = ci.dept >= 0 ? (f[ci.dept] || '').trim() : '';
 
     if (!id && !name) continue;                                  // 整行空，跳过
     if (!id) { rows.push({ lineNo: lineNo, bad: '缺工号' }); continue; }
@@ -197,7 +204,7 @@ function readRoster(file) {
       rows.push({ lineNo: lineNo, id: id, name: name, bad: '角色非法：' + role + '，可选 ' + ROLES.join('/') });
       continue;
     }
-    rows.push({ lineNo: lineNo, id: id, name: name, prefix: prefix, role: role || 'viewer' });
+    rows.push({ lineNo: lineNo, id: id, name: name, prefix: prefix, role: role || 'viewer', dept: dept });
   }
   return rows;
 }
@@ -259,7 +266,8 @@ function main() {
   if (dryRun) {
     console.log('将要新建 ' + toCreate.length + ' 个账号：');
     toCreate.forEach(function (r) {
-      console.log('  ' + r.id.padEnd(14) + r.name.padEnd(10) + r.role.padEnd(8) + '密码 ' + buildPassword(r.prefix, r.id, cfg));
+      console.log('  ' + r.id.padEnd(14) + r.name.padEnd(14) + r.role.padEnd(8)
+        + (r.dept || '(无部门)').padEnd(24) + '密码 ' + buildPassword(r.prefix, r.id, cfg));
     });
     if (skipped.length) {
       console.log('');
@@ -282,6 +290,7 @@ function main() {
         id: r.id,
         name: r.name,
         role: r.role,
+        department: r.dept || null,
         password: buildPassword(r.prefix, r.id, cfg),
         initialPassword: true
       });

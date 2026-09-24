@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS users (
   dingtalk_id   TEXT,                      -- 钉钉 userId，将来扫码登录用
   password_hash TEXT,                      -- scrypt 加盐哈希；纯钉钉登录的用户可为空
   role          TEXT NOT NULL DEFAULT 'viewer',
+  department    TEXT,                      -- 部门（钉钉通讯录叶子部门名）。用于部门 admin 只读本部门、按部门筛选
   enabled       INTEGER NOT NULL DEFAULT 1,
   pwd_is_initial INTEGER NOT NULL DEFAULT 0, -- 1 = 还在用批量建号发的初始密码（前端提示可改，不强制）
   created_at    TEXT,
@@ -116,6 +117,10 @@ function migrate() {
   if (!cols.includes('pwd_is_initial')) {
     get().exec('ALTER TABLE users ADD COLUMN pwd_is_initial INTEGER NOT NULL DEFAULT 0');
     console.log('[db] 已为 users 表补列 pwd_is_initial（初始密码标记）');
+  }
+  if (!cols.includes('department')) {
+    get().exec('ALTER TABLE users ADD COLUMN department TEXT');
+    console.log('[db] 已为 users 表补列 department（部门，用于部门 admin 与按部门筛选）');
   }
 }
 
@@ -207,18 +212,19 @@ function findUser(id) {
 
 function listUsers() {
   return get().prepare(
-    'SELECT id, name, role, dingtalk_id, enabled, created_at FROM users ORDER BY created_at'
+    'SELECT id, name, role, department, dingtalk_id, enabled, created_at FROM users ORDER BY department, id'
   ).all();
 }
 
-function createUser({ id, name, password, role, dingtalkId, initialPassword }) {
+function createUser({ id, name, password, role, dingtalkId, initialPassword, department }) {
   if (!id || !name) throw new Error('账号和姓名不能为空');
   if (findUser(id)) throw new Error('账号已存在：' + id);
   const now = new Date().toISOString();
   get().prepare(
-    'INSERT INTO users(id, name, password_hash, role, dingtalk_id, enabled, pwd_is_initial, created_at, updated_at) VALUES(?,?,?,?,?,1,?,?,?)'
+    'INSERT INTO users(id, name, password_hash, role, department, dingtalk_id, enabled, pwd_is_initial, created_at, updated_at) VALUES(?,?,?,?,?,?,1,?,?,?)'
   ).run(String(id), String(name), password ? hashPassword(password) : null,
-        String(role || 'viewer'), dingtalkId || null, initialPassword ? 1 : 0, now, now);
+        String(role || 'viewer'), department ? String(department) : null,
+        dingtalkId || null, initialPassword ? 1 : 0, now, now);
   return findUser(id);
 }
 

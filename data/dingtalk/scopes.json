@@ -1,0 +1,23 @@
+{
+  "_说明": "钉钉通讯录的拉取范围。改这里，不用动代码。",
+  "_为什么不全量拉": "这个钉钉组织是全公司的（实测 4657+ 部门、21340 人），而平台受众是某个部门。全量拉每次两分钟，且 99% 的数据永远用不上。",
+
+  "_怎么加范围": [
+    "在 scopes 数组里加一项即可，跑 node dingtalk-sync.js --scope <id> 选择要拉哪个。",
+    "不传 --scope 时按 defaultScope 拉。",
+    "deptId 是钉钉部门 id；deptName 只用于日志和标注，写错不影响拉取。",
+    "不知道 deptId？跑 node dingtalk-sync.js --find \"部门名关键字\" 来查。"
+  ],
+
+  "defaultScope": "smart-energy",
+
+  "scopes": [
+    {
+      "id": "smart-energy",
+      "deptId": "509469754",
+      "deptName": "智慧能源产品中心 Smart Energy Product Center",
+      "path": "董事长 > 高级副总裁 SVP（顾亦磊）> 光储集团 PV&Storage BG > 光储技术平台 PV&ES Technology Platform > 智慧能源产品中心",
+      "_备注": "当前使用的大部门，旗下含研发中心、测试部等。maxDepth 给 8 层足够覆盖到小组。"
+    }
+  ]
+}

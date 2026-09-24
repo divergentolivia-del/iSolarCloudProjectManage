@@ -35,6 +35,14 @@ data/dingtalk/secret.json
 data/dingtalk/state.json
 data/dingtalk/token.json
 
+# 钉钉通讯录拉取产物（含 372 名真实员工的姓名 + 工号 + 部门，不入库）
+# 这些是【本机快照】，不是配置：每个人自己跑 node dingtalk-sync.js 重新生成。
+# scopes.json 不在此列 —— 它只有部门 id 和名字，是配置，要进库当模板。
+data/dingtalk/org.json
+data/dingtalk/roster.csv
+data/dingtalk/leavers.csv
+data/dingtalk/report.txt
+
 # 公司 SSO 应用凭据（client_secret，绝不入库；模板见 docs/samples/sso-secret.sample.json）
 data/sso/
 

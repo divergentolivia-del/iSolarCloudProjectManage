@@ -287,11 +287,13 @@ async function checkReminders() {
       queued++;
     }
 
-    /* 工作通知：给团队负责人（仅封版/上线类，里程碑没有明确责任人字段） */
-    if (t.ownerTarget && pusher.workNoticeReady()) {
+    /* 单聊：给团队负责人发。有 agentId 用工作通知（更正式），否则机器人单聊 */
+    if (t.ownerTarget) {
       const uids = teamOwnerUserIds();
       if (uids.length) {
-        const r = await pusher.sendWorkNotice(uids, text);
+        let r;
+        if (pusher.workNoticeReady()) r = await pusher.sendWorkNotice(uids, text);
+        else r = await pusher.sendUserText(uids, text);
         if (!r.ok) pushOutbox({ kind: 'workNotice', key: t.key, userIds: uids, text, error: r.error });
       }
     }
@@ -301,6 +303,39 @@ async function checkReminders() {
   }
   if (reminded.length) saveNotifyState(ns);
   return { reminded, queued, pushed };
+}
+
+/* ---------- 手动单点发送 ---------- */
+
+/**
+ * 按姓名（支持多个，用英文逗号/中文顿号/空格分隔）解析钉钉 userId。
+ * @returns {{found:Array, missing:Array}}
+ */
+function resolveUsers(namesText) {
+  const names = String(namesText || '')
+    .split(/[,，、\s]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+  const org = readJson(ORG_FILE, { users: [] });
+  const found = [];
+  const missing = [];
+  for (const name of names) {
+    const u = (org.users || []).find(x => x && x.name === name && x.active !== false);
+    if (u) found.push({ name, userId: u.userId, dept: u.deptName || '' });
+    else missing.push(name);
+  }
+  return { found, missing };
+}
+
+/**
+ * 给指定姓名的人发一条消息（机器人单聊）。
+ * @returns {Promise<{ok:boolean, sent:number, missing:Array, error?:string}>}
+ */
+async function sendToUsers(namesText, text) {
+  const { found, missing } = resolveUsers(namesText);
+  if (!found.length) return { ok: false, sent: 0, missing, error: '没有匹配到可发送的人' };
+  const r = await pusher.sendUserText(found.map(f => f.userId), text);
+  return { ok: r.ok, sent: r.ok ? found.length : 0, missing, error: r.ok ? '' : r.error };
 }
 
 /* ---------- 对外：一次完整检查 ---------- */
@@ -360,5 +395,6 @@ async function flushOutbox() {
 
 module.exports = {
   checkAll, checkHighSeverity, checkReminders, flushOutbox,
-  outbox, notifyState, _internal: { parseMD, daysUntil, ownerName, userIdOf, teamOwnerUserIds, sevOf }
+  outbox, notifyState, resolveUsers, sendToUsers,
+  _internal: { parseMD, daysUntil, ownerName, userIdOf, teamOwnerUserIds, sevOf }
 };

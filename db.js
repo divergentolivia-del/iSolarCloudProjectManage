@@ -93,6 +93,7 @@ const DEFAULT_PERMISSIONS = {
     'pradapter:read', 'pradapter:write',   // Git PR adapter：采集/确认映射/看告警
     'skill:read', 'skill:write',            // AI Skill 运行时：风险/周报/偏差 + 确认待确认项
     'inbox:read', 'inbox:write',             // 今日待确认：跨 Skill 聚合入口（AI 输出的统一落点）
+    'notify:read', 'notify:write',           // 钉钉主动推送：看配置/待发队列 + 改配置/手动发/补发
     'ai:doc', 'ai:risk', 'ai:report'          // 可调用文档/风险/周报 Agent
     // 刻意不含 'budget:write' 与 'ai:finance'：PM 不能改预算基准、不能调财务 Agent
   ],
@@ -100,6 +101,7 @@ const DEFAULT_PERMISSIONS = {
     'plan:read', 'iteration:read', 'project:read', 'csenergy:read',
     'dashboard:read', 'token:read', 'pradapter:read', 'skill:read', 'inbox:read'
     // 无 write：研发改自己的任务状态走单独的 'task:write' 通道（后续用行级权限补齐）
+    // 也不含 notify:*：推送配置里是 groupChatId / agentId，能改就等于能让平台以公司名义往群里发消息
   ],
   viewer: [
     'plan:read', 'iteration:read', 'project:read', 'csenergy:read',

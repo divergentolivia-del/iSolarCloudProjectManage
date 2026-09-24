@@ -33,6 +33,8 @@ const SECRET_FILE = path.join(__dirname, '..', '..', '..', 'data', 'dingtalk', '
 
 const TEXT_MAX = 1800; // 钉钉单条文本消息上限约 2000 字符，留余量按行切段
 
+const BATCH_MAX = 100; // 机器人单聊单次最多 100 个 userId
+
 /* ---------- 配置 ---------- */
 
 function readConfig() {
@@ -150,7 +152,57 @@ async function sendGroupText(text) {
 }
 
 /**
- * 发工作通知（企业内部应用 → 指定员工单聊）。userIds 为钉钉 userId 数组。
+ * 机器人单聊（企业内部应用机器人 → 指定员工）。
+ * 走新版接口 /v1.0/robot/oToMessages/batchSend，只需 robotCode（=appKey），
+ * 不需要 agentId —— 「给单点某个人发消息」的默认通道。
+ * @returns {Promise<{ok:boolean, error?:string, detail?:object}>}
+ */
+async function sendUserText(userIds, text) {
+  const cfg = readConfig();
+  if (!cfg.enabled) return { ok: false, error: '推送未启用（config.enabled=false）' };
+  const ids = (userIds || []).filter(Boolean);
+  if (!ids.length) return { ok: false, error: '没有可发送的 userId' };
+
+  let token;
+  try {
+    token = await dt.getToken();
+  } catch (e) {
+    return { ok: false, error: '取 token 失败：' + (e && e.message || e) };
+  }
+
+  const code = robotCode();
+  if (!code) return { ok: false, error: '缺少 robotCode / appKey' };
+
+  const sent = [];
+  for (let i = 0; i < ids.length; i += BATCH_MAX) {
+    const batch = ids.slice(i, i + BATCH_MAX);
+    const parts = splitText(text);
+    for (const part of parts) {
+      const r = await dt.req('POST', API + '/v1.0/robot/oToMessages/batchSend', {
+        token,
+        body: {
+          robotCode: code,
+          userIds: batch,
+          msgKey: 'sampleText',
+          msgParam: JSON.stringify({ content: part })
+        }
+      });
+      if (r.status >= 200 && r.status < 300 && r.json && !r.json.errorCode) {
+        sent.push(r.json);
+      } else {
+        return {
+          ok: false,
+          error: '单聊发送失败（HTTP ' + r.status + '）：' + JSON.stringify(r.json || r.text).slice(0, 300),
+          sent: sent.length
+        };
+      }
+    }
+  }
+  return { ok: true, sent: sent.length, detail: sent };
+}
+
+/**
+ * 发工作通知（企业内部应用 → 指定员工单聊，需 agentId）。
  * @returns {Promise<{ok:boolean, error?:string, detail?:object}>}
  */
 async function sendWorkNotice(userIds, text) {
@@ -193,5 +245,5 @@ async function sendWorkNotice(userIds, text) {
 
 module.exports = {
   readConfig, groupReady, workNoticeReady, splitText,
-  sendGroupText, sendWorkNotice
+  sendGroupText, sendUserText, sendWorkNotice
 };

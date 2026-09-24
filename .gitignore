@@ -2,6 +2,9 @@ node_modules/
 data/iteration/state.json
 data/iteration/state.json.bak
 data/iteration/state.json.broken
+# 排障时留下的损坏样本（*.CORRUPT-<时间戳>.bak 等），只在本机留证，不入库。
+# 2026-09-24 数据被覆盖事故中留了一份 171 字节的现场，差点被 git add 带进去。
+data/iteration/state.json.*
 data/iteration/history/
 data/state.json
 data/archive/*.json

@@ -6,8 +6,9 @@
    设计要点：
      - 密码规则从 data/auth-config.json 读，不写死在代码里（见 docs/plan-dingtalk-sso.md D4）
      - 程序不做拼音转换（零依赖是本项目的硬约束）
-     - 当前公式：前缀 + 后缀 + 工号后 6 位（defaultPasswordMode: initials+suffix+last6）
-     - 「密码前缀」列因此是【可选】的：留空就是「后缀+工号后6位」，能开户、且天然不重名
+     - 当前公式：姓名缩写（首字母大写） + 年份 + 工号后 4 位，如 Cdp20267968
+       （defaultPasswordMode: initials+suffix+last4）
+     - 「密码前缀」列【必填】：它是密码第一段，程序不做拼音转换，只能人工/Excel 填好带进来
      - 已存在的工号一律跳过，绝不覆盖密码和角色（重跑安全）
 
    用法:
@@ -32,11 +33,7 @@ const db = require('./db');
 const ROLES = ['admin', 'pm', 'dev', 'viewer'];
 
 /* 已实现的密码公式。加公式时这里和 buildPassword 一起改。 */
-const SUPPORTED_MODES = ['initials+suffix', 'initials+suffix+last6'];
-/* 公式里含工号段时，前缀就是可选的 —— 判据跟着公式走，不写死。
-   readRoster 在 loadConfig 之前被调用，所以这份配置在入口处赋值。 */
-let PREFIX_OPTIONAL = false;
-let CFG_AT_READ = null;
+const SUPPORTED_MODES = ['initials+suffix', 'initials+suffix+last4'];
 
 /* 密码规则配置：与 db.js 同源，落在 data 目录下（已 gitignore） */
 const CONFIG_FILE = path.join(
@@ -45,7 +42,7 @@ const CONFIG_FILE = path.join(
 );
 const DEFAULT_CONFIG = {
   defaultPasswordSuffix: '2026',
-  defaultPasswordMode: 'initials+suffix+last6',
+  defaultPasswordMode: 'initials+suffix+last4',
   forceChangeOnFirstLogin: false
 };
 
@@ -86,43 +83,39 @@ function loadConfig() {
 }
 
 /**
- * 拼密码。规则 = 「前缀（名单带来，可空）」+「固定后缀」+「工号后 6 位」。
+ * 拼密码。规则 = 「姓名缩写（首字母大写）」+「年份」+「工号后 4 位」。
+ * 例：陈丹萍（cdp）+ 2026 + 工号 1001**7968** → `Cdp20267968`
  *
- * ── 为什么要有工号段（2026-09-24 加）──────────────────────────
- * 原本只有「前缀 + 后缀」。问题出在前缀是人按姓名缩写手填的：
- *   1. 372 行全得手工填，而程序不做拼音转换（零依赖约束），填不了就导入不了；
- *   2. 重名的人前缀一样（两个张磊都是 zl），加同一个后缀后密码完全相同 ——
- *      等于两个人共用一套账号密码，而且谁也没法从密码看出来。
+ * ── 2026-09-24 纠正 ──────────────────────────────────────────
+ * 这一天我先写错过两版，都不是这个平台要的规则：
+ *   v1「缩写 + 后缀」        —— 缺工号段，两个张磊（缩写都是 zl）密码完全相同
+ *   v2「缩写 + 后缀 + 后6位」 —— 工号段取错位数，且缩写全小写
+ * 正确规则是用户给出的 `Cdp20267968` 反推出来的：工号取【后 4 位】，
+ * 缩写【首字母大写】，年份与工号段连着写。
  *
- * 工号段直接解决这两点：它是唯一的（同工号本来就只发一个账号），
- * 是现成的（CSV 里就有），且不需要拼音。前缀那一列因此变成【可选】：
- * 填了是「zl20268531」，不填是「20268531」，都能开户。
+ * ── 关于重名 ────────────────────────────────────────────────
+ * 加不带工号段的 v1 时我以为「重名必然撞密码」，于是自作主张加了工号段
+ * 又加了位数。其实不必：重名的两个人缩写相同（张磊都是 zl），
+ * 但工号后 4 位不同，拼出来的密码天然不同 —— 不需要额外区分机制。
  *
- * 保留前缀段而不是直接删掉，是因为老名单（已发出去的）带前缀，
- * 换公式会让那些人按新公式登录不上。老规则仍可通过
- * defaultPasswordMode 切回 'initials+suffix'。
+ * ── 缩写从哪来 ──────────────────────────────────────────────
+ * 名单的「密码前缀」列，人工/Excel 公式生成。程序不做拼音转换
+ * （零依赖是本项目的硬约束，且多音字会出错）。这一列【必填】：
+ * 它进密码，缺了就没法开户（见 readRoster 的校验）。
  *
- * ── 为什么取【后 6 位】而不是后 4 位（2026-09-24 实测）────────────
- * 工号是 8 位，但前缀不止一种（1001xxxx / 1004xxxx / 1005xxxx），
- * 所以「后 4 位」不唯一 —— 实测 372 人里有 5 组撞号：
- *   10033343 王卢卢 / 10043343 季星宇    ← 后4位都是 3343
- *   10014295 王志成 / 10044295 王振
- *   10017138 韦凯   / 10047138 陈斌
- *   10019814 王统领 / 10049814 张鸿鹏
- *   10040705 张可涵 / 10050705 王寅
- * 这些人会拿到同一个密码。去掉 2 位前缀后的 6 位是流水号，实测 372 人无重合。
- *
- * 依然只是个约定，不是保证 —— 流水号是 6 位十进制，理论上会回卷。
- * 真要防重复，靠的是库里工号唯一（users.id），密码段只是减小概率。
+ * 大小写在这里统一：不管名单里填的是 `cdp` / `CDP` / `Cdp`，
+ * 一律规范成首字母大写 —— 免得同一批人因为录入习惯不同拿到两种格式的密码。
  */
 function buildPassword(prefix, id, cfg) {
   const suffix = String(cfg.defaultPasswordSuffix || '');
   const mode = cfg.defaultPasswordMode || DEFAULT_CONFIG.defaultPasswordMode;
-  const tail = String(id || '').slice(-6);
   if (mode === 'initials+suffix') {
     return String(prefix || '') + suffix;           // 老规则，兼容老名单
   }
-  return String(prefix || '') + suffix + tail;      // initials+suffix+last6
+  /* initials+suffix+last4（当前） */
+  const p = String(prefix || '');
+  const norm = p ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() : '';
+  return norm + suffix + String(id || '').slice(-4);
 }
 
 /* ---------- CSV ---------- */
@@ -196,22 +189,12 @@ function readRoster(file) {
     if (!id && !name) continue;                                  // 整行空，跳过
     if (!id) { rows.push({ lineNo: lineNo, bad: '缺工号' }); continue; }
     if (!name) { rows.push({ lineNo: lineNo, id: id, bad: '缺姓名' }); continue; }
-    /* 前缀【可以为空】。当前公式是「前缀+后缀+工号后6位」，前缀只是可选段；
-       过去只有「前缀+后缀」，所以前缀是必填。判据是「拼出来的密码够不够长」，
-       而不是「前缀填没填」—— 否则 372 行的名单会整份被拒。 */
-    if (!prefix && !PREFIX_OPTIONAL) {
-      rows.push({ lineNo: lineNo, id: id, name: name, bad: '缺密码前缀' });
-      continue;
-    }
+    /* 前缀【必填】。它是密码的第一段（姓名缩写），缺了密码就只剩
+       「年份+工号后4位」，既不是约定的规则，也没法从密码看出是谁。
+       程序不做拼音转换，这一列只能人工/Excel 填好带进来。 */
+    if (!prefix) { rows.push({ lineNo: lineNo, id: id, name: name, bad: '缺密码前缀' }); continue; }
     if (role && ROLES.indexOf(role) < 0) {
       rows.push({ lineNo: lineNo, id: id, name: name, bad: '角色非法：' + role + '，可选 ' + ROLES.join('/') });
-      continue;
-    }
-    /* 密码太短不值得发。平台改密的下限是 6 位（见 modules/auth/routes.js），
-       首发的初始密码没理由比这还弱。 */
-    const pwd = buildPassword(prefix, id, CFG_AT_READ);
-    if (pwd.length < 6) {
-      rows.push({ lineNo: lineNo, id: id, name: name, bad: '拼出的密码只有 ' + pwd.length + ' 位（' + pwd + '），至少要 6 位' });
       continue;
     }
     rows.push({ lineNo: lineNo, id: id, name: name, prefix: prefix, role: role || 'viewer' });
@@ -228,10 +211,6 @@ function main() {
   if (!file) usage(1);
 
   const cfg = loadConfig();
-  /* readRoster 要按公式判断「前缀能不能空」，而它跑在 loadConfig 之后 ——
-     把结果挂到模块变量上，避免 readRoster 再读一次配置文件。 */
-  CFG_AT_READ = cfg;
-  PREFIX_OPTIONAL = String(cfg.defaultPasswordMode).indexOf('last') >= 0;
   const rows = readRoster(file);
 
   console.log('账号库：  ' + DB_DESC);

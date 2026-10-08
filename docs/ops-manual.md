@@ -9,16 +9,21 @@
 
 | 场景 | 命令 |
 |---|---|
-| 本地开发 | `node server.js`（默认端口 8770） |
+| 本地开发 | `node server.js`（默认端口 **9680**） |
 | 本地带端口 | `node server.js 8800` 或 `start.bat 8800` |
 | 部署（Windows 服务器） | 双击 `start.bat`；建议用 nssm 注册成 Windows 服务保活 |
-| 部署（Linux） | `nohup node server.js 8770 >> server.log 2>&1 &` 或 systemd |
+| 部署（Linux） | `nohup node server.js 9680 >> server.log 2>&1 &` 或 systemd |
+
+> ⚠️ **端口 9680 是公司 SSO 回调白名单里登记过的值**（`http://10.63.139.103:9680/sso/callback`）。
+> 改端口必须同步去「流程数字化中心」变更回调地址，否则 SSO 回跳到新端口会被拒绝。
+> `server.js` / `start.bat` / `start.sh` **三处默认端口必须同源**，曾经不一致过，
+> 表现为「登录完没反应」。服务器部署完整步骤见 `docs/ops-server-deploy.md`。
 
 环境变量：
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `PORT` | 8770 | 监听端口（也可用命令行第 1 个参数） |
+| `PORT` | 9680 | 监听端口（也可用命令行第 1 个参数） |
 | `DATA_DIR` | 项目目录 `data/` | 数据根目录，部署时建议指向持久化路径 |
 | `AUTH_REQUIRED` | 关 | `1` 启用真实登录。**升级当天先关着启动确认一切正常，再开** |
 | `ACCESS_TOKEN` | 空 | 旧版密码门禁（整站级），与登录并存：先过密码再过登录 |
@@ -217,7 +222,7 @@ node -e "const d=require('./db'); d.open(); console.table(d.get().prepare('SELEC
 
 | 现象 | 处理 |
 |---|---|
-| 端口被占用 | 换端口 `node server.js 8800`；或查谁占用：`netstat -ano \| findstr 8770` |
+| 端口被占用 | 换端口 `node server.js 8800`；或查谁占用：`netstat -ano \| findstr 9680`。⚠️ 换端口要同步改 SSO 回调登记 |
 | 启动日志刷 `ExperimentalWarning: SQLite` | 正常现象（node:sqlite 尚标记 experimental），不影响使用 |
 | 页面一直转圈 | 看 server 日志；若 `state.json 解析失败`，服务端会自动回退最近快照（日志有提示） |
 | 有人反馈"我登录的是别人" | 不应再发生（身份只认服务端会话 Cookie，不再信 localStorage）；若发生，查该请求的审计记录里 `user_id` |

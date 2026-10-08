@@ -71,6 +71,15 @@
     <div class="divider">或用</div>
     <button type="button" class="sso" id="ssoBtn">公司统一认证登录</button>
   </div>
+
+  <!-- 钉钉入口。同样「配好才显示」。与 SSO 的区别：
+       SSO 是浏览器跳转，钉钉免登必须在钉钉客户端内才能拿到 authCode -->
+  <div id="ddBox" style="display:none">
+    <div class="divider">或用</div>
+    <button type="button" class="sso" id="ddBtn" style="color:#1677ff;border-color:#1677ff">
+      钉钉一键登录
+    </button>
+  </div>
   <div class="err" id="err"></div>
 </form>
 
@@ -134,6 +143,121 @@
           var next = new URLSearchParams(location.search).get('next') || '';
           location.href = '/sso/login' + (next ? '?next=' + encodeURIComponent(next) : '');
         });
+      })
+      .catch(function () { /* 忽略：不影响账号密码登录 */ });
+  })();
+
+  /* ---- 钉钉免登 ----
+     与 SSO 最大的区别：authCode 由【前端在钉钉客户端里】取得后 POST 给后端，
+     钉钉服务器从不访问平台 —— 所以纯内网 IP 也能用，不需要回调域名。
+
+     两种情况：
+       ① 在钉钉客户端里打开（从工作台点卡片进来）→ 自动免登，用户不用点任何东西
+       ② 在普通浏览器里打开 → 显示按钮，点了会提示「请在钉钉中打开」
+
+     这个入口整体是【增强】：任何一步失败都不能影响账号密码登录这条主路，
+     所以全程 catch，且失败只在用户主动点击时才报错（自动那次失败保持安静，
+     否则用户一进页面就看到红字，会以为平台坏了）。 */
+  (function () {
+    var box = document.getElementById('ddBox');
+    var btn = document.getElementById('ddBtn');
+    var errEl = document.getElementById('err');
+    var cfg = null;
+
+    /* 钉钉客户端的 webview UA 里带 DingTalk。
+       注意这也包含 PC 客户端与 Mac 客户端，都是我们想要的。 */
+    var inDingTalk = /DingTalk/i.test(navigator.userAgent);
+
+    function showErr(msg) { if (errEl) errEl.textContent = msg; }
+
+    function nextPath() {
+      var n = new URLSearchParams(location.search).get('next') || '';
+      /* 只接受站内相对路径，与服务端 safeNext 同规则（双保险） */
+      return (n.charAt(0) === '/' && n.charAt(1) !== '/') ? n : '/';
+    }
+
+    /** 把 authCode 交给后端换会话 */
+    function submit(code) {
+      return fetch('/api/dingtalk/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ authCode: code, next: nextPath() })
+      }).then(function (r) {
+        return r.json().then(function (d) { return { ok: r.ok, d: d }; });
+      }).then(function (r) {
+        if (!r.ok) throw new Error(r.d.error || '钉钉登录失败');
+        /* 免登成功：整页跳转（不是 fetch），让服务端种的 Cookie 生效后重新加载 */
+        location.href = (r.d && r.d.next) ? r.d.next : '/';
+      });
+    }
+
+    /** 载入钉钉 JSAPI。内网环境可能拿不到 CDN，所以必须有超时兜底。 */
+    function loadJsapi() {
+      return new Promise(function (resolve, reject) {
+        if (window.dd && window.dd.runtime) return resolve(window.dd);
+        var s = document.createElement('script');
+        s.src = 'https://g.alicdn.com/dingding/dingtalk-jsapi/3.0.25/dingtalk.open.js';
+        var done = false;
+        var timer = setTimeout(function () {
+          if (!done) { done = true; reject(new Error('钉钉 JSAPI 加载超时（内网可能无法访问 CDN）')); }
+        }, 8000);
+        s.onload = function () {
+          if (done) return;
+          done = true; clearTimeout(timer);
+          window.dd ? resolve(window.dd) : reject(new Error('钉钉 JSAPI 加载后未就绪'));
+        };
+        s.onerror = function () {
+          if (done) return;
+          done = true; clearTimeout(timer);
+          reject(new Error('钉钉 JSAPI 加载失败'));
+        };
+        document.head.appendChild(s);
+      });
+    }
+
+    /** 取 authCode → 交给后端。silent=true 时失败不显示错误（用于自动尝试） */
+    function login(silent) {
+      btn.disabled = true;
+      btn.textContent = '登录中…';
+      var restore = function () { btn.disabled = false; btn.textContent = '钉钉一键登录'; };
+
+      loadJsapi().then(function (dd) {
+        return new Promise(function (resolve, reject) {
+          dd.ready(function () {
+            dd.runtime.permission.requestAuthCode({
+              corpId: cfg.corpId,
+              onSuccess: function (res) { resolve(res.code); },
+              onFail: function (e) { reject(new Error('取授权码失败：' + (e && e.errorMessage || '未知原因'))); }
+            });
+          });
+          dd.error(function (e) {
+            reject(new Error('钉钉环境初始化失败：' + (e && e.errorMessage || '未知原因')));
+          });
+        });
+      }).then(submit).catch(function (e) {
+        restore();
+        /* 自动那次失败保持安静：只在普通浏览器里点了按钮才提示 */
+        if (!silent) showErr(e.message || '钉钉登录失败');
+      });
+    }
+
+    fetch('/api/dingtalk/status', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.configured) return;    // 没配好就不摆按钮
+        cfg = d;
+        box.style.display = 'block';
+        btn.addEventListener('click', function () {
+          if (!inDingTalk) {
+            showErr('钉钉免登需要在钉钉客户端内打开本页面（请从钉钉工作台进入，或用手机钉钉扫码打开）。');
+            return;
+          }
+          login(false);
+        });
+        /* 已经在钉钉里 → 直接自动登录，省掉一次点击。
+           这正是「打通」的体验收益：从工作台点进来就已经是登录态。 */
+        if (inDingTalk) login(true);
       })
       .catch(function () { /* 忽略：不影响账号密码登录 */ });
   })();

@@ -385,10 +385,14 @@ E:\PMWork\Project Materials\iSolarCloudProject\迭代版本\iSolarCloudProjectMa
     本轮发现它是**未忽略**状态且已积累 108KB 真实数据 —— 若有人执行 `git add .` 就进仓库了。
     **新增任何模块后，第一件事是确认 `data/<模块>/state.json` 进了 gitignore。**
 
-25. **`NODE_TLS_REJECT_UNAUTHORIZED=0` 是这台机器的系统环境变量**，
-    等于**全局关闭 HTTPS 证书校验**。当前不阻塞开发，但：
-    - 部署到服务器前必须处理（装公司根证书 + 恢复校验）
-    - `appSecret` 要经这条链路传给钉钉，一直关着等于裸奔
+25. **`NODE_TLS_REJECT_UNAUTHORIZED=0`：本轮曾误判为「系统环境变量、需装公司根证书」，2026-10-08 已证伪。**
+    当时看到这个变量就推断「全局关闭 HTTPS 校验、上线要装公司根证书」——**两步推断都是错的**。
+    - **实测**：`tls.connect({ host: 'sso-sit.sungrow.cn' })` → 对端证书由
+      **DigiCert 公共 CA** 签发（`issuer: Encryption Everywhere DV TLS CA - G2 / DigiCert Inc`），
+      **`authorized = true`**。本机凭据链验得过，**不需要任何公司根证书**。
+    - **真实来源**：`C:\Users\chendanping\.claude\settings.json` —— 属于 **Claude Code 自己的会话环境**，
+      只影响 Claude Code 起的临时命令，**不在** HKCU/HKLM/certutil 里，**平台服务不受影响**。
+    - **结论**：平台上线**不需要**做任何 TLS 侧处理。原先的 P1 任务作废。
 
 **沿用（未变）**：
 - **`git add .` 一次都不能用** —— `data/iteration/state.json` 被 git 跟踪且含真实工时
@@ -880,3 +884,412 @@ total     : 372
 5. **`modules/*/` 只有 `client.js` 没有 `routes.js` = 静默不挂载**，加载器不报错（`module-loader.js:33`）。
    排查"模块为什么访问不到"时先看这个。
 6. **本文件用 CRLF 换行**，追加内容时必须统一，否则 git diff 会整文件变红。
+
+
+# 交接文档 v9 · 批6（钉钉对账落地 + 服务器部署前置）
+
+> 2026-10-08 ｜ 分支 `dev/sgai` @ `9208b43`（= `origin/dev/sgai`；`main` 停在 `a223075` 等验收）
+> **接续工作只看本节。** v1~v8 保留在上方，作为历史架构与踩坑记录。
+> ⚠️ v8 的 §B 有一处**已成事实性错误**（`users.department` 的口径），见本节 §B 更正。
+
+---
+
+## A. 本轮做了什么
+
+### 1. `dingtalk-reconcile.js` —— 钉钉通讯录 ↔ `users` 表对账（P1-3 / P1-4）
+
+新增 393 行，落地 `docs/plan-dingtalk-sso.md` §3 的 P1-3、P1-4 两项。
+
+```
+node dingtalk-reconcile.js                              # 干跑（默认）：只出报告，一个字节都不写
+node dingtalk-reconcile.js --apply                      # 新增缺失账号（一律 viewer，无密码）
+node dingtalk-reconcile.js --apply --disable-missing    # 再停用「钉钉查无此人」的账号
+```
+
+产出 `data/dingtalk/reconcile-report.txt`（已 gitignore），分五类：
+① 钉钉有平台无　② 平台有钉钉无　③ 不在快照范围内　④ 建议复核·角色　⑤ 建议复核·姓名/部门漂移。
+
+**默认干跑，与 `user-import.js` 相反**——建号最坏是多建几个号，删掉就行；
+对账会**停用账号**，几百人系统里最贵的错是「把还在职的人停掉」，且**脚本不会报错**。
+所以想写库必须显式 `--apply`。
+
+### 2. ★ 三道安全闸（本文件最重要的一段）
+
+**没有它们，这个脚本会在一次重跑后停掉几百人，且全程不报错。**
+
+| # | 闸 | 拦什么 | 退出码 |
+|---|---|---|---|
+| 1 | **范围闸** | 快照 `scope.full=false` 时，用 `departments` 的 `parentId` 求 `scope.deptId` 子树 id 全集，范围外的账号**压根不进候选集**（不是给提示，是不参与） | — |
+| 2 | **完整闸** | `truncated === true` 或 `errors` 非空 → 拒绝停用 | **2** |
+| 3 | **幅度闸** | 停用候选 > `max(5, 范围内人数 × 20%)` → 拒绝停用 | **2** |
+
+被拦下时加 `--force` 可强制执行（新增不受影响，仍然执行）。
+
+**为什么范围闸必须是「不参与」而不是「给提示」**——这是一条真实的、不会报错的路径：
+
+> 有人用 `node dingtalk-sync.js --dept 阳光云组` 重跑一次 → 快照只剩 9 人
+> → 对账看不到其余 363 人 → 判定他们「钉钉里没有」→ **全部停用**。
+
+### 3. 端到端验证（生产库零写入）
+
+全部在**副本库**上完成（`DATA_DIR` 指向 `.scratch/rc-copy1`），`data/platform.db` 的 mtime
+全程停在 `2026-09-24 11:54:28`。
+
+| 场景 | 结果 |
+|---|---|
+| 干净快照干跑 | 覆盖 372 / 范围外 1（`admin`）；建号 0 / 停用 0；报告落副本 |
+| **干跑是否写库** | 逐表逐行零差异（用户 373→373、审计 781→781、`schema_sha` 一致） |
+| A 子树脏快照（阳光云组 9 人） | 364 人被划入「不在范围内·一律不动」，**候选 0** |
+| B `truncated=true` | **退出码 2**，阻断停用 |
+| C 幅度 120 候选 > 阈值 75 | **退出码 2**，阻断停用 |
+| D 同上 + `--force` | 放行，退出码 0 |
+| E `errors` 非空 | **退出码 2**，阻断停用 |
+| F `--apply` 建号 | 建 2、撞名的 1 个**跳过**；新建均为 `viewer` + `password_hash=null` + `enabled=1` |
+| F `--apply` 停用 | 停 1；审计 #784 `[停用用户]` 记「因钉钉对账停用：快照范围…」 |
+| 硬约束核对 | `10017968` 角色仍是 `admin`、密码未被动；用户总数 373→375 ✓ |
+
+### 4. 基线侦察结论（2026-10-08 实测）
+
+- 连接键：`users.id` == 钉钉 `jobNumber`，命中 **372/372**
+- 钉钉有平台无 = **0**；平台有钉钉无 = **1**（`admin` 本地管理员，本就该在）
+- 姓名不一致 = 0，部门不一致 = 0，`active=false` = 0，`enabled=0` = 0
+- ⚠️ **`users.dingtalk_id` 列全空（0/373）**，从来没被填过 —— 会影响后续免登
+- `org.json`：85 个部门全带 `parentId`，`scope.full=false`，`truncated=false`，`errors=[]`
+
+### 5. 文档与清理
+
+- `docs/plan-dingtalk-sso.md`：P1-3 / P1-4 状态改 ✅；§3.5 新增「落地：对账脚本」小节（+60 行，含三道闸表格、四条硬约束落实方式、两个刻意设计决定）
+- `.gitignore`：新增 `data/dingtalk/reconcile-report.txt`
+- `.scratch/`：删掉 `rc-copy1`/`datacopy2`（含**生产库副本 + 三份 secret.json**：钉钉/SSO/TB 凭据）+ 28 项杂项，共 1265 项
+
+---
+
+## B. 关键决策（改动前必读）
+
+### 1. ⚠️ 更正 v8 §B：`users.department` 存的是钉钉叶子部门名，不是 CSV 团队分类
+
+v8 §B 写着「`users.department` 列存 **CSV 团队分类**（19 个值）」——**这是错的**，
+实测列里是**钉钉叶子部门名**（68~73 个取值，如 `阳光云组`、`WEB组 WEB Team`）。
+
+**三个维度是正交的，谁也替代不了谁：**
+
+| | 数量 | 形态 | 用途 | 位置 |
+|---|---|---|---|---|
+| `config.js` `TEAMS[].key` | **18** | 业务线 × 部门（`APP开发-阳光云`） | 工时偏差**按团队核算** | `config.js` |
+| 团队分类 | **19** | 纯部门（`App开发部`） | **权限与人管** | `data/dingtalk/teams.json` |
+| 钉钉叶子部门名 | **68~73** | 通讯录原始结构 | 保留原貌可回溯 | `users.department` 列 |
+
+**处理方式（用户 2026-09-24 已拍板，未变）：不动库、不回填。**
+人员归属以 `teams.json` 为唯一口径，服务端按**姓名反查**派生（`teams.js` 的 `teamOf()`），
+带 mtime 缓存、改完即生效、不用重启。**回填 `users.department` 是写生产库且不可逆，不做。**
+
+### 2. 对账脚本的两个刻意设计
+
+1. **新账号密码留空**（`password_hash = null`）。`user-import.js` 的公式要人工提供「密码前缀」，
+   对账脚本没有；硬造会让平台出现**第二种初始密码形态**。留空后由管理员在「用户管理」里按人重置。
+   **新账号在重置前登不进去，这是有意的。**
+2. **姓名撞库不自动建号**。工号平台没有、但姓名与平台已有账号相同（换工号 or 重名）→
+   只写进报告并标出撞的是哪个工号。否则用户列表冒出两个同名的人，管理员无从分辨。
+
+---
+
+## C. 三条线的真实进度（2026-10-08）
+
+### 线 1 · 登录与账号：**P0 完成**
+
+| 项 | 状态 |
+|---|---|
+| 登录/登出/改密/当前用户、会话、scrypt 哈希、四角色矩阵、登录节流 | ✅ |
+| 批量建号 CLI（支持 `department` 列）、初始密码提示条 | ✅ |
+| **按部门筛人 + 用户管理界面** | ✅ 本轮前一批（`633474a`）：`GET /api/auth/users?dept=&q=` + `GET /api/auth/teams` + `modules/settings/index.js` 用户管理区块 |
+| 钉钉通讯录 → `users` 对账（P1-3/P1-4） | ✅ 本轮（`9208b43`） |
+| **P1-5 团队映射** | ⬜ 待做（规则见 `plan-dingtalk-sso.md` §3.5） |
+
+### 线 2 · SSO：**代码完整，卡在 3 个只能靠真实登录才能定的值**
+
+| # | 卡点 | 现状 |
+|---|---|---|
+| 1 | **`idField` 是猜的** | `modules/sso/routes.js:55` 的 `DEFAULTS.idField` 为空串，实际值只能等第一次真实登录（`debug: true` 就是为那一刻打印原始返回体而留） |
+| 2 | **`logoutUrl` 环境待确认** | 默认 `https://sso.sungrow.cn/uaa/logout`，曾用 SIT 地址。混用会出现「SIT 登录、生产登出」 |
+| 3 | **从没真跑过一次** | `_test-sso.js` 是本地断言，不是端到端 |
+
+> 这三条**只能用户来**：服务器开 `AUTH_REQUIRED=1` 走一遍 `/sso/login`，
+> 把控制台**原始返回体**给出来，才能定死 `idField`。
+
+### 线 3 · 钉钉：**通讯录线已闭环，其余三条待动**
+
+| 支线 | 状态 |
+|---|---|
+| (a) 通讯录拉取 | ✅ `dingtalk-sync.js` / `dingtalk-roster.js` 跑通 |
+| (a) 通讯录 → `users` 对账 | ✅ **本轮完成** |
+| (b) 文档同步 2b | ⏸ 卡在 `operatorId` / `docUrl` 两个空值；`dingtalk-ping.js` 换 token 已实测通过，补齐后重跑即可，**不用改代码** |
+| (c) 钉钉工作通知（P1.5） | ✅ 服务端已做（`modules/notify/`）|
+| (d) 免登（扫码登录） | ❌ 没开始 |
+| (e) **`modules/dingtalk/` 无 `routes.js`** | ⚠️ 结构问题：加载器扫不到 `routes.js` 就**静默跳过**（`module-loader.js:33`），所以钉钉**不是可访问模块**，**没有网页界面能看/操作通讯录** |
+
+**模块挂载现状（`routes.js` 有无）：**
+
+```
+已挂载 15 个：auth budget csenergy dashboard inbox iteration notify
+              plan pradapter project settings skill tb token
+未挂载  1 个：dingtalk（只有 client.js）
+特殊    1 个：sso（走 server.js:354 站点级路由，不走 module-loader）
+```
+
+---
+
+## D. 下一步（按优先级，接续工作从这里开始）
+
+### 第一件（立刻做，已解锁）：给 `modules/dingtalk/` 加 `routes.js`
+
+v8 §D 的第四件，当时标注「在做完第一、二件之前不动」——**第一、三件已完成，现已解锁**。
+让它成为真正可访问的模块：看通讯录、跑对账、看对账报告、**触发 `dingtalk-sync.js` 拉快照**。
+⚠️ 注意 `server.js:327` 是 `url.parse(...)` 旧式对象（无 `searchParams`），
+新端点一律用 `url.query.xxx`；管理类端点还要同步加进 `server.js:271` 的 `needAdmin` 白名单。
+
+### 第二件：P1-5 团队映射收尾
+
+`teams.json` 与 `teams.js` 已就位。剩下的是把「未归类」的人在界面上暴露出来
+（`teamOf()` 返回 `''` 时显示「未归类」，**不要猜一个**）。
+
+### 第三件：服务器部署（本轮用户新提的场景，详见 §E）
+
+### 第四件（可选）：`modules/dingtalk/` 里的对账也做成网页按钮
+
+同上第一件，可合并。
+
+---
+
+## E. ⭐ 服务器部署场景（用户 2026-10-08 新提，尚未落地）
+
+> 用户原话：「目前这个平台都还是我本地起服务，等我代码功能完善 ok 我就要放在服务器上供大家使用了」
+
+**现状盘点：能搬，但有 6 个必须先在本地解决的口子。**
+
+### E.1 代码拉取
+
+```bash
+git clone <仓库地址> && cd iSolarCloudProjectManage
+git checkout dev/sgai          # ⚠ 服务器上跑的是 dev/sgai，不是 main（main 是验收快照）
+```
+
+**`git clone` 会缺的东西**（全在 `.gitignore` 里，这是设计如此，不是漏了）：
+
+| 缺什么 | 为什么 | 怎么补 |
+|---|---|---|
+| `data/platform.db` | 身份/权限/审计，已 gitignore | 服务器首次启动**自动建库**并打印 admin 一次性随机密码 |
+| `data/dingtalk/secret.json` | 钉钉 appKey/appSecret | 手工拷，模板见 `data/dingtalk/secret.example.json` |
+| `data/sso/secret.json` | SSO clientSecret | 手工拷，模板见 `docs/samples/sso-secret.sample.json` |
+| `data/auth-config.json` | 初始密码规则 | 手工拷（不拷则用内置默认值，会打印一条提示，不会崩） |
+| `data/iteration/state.json` 等业务数据 | 真实工时数据 | **不要搬**（见 E.3 的决策点） |
+| `data/dingtalk/teams.json` | ✅ **例外：这个已入库**，clone 就有 | 无需处理 |
+| `node_modules/` | 18M | 服务器**不需要**（零依赖）。只有跑 `export-cli.js` 才要 `npm install` |
+
+### E.2 环境要求
+
+- **Node ≥ v22.5，实测用 v24.12.0** —— `node:sqlite` 是内置模块，低于 v22.5 直接起不来
+- 每次启动会打印 `ExperimentalWarning: SQLite is an experimental feature` —— **正常，不是错误**
+- 端口默认 **9680**（`server.js` / `start.bat` / `start.sh` **三处已统一**）。此前 `server.js` 兜底写过 8770，
+  与 `start.bat` 的 9680 不一致，裸跑 `node server.js` 会静默落到 8770，
+  表现为「SSO 登录完没反应」——**已于本轮修正**，见 `server.js:40` 注释。
+
+### E.3 三个必须先定的决策点（**动手前问清楚，别自己拍**）
+
+| # | 决策点 | 两边的代价 |
+|---|---|---|
+| 1 | **要不要把本地数据搬上去** | **用户已明确：要搬。** 完整方案见 `docs/plan-server-migration.md`（含 3 个坑：WAL 未落盘 / `DATA_DIR` 硬编码 / Node 版本）|
+| 2 | **`AUTH_REQUIRED=1` 什么时候开** | ops-manual 的建议是「**升级当天先关着启动确认一切正常，再开**」。但服务器一上来就对外，**建议一次开启**，先自己用 admin 登一次验证 |
+| 3 | **服务怎么保活** | systemd / nssm 注册成服务 —— 完整配置见 `docs/ops-server-deploy.md` 第五节（端口已是 9680，可直接抄） |
+
+### E.4 ⚠️ SSO 回调地址：**服务器上线前必须对齐，否则 SSO 直接不可用**
+
+现在有**三处硬编码 + 一处文档**，值还不一致：
+
+| 位置 | 值 |
+|---|---|
+| `modules/sso/routes.js:66` `DEFAULTS.redirectUri` | `http://10.63.139.103:9680/sso/callback` |
+| `data/sso/secret.json:19` | `http://10.63.139.103:9680/sso/callback` |
+| `docs/samples/sso-secret.sample.json:25` | `http://10.63.139.103:9680/sso/callback` |
+| `_test-sso.js:93` 断言 | 同上（**改 redirectUri 必须同步改这个断言，否则 `npm test` 红**） |
+| `docs/plan-dingtalk-sso.md` D5 | `http://10.13.39.160:8770` ← **旧值，待更正** |
+
+**流程**：先定服务器实际 IP:端口 → 去「流程数字化中心」**变更 SSO 回调白名单** →
+再改 `data/sso/secret.json` 的 `redirectUri`（文件优先于 DEFAULTS，改文件不用动代码）→
+同步改 `_test-sso.js` 断言。**顺序不能反**，白名单没变之前改代码只会让 SSO 跳回来被拒。
+
+### E.5 ✅ `NODE_TLS_REJECT_UNAUTHORIZED=0`：**已证伪，无需处理**（2026-10-08 更正）
+
+原判断「本机系统环境变量关着 HTTPS 校验、上线前必须装公司根证书」**是错的**，两处都错：
+
+| 原以为 | 实际 |
+|---|---|
+| 证书链验不过，需要公司根证书 | `tls.connect('sso-sit.sungrow.cn')` → `authorized = true`，证书由 **DigiCert 公共 CA** 签发 |
+| 这是机器级环境变量，平台服务也受影响 | 它来自 `C:\Users\chendanping\.claude\settings.json` —— **Claude Code 自己的会话环境**，平台服务读不到 |
+
+**结论：服务器上不需要装任何根证书，也不需要设这个变量。** 平台用 Node 内置凭据链即可正常访问 https 站点。
+
+### E.6 建议的服务器落地顺序
+
+1. 本地先把 `idField` 定死（走一次真实 SSO 登录）—— 否则搬上去 SSO 也是废的
+2. 本地跑通 `npm test` 全绿
+3. 服务器装 Node ≥ v22.5，`git clone` + `checkout dev/sgai`
+4. 手工拷 3 个 secret/config 文件（`dingtalk/secret.json`、`sso/secret.json`、`auth-config.json`）
+5. **定端口** → 更新 SSO 白名单 → 改 `secret.json` 的 `redirectUri` → 改 `_test-sso.js` 断言
+6. 服务器上重跑 `node check-network.js`（**开发机通了不代表服务器通**，`plan-dingtalk-sso.md` §6 已列为此项）
+7. `DATA_DIR` 指向持久化路径（`start.bat` 里留了 `rem set DATA_DIR=D:\pmwork\data` 的口子）
+8. 手动 `node server.js <端口>` 跑一次，浏览器能打开
+9. 注册成服务（systemd / nssm）+ 配 `backup-data.bat` 定时任务
+10. 开 `AUTH_REQUIRED=1`，admin 登一次，按 `docs/ops-manual.md` §6 清单过一遍
+
+> ⚠️ 重启会掐断当前连接。用户明确说过「云服务迭代版本那里现在服务还在启着用着更新着呢」——
+> **何时重启、何时搬迁，由用户定，不要自作主张。**
+> 部署当天用户的本地服务应保持运行，等服务器验证通过后再停。
+
+---
+
+## F. 验收怎么做（用户 2026-10-08 明确问过）
+
+### F.1 拉代码
+
+```bash
+git fetch origin
+git log --oneline origin/dev/sgai -8     # 待验收的 4 个提交
+git checkout dev/sgai && git pull
+```
+
+**待验收提交（`9208b43` 往前）**：
+
+| 提交 | 内容 |
+|---|---|
+| `9208b43` | 钉钉对账脚本（P1-3/P1-4）+ 三道安全闸 |
+| `979039d` | AI 推送中心页面 + 修复 `resolve` 端点 `url.parse` 兼容崩溃 |
+| `633474a` | 用户管理界面 + 按团队筛人 |
+| `a223075` | v8 交接文档（**main 的 HEAD**） |
+
+> `main` 停在 `a223075`。dev/sgai 上这 3 个提交是**待验收**状态，验收通过才合并 main。
+
+### F.2 起服务
+
+```bash
+node server.js 9680        # 或双击 start.bat
+```
+
+- **默认不开登录**（`AUTH_REQUIRED` 空）—— 验收界面/功能时够用
+- 要验账号权限就：`cmd /c "set AUTH_REQUIRED=1&& start.bat"`（⚠️ PowerShell 不认 `set`，会静默不生效）
+- **⚠️ 重启这件事要先问用户** —— 他的服务正在用
+
+### F.3 功能试用清单（按用户本轮问的三块展开）
+
+**① 用户管理 / 按团队筛人**（`633474a`）
+
+- [ ] 「系统设置 → 用户管理」区块**只对 admin 可见**（换成 pm 登录应看不到）
+- [ ] 团队下拉有 **19 项**，选一个后列表只剩该团队的人
+- [ ] 团队下拉能显示「声明人数 vs 实际人数」，**差值不为 0 会被暴露出来**
+- [ ] 搜索框输姓名或工号，能模糊匹配
+- [ ] 改名 / 改角色 / 启停用 / 重置密码各试一次，改完刷新页面仍是新值
+- [ ] 每个动作在「审计日志」里留了痕
+
+**② 钉钉对账**（`9208b43`）—— **先干跑，不要直接 `--apply`**
+
+```bash
+node dingtalk-reconcile.js                # 干跑
+# 看 data/dingtalk/reconcile-report.txt 的五类分项
+```
+
+- [ ] 报告「快照内 372 / 覆盖 372 / 范围外 1」——**范围外那 1 个应是 admin**
+- [ ] 第 ①类「钉钉有平台无」应为 **0**
+- [ ] 第 ⑤类「姓名/部门漂移」应为 **0**
+- [ ] 干跑后 `git status` 不应出现 DB 变动
+- [ ] 想验 `--apply` 请**在副本库上验**（`DATA_DIR=<副本> node dingtalk-reconcile.js --apply`），
+      **不要动生产库**
+
+**③ SSO**（需服务器可达）
+
+- [ ] `AUTH_REQUIRED=1` 下打开 `/sso/login`，能跳到公司 SSO 认证页
+- [ ] 认证回来能落地，**把控制台原始返回体给出来**（这是定 `idField` 的唯一途径）
+- [ ] 未开户的工号登录 → 明确拒绝 + 审计留痕（**不是静默建号**）
+
+**④ 钉钉推送**（前一批 `979039d`）
+
+- [ ] 「AI 推送中心」页面状态总览 / 单点发送 / 推送配置 / 待发队列补发四个区块都能打开
+- [ ] ⚠️ 重启服务前，`pm` 账号访问配置页会 **403**（`notify:read` 还没补种进权限表）
+
+### F.4 回归测试
+
+```bash
+npm test        # node --test _test-*.js
+```
+
+⚠️ **改了 `redirectUri` 的话 `_test-sso.js` 的断言会红**，必须同步改（见 E.4）。
+
+### F.5 验收通过后合并 main
+
+```bash
+git checkout main && git merge dev/sgai && git push origin main
+```
+
+⚠️ 合并前确认 `data/iteration/state.json` **没有**混进任何一个提交（见 §H 铁律 1）。
+
+---
+
+## G. 剩余任务总盘点（用户本轮明确问过）
+
+| 优先级 | 任务 | 归属 | 阻塞在谁 |
+|---|---|---|---|
+| P0 | **给 `modules/dingtalk/` 加 `routes.js`** | Claude Code | 无（已解锁） |
+| P0 | **服务器部署**（§E 十步） | Claude Code + 用户 | 用户定端口/IP + 白名单变更 |
+| P0 | **一次真实 SSO 登录**，定死 `idField` | **只能用户** | 用户的 SSO 账号 |
+| P1 | P1-5 团队映射收尾（界面暴露「未归类」） | Claude Code | 无 |
+| P1 | 更正 `plan-dingtalk-sso.md` D5 的旧 IP（`10.13.39.160:8770`） | Claude Code | 无 |
+| ~~P1~~ | ~~处理 `NODE_TLS_REJECT_UNAUTHORIZED=0`（装根证书）~~ —— **已证伪，任务作废**，见 §E.5 | — | — |
+| P2 | 填 `data/dingtalk/secret.json` 的 `operatorId` + `docUrl` | 用户 | 用户 |
+| P2 | 免登（扫码登录） | Claude Code | 上一条 |
+| P2 | `users.dingtalk_id` 全空 —— 免登落地时要用 | Claude Code | 免登开始时 |
+| P3 | M2-C / 后续（见 `plan-ai-m2-tasks.md`） | SGAI+ | — |
+
+> **不属于 Claude Code 的范围**：Skill 代码（`modules/skill/skills/*`）属于 SGAI+。
+
+---
+
+## H. 安全铁律（未变，重申）
+
+1. **绝不 `git add .`** —— `data/iteration/state.json` 已被 git 跟踪，会一并提交
+2. 提交前 `git diff --cached --name-only | grep -c '^data/'` 必须为 **0**
+3. 密钥类值**不进聊天、不进截图、不进代码**，只进 gitignore 的配置文件
+4. `client_secret` 只存 `data/sso/secret.json`；钉钉 `appSecret` 只存 `data/dingtalk/secret.json`
+5. `AI项目管理新范式思路.txt` 和 `钉钉开发/` 保持**未跟踪**
+6. **改动一律推 `origin/dev/sgai`，验收后才合并 main**（`CLAUDE.md` 第一条）
+7. **Skill 代码属于 SGAI+**，Claude Code 不写 Skill 代码；范围是平台骨架、模块集成、版面设计、钉钉/SSO 打通、排障
+
+---
+
+## I. 本轮踩过的坑
+
+1. **★ 撞名判定必须用「平台侧」姓名索引，不能用快照内部的重名统计。**
+   第一版拿 `orgByName` 判「姓名有没有重」——那是**快照内部**的重名。快照里只有一个「陈丹萍」时
+   判定为假，于是脚本给 `19990002 陈丹萍` 建了号，而平台里早就有 `10017968 陈丹萍`，
+   用户列表冒出两个同名的人。要防的是「与**平台已有账号**撞名」，比较对象只能是 `db.listUsers()`。
+
+2. **★ 报告路径必须跟随 `DATA_DIR` 走。** 脚本第一版把报告硬编码到 `__dirname/data/dingtalk/`，
+   而 `db.js` 认 `process.env.DATA_DIR` —— 在副本上跑一次干跑，报告写进了**生产目录**，
+   干跑看着干净、实则污染。凡「测试时指副本库」的脚本，**所有产出路径都要跟 `DATA_DIR`**。
+
+3. **追加代码块前先确认变量定义顺序。** 我把 `platByName` 的构建插在「读快照」区域（第 159 行），
+   而它依赖第 ~200 行才定义的 `platUsers`，直接 `ReferenceError: Cannot access before initialization`。
+   插到 `const platUsers = db.listUsers();` 之后即可。
+
+4. **`exit code` 别用管道测。** `node ... | grep ...; echo $?` 拿到的是 `grep` 的退出码，不是脚本的。
+   要用 `${PIPESTATUS[0]}` 或 `> file 2>&1; echo $?`。我一开始测出 0，实际闸门退出码是 **2**。
+
+5. **`cmp` 报「有差异」时先看两边分别是什么时候复制的。** 备份是**这次**复制的、
+   副本从当时的 `data/` 复制，但 `data/platform.db` 后来又被服务写过（WAL 落盘），
+   两者内容不一致是**复制时机**造成的，与脚本无关。逐项对比页数/行数才能下结论。
+
+6. **环境拦 `rm` / `fs.rmSync`，放行 `fs.unlinkSync` / `fs.rmdirSync`。**
+   删目录树要自己写递归（`unlinkSync` 文件 + `rmdirSync` 目录），或直接 `rmdir` 空目录。
+
+7. **删除的目录可能有 `.git` 之外的东西被 `.gitignore` 遮住。**
+   `.scratch/rc-copy1` 里有 `secret.json`（钉钉/SSO/TB 三份凭据），
+   `ls` 看不出来（被 copy 进去时没加后缀）—— 删之前务必 `find -type f` 列一遍。
+
+8. **本文件用 CRLF 换行**，追加内容时必须统一，否则 git diff 会整文件变红。

@@ -37,7 +37,10 @@ const { compute } = require('./calc');
    PORT           监听端口
    DATA_DIR       数据目录（部署时建议指向服务器上的持久化路径）
    ACCESS_TOKEN   访问密码，设置后所有请求需带 ?token=xxx，留空则不校验 */
-const PORT = Number(process.argv[2]) || Number(process.env.PORT) || 8770;
+/* 兜底端口 9680 —— 与 start.bat / start.sh 一致，也是 SSO 回调白名单里登记的端口。
+   三处必须同源：曾经这里写 8770 而 start.bat 写 9680，裸跑 node server.js 会静默
+   落到 8770，浏览器按白名单回跳到 9680 落空，表现为「登录完没反应」。 */
+const PORT = Number(process.argv[2]) || Number(process.env.PORT) || 9680;
 const ROOT = __dirname;
 const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
@@ -225,6 +228,11 @@ const AUTH_OPEN = [
   '/sso/login',
   '/sso/callback',
   '/sso/status',
+  /* 钉钉身份打通：这两个端点必须在【登录前】可访问 ——
+     登录页要先问 status 才知道显不显示钉钉入口，login 本身就是登录动作。
+     其余 /api/dingtalk/*（me / logout）仍需登录，照常走门禁。 */
+  '/api/dingtalk/status',
+  '/api/dingtalk/login',
   '/login.html',
   '/favicon.ico'
 ];

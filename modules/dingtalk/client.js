@@ -48,7 +48,10 @@ function loadConfig() {
   return {
     appKey: env.DINGTALK_APP_KEY || file.appKey,
     appSecret: env.DINGTALK_APP_SECRET || file.appSecret,
-    operatorId: env.DINGTALK_OPERATOR_ID || file.operatorId
+    operatorId: env.DINGTALK_OPERATOR_ID || file.operatorId,
+    /* corpId 只有【登录】用得上（换用户身份、给前端 JSAPI 传参），通讯录不需要。
+       所以它不影响 isConfigured()，否则没填 corpId 会把已跑通的通讯录同步也一起关掉。 */
+    corpId: env.DINGTALK_CORP_ID || file.corpId
   };
 }
 
@@ -56,6 +59,12 @@ function loadConfig() {
 function isConfigured() {
   const c = loadConfig();
   return !missing(c.appKey) && !missing(c.appSecret);
+}
+
+/** 配置是否齐全到能走钉钉登录（比通讯录多要一个 corpId） */
+function isLoginConfigured() {
+  const c = loadConfig();
+  return !missing(c.appKey) && !missing(c.appSecret) && !missing(c.corpId);
 }
 
 /* ---------- 请求 ---------- */
@@ -362,11 +371,211 @@ async function fetchOrg(opts) {
   return { departments, users, errors, truncated };
 }
 
+/* ---------- 钉钉身份（登录用）----------------------------------
+ *
+ * ── 两条路，能力完全不同，别混 ────────────────────────────────────
+ *
+ *  ① 免登（JSAPI）：用户在钉钉客户端里打开平台 → 前端 dd.runtime.permission
+ *     .requestAuthCode({ corpId }) 拿到 authCode → POST 给后端。
+ *     ★ 钉钉服务器【不访问】平台 —— 没有回调域名白名单这回事，
+ *       所以纯内网 IP（10.63.139.103:9680）直接能用。
+ *
+ *  ② 扫码（OAuth2）：浏览器 → login.dingtalk.com → 【回调到平台】。
+ *     需要钉钉侧登记回调地址，纯内网 IP 登记不了。本文件不实现②。
+ *
+ * ── 为什么先取 userid 再取 token，而不是反过来 ──────────────────────
+ * 身份（userid）是【能不能登录】的闸门，用户级 token 只是【能不能调钉钉接口】。
+ * 顺序反过来的话：先换 token 成功、再取 userid 失败 → 谁也别想登录。
+ * 现在这个顺序最坏也只是「登进来了，但文档接口暂时用不了」，
+ * 用户能干活，且提示明确可查。
+ *
+ * ── authCode 能不能用两次 ─────────────────────────────────────────
+ * 钉钉的 authCode 是一次性的（用完即废）。所以这里必须：
+ *   先 getuserinfo（决定成败）→ 再换 userAccessToken（锦上添花）。
+ * 若实测发现二者不能共用同一个 code，正确做法是让前端调两次
+ * requestAuthCode 各拿一个 code，而不是把顺序调回来。
+ */
+
+/**
+ * 用 authCode 换【钉钉身份】（userid / 姓名）。
+ * 走老版 oapi —— 这个接口只有老版有，且 token 要放 query（放请求头会 400）。
+ * @param {string} code 前端 requestAuthCode 拿到的 authCode
+ * @returns {Promise<{userId:string, name:string}>}
+ */
+async function getUserInfoByCode(code) {
+  if (missing(code)) {
+    const err = new Error('缺少 authCode');
+    err.step = 'param';
+    throw err;
+  }
+  const token = await getToken();
+  const r = await req('POST', oapiUrl('/topapi/v2/user/getuserinfo', { access_token: token }), {
+    body: { code: String(code) }
+  });
+  const j = unwrap(r, '用 authCode 换钉钉身份');
+  const res = j.result || {};
+  const userId = String(res.userid || res.userId || '');
+  if (!userId) {
+    /* 返回体里没有 userid 只有一种常见成因：调用方不是本企业成员，
+       或者应用的可见范围没覆盖到这个人。两者处置方式不同，所以把体打出来。 */
+    const err = new Error('钉钉返回体里没有 userid（可能不在应用可见范围内）');
+    err.step = 'field';
+    err.body = JSON.stringify(j).slice(0, 300);
+    throw err;
+  }
+  return { userId: userId, name: String(res.name || '') };
+}
+
+/**
+ * 按 userid 取通讯录详情 —— 关键是为了拿【工号 job_number】。
+ * 工号是平台的主键（users.id），也是唯一能与 SSO 对齐的口径。
+ * @param {string} userId
+ * @returns {Promise<{userId:string,name:string,jobNumber:string,mobile:string,active:boolean|null}>}
+ */
+async function getUserDetail(userId) {
+  const token = await getToken();
+  const r = await req('POST', oapiUrl('/topapi/v2/user/get', { access_token: token }), {
+    body: { userid: String(userId) }
+  });
+  const j = unwrap(r, '取钉钉用户详情（' + userId + '）');
+  const u = j.result || {};
+  return {
+    userId: String(u.userid || userId),
+    name: String(u.name || ''),
+    jobNumber: String(u.job_number || ''),
+    mobile: String(u.mobile || ''),
+    active: u.active !== undefined ? !!u.active : null
+  };
+}
+
+/* ---------- 用户级 token（权限透传）------------------------------
+ *
+ * ★ 这是「权限透传」的技术实质：
+ *   企业 token（getToken）代表【应用】—— 能看到的取决于应用被授了哪些权限点。
+ *   用户 token（这里）代表【这个自然人】—— 钉钉按【他本人】的可见范围鉴权。
+ *   拿用户 token 去调文档接口，他在钉钉看得到的，平台上就调得到；
+ *   看不到的，钉钉直接拒 —— 平台【不需要自己维护一套文档权限表】。
+ *
+ * ⚠ 只存内存，不落盘。理由同上面的企业 token：多落一个盘就多一个要
+ *   gitignore 的密钥文件，而重启后让用户重新登录一次的代价可以接受。
+ *   代价：服务重启后已登录的人要重新点一次登录，才能用文档类功能。
+ */
+const _userTokens = new Map();   // userId → { accessToken, refreshToken, expireAt }
+
+/**
+ * 用 authCode 换【用户级 access_token】。
+ * @returns {Promise<{accessToken:string, refreshToken:string, expireIn:number}>}
+ */
+async function exchangeUserToken(code) {
+  const cfg = loadConfig();
+  if (missing(cfg.appKey) || missing(cfg.appSecret)) {
+    const err = new Error('缺少 appKey / appSecret');
+    err.step = 'config';
+    throw err;
+  }
+  const r = await req('POST', API + '/v1.0/oauth2/userAccessToken', {
+    body: {
+      clientId: cfg.appKey,
+      clientSecret: cfg.appSecret,
+      code: String(code),
+      grantType: 'authorization_code'
+    }
+  });
+  if (r.status !== 200 || !r.json || !r.json.accessToken) {
+    const err = new Error('换用户 token 失败：HTTP ' + r.status + ' ' + String(r.text || '').slice(0, 200));
+    err.step = 'userToken';
+    throw err;
+  }
+  return {
+    accessToken: r.json.accessToken,
+    refreshToken: r.json.refreshToken || '',
+    expireIn: Number(r.json.expireIn) > 0 ? Number(r.json.expireIn) : 7200
+  };
+}
+
+/**
+ * 用 refreshToken 续期。用户 token 有效期约 2 小时，
+ * 过期后不续期就得让用户重新登录一次 —— 体验断崖，所以必须实现续期。
+ */
+async function refreshUserToken(refreshToken) {
+  const cfg = loadConfig();
+  const r = await req('POST', API + '/v1.0/oauth2/userAccessToken', {
+    body: {
+      clientId: cfg.appKey,
+      clientSecret: cfg.appSecret,
+      refreshToken: String(refreshToken),
+      grantType: 'refresh_token'
+    }
+  });
+  if (r.status !== 200 || !r.json || !r.json.accessToken) {
+    const err = new Error('续期用户 token 失败：HTTP ' + r.status + ' ' + String(r.text || '').slice(0, 200));
+    err.step = 'userTokenRefresh';
+    throw err;
+  }
+  return {
+    accessToken: r.json.accessToken,
+    refreshToken: r.json.refreshToken || refreshToken,
+    expireIn: Number(r.json.expireIn) > 0 ? Number(r.json.expireIn) : 7200
+  };
+}
+
+/** 存下某人的用户 token。提前 5 分钟算过期，避免边界上打出 401。 */
+function putUserToken(userId, t) {
+  _userTokens.set(String(userId), {
+    accessToken: t.accessToken,
+    refreshToken: t.refreshToken || '',
+    expireAt: Date.now() + (t.expireIn - 300) * 1000
+  });
+}
+
+function getUserToken(userId) {
+  const t = _userTokens.get(String(userId));
+  if (!t) return null;
+  if (t.expireAt <= Date.now()) return null;   // 过期即视为没有，由调用方决定要不要续
+  return t;
+}
+
+function clearUserToken(userId) { _userTokens.delete(String(userId)); }
+
+/**
+ * 取某人的可用用户 token，必要时自动续期。
+ * 拿不到（从没登录过 / 刷新也失败）返回 null，由调用方降级，
+ * 【不要抛错】—— 文档类功能用不了不该把整个页面打挂。
+ * @returns {Promise<string|null>}
+ */
+async function userTokenOf(userId) {
+  const t = _userTokens.get(String(userId));
+  if (!t) return null;
+  if (t.expireAt > Date.now()) return t.accessToken;
+  if (!t.refreshToken) { _userTokens.delete(String(userId)); return null; }
+  try {
+    const fresh = await refreshUserToken(t.refreshToken);
+    putUserToken(userId, fresh);
+    return fresh.accessToken;
+  } catch (e) {
+    /* 续期失败的常见成因是 refreshToken 也过期了（有效期比 access 长得多，
+       但不是无限）。清掉，让前端引导用户重新登录一次。 */
+    _userTokens.delete(String(userId));
+    return null;
+  }
+}
+
+/** 当前有多少人持有可用的用户 token —— 只给 /dingtalk/status 做观测用 */
+function userTokenStats() {
+  let alive = 0;
+  const now = Date.now();
+  for (const t of _userTokens.values()) if (t.expireAt > now) alive++;
+  return { cached: _userTokens.size, alive: alive };
+}
+
 module.exports = {
   API, OAPI, SECRET_FILE,
-  missing, loadConfig, isConfigured,
+  missing, loadConfig, isConfigured, isLoginConfigured,
   req, maskToken, maskDeep,
   getToken, clearToken,
   listSubDepartments, listDepartmentUsers,
-  fetchOrg
+  fetchOrg,
+  /* 用户身份 / 权限透传 */
+  getUserInfoByCode, getUserDetail, exchangeUserToken, refreshUserToken,
+  putUserToken, getUserToken, userTokenOf, clearUserToken, userTokenStats
 };

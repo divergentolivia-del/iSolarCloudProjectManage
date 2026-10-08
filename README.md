@@ -26,9 +26,10 @@ node server.js
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `PORT` | 8770 | 监听端口，也可用 `node server.js 9000` |
-| `DATA_DIR` | `./data` | 数据目录，部署时建议指向独立路径 |
-| `ACCESS_TOKEN` | 空（不校验） | 访问密码，设置后链接需带 `?token=` |
+| `PORT` | 9680 | 监听端口，也可用 `node server.js 9000`。⚠️ 9680 是 SSO 回调白名单登记值，改端口要同步变更登记 |
+| `DATA_DIR` | `./data` | 数据目录。⚠️ 部分钉钉/推送脚本写死了 `data/` 路径，不跟随此变量，见 `docs/plan-server-migration.md` |
+| `AUTH_REQUIRED` | 关 | `1` 启用真实登录（账号 + 密码 + 会话） |
+| `ACCESS_TOKEN` | 空（不校验） | 旧版整站密码门禁，与登录并存 |
 
 ## 使用流程
 

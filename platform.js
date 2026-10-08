@@ -356,11 +356,31 @@ const Platform = (() => {
     if (logout) {
       logout.addEventListener('click', () => {
         if (!window.confirm('确定退出登录？')) return;
-        /* 是否一并通知 SSO 登出，取决于【本次是不是用 SSO 登录的】。
-           本地账号密码登录的人不能走这条 —— 那会把他其他系统的登录态一起退掉。
-           标记由服务端在 SSO 回调成功时种下（modules/sso/routes.js 的 setSessionCookie）。 */
-        const viaSso = document.cookie.split('; ').some(c => c === 'wb_auth_src=sso');
-        fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+        /* 退出分三种情况，取决于【本次是怎么登录进来的】，
+           标记由各模块回调成功时种下（modules/auth|sso|dingtalk/routes.js 的 setSessionCookie）：
+
+             · 钉钉登录（wb_auth_src=dingtalk）—— 必须先清用户级 token，再走 auth 登出。
+               顺序不能反：钉钉那个端点靠 Cookie 认人，auth 一执行 Cookie 就没了。
+               也不需要同步去钉钉那边登出 —— 钉钉客户端里的登录态是钉钉自己的，
+               平台关不掉，也不该关（用户可能还在用钉钉干别的）。
+             · SSO 登录（wb_auth_src=sso）—— 登出平台后还要通知 SSO 一起退，
+               否则其他接入 SSO 的系统登录态会莫名其妙跟着没了 / 或者留下不一致。
+             · 本地账号密码登录 —— 只退平台，绝不能碰 SSO，
+               那会把用户在其他系统的登录态一起退掉。 */
+        const src = document.cookie.split('; ').reduce((acc, c) => {
+          return c.indexOf('wb_auth_src=') === 0 ? c.slice('wb_auth_src='.length) : acc;
+        }, '');
+        const viaSso = src === 'sso';
+        const viaDingtalk = src === 'dingtalk';
+
+        /* 先清钉钉的用户级 token。失败也继续 —— 不能因为这一步卡住退不出去 */
+        const clearDingtalk = viaDingtalk
+          ? fetch('/api/dingtalk/logout', { method: 'POST', credentials: 'same-origin' })
+              .catch(() => { /* 清不掉也只是内存里多留一份，不该卡住用户 */ })
+          : Promise.resolve();
+
+        clearDingtalk
+          .then(() => fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }))
           .catch(() => { /* 请求失败也照常走：本地会话清不掉也不该卡住用户 */ })
           .then(() => {
             window.location.href = viaSso ? '/sso/logout' : '/login.html';

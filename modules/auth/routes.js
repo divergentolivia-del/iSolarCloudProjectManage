@@ -20,6 +20,7 @@
 'use strict';
 
 const db = require('../../db');
+const teams = require('../../teams');
 
 const COOKIE = 'wb_session';
 /* 登录来源标记，与 modules/sso/routes.js 里同名同属性。取值 sso | local。
@@ -267,14 +268,68 @@ async function handle(req, res, url) {
   }
 
   /* ---- 以下仅管理员 ---- */
-  const needAdmin = p === '/api/auth/users' || p.startsWith('/api/auth/users/');
+  const needAdmin = p === '/api/auth/users' || p.startsWith('/api/auth/users/')
+                    || p === '/api/auth/teams';
   if (needAdmin) {
     const me = currentUser(req);
     if (!me) return sendJson(res, 401, { error: '请先登录' });
     if (me.role !== 'admin') return sendJson(res, 403, { error: '仅管理员可操作' });
 
+    /* 团队分类清单 + 实际人数。
+       给前端下拉用，同时把「声明人数 vs 实际人数」的差当场暴露出来 ——
+       差不为 0 就说明库里有人没归到团队（新入职还没来得及入名单），
+       这种偏差不该等到对账报告才发现。 */
+    if (p === '/api/auth/teams' && method === 'GET') {
+      const users = db.listUsers();
+      const actual = {};
+      let unassigned = 0;
+      for (const u of users) {
+        const t = teams.teamOf(u.name);
+        if (!t) { unassigned++; continue; }
+        actual[t] = (actual[t] || 0) + 1;
+      }
+      const list = teams.all().map(t => ({
+        team: t.team,
+        declared: t.declared,          // 名单里声明的人数
+        count: actual[t.team] || 0     // 库里实际归到该团队的人数
+      }));
+      /* 名单里有、但库里一个号都没有的团队 —— 也要列出来，不能凭空消失 */
+      for (const [t, n] of Object.entries(actual)) {
+        if (!list.some(x => x.team === t)) list.push({ team: t, declared: null, count: n });
+      }
+      return sendJson(res, 200, {
+        ready: teams.ready(),
+        meta: teams.meta(),
+        total: users.length,
+        unassigned: unassigned,        // 没有团队分类的用户数（管理员等）
+        teams: list
+      });
+    }
+
     if (p === '/api/auth/users' && method === 'GET') {
-      return sendJson(res, 200, db.listUsers());
+      /* 按团队分类筛选 + 按姓名/工号模糊搜索。
+         ★ 团队分类来自 teams.json 的姓名反查，不是 users.department
+           （后者是钉钉叶子部门名，68 个值，与本处的 19 个团队不是一个维度）。
+         url 是 url.parse(req.url, true) 的旧式对象：只能读 url.query，没有 searchParams。 */
+      const dept = String(url.query.dept || '').trim();
+      const q = String(url.query.q || '').trim().toLowerCase();
+
+      let rows = db.listUsers().map(u => Object.assign({}, u, { team: teams.teamOf(u.name) }));
+
+      if (dept) rows = rows.filter(u => u.team === dept);
+      if (q) {
+        rows = rows.filter(u =>
+          String(u.name || '').toLowerCase().indexOf(q) >= 0 ||
+          String(u.id || '').toLowerCase().indexOf(q) >= 0);
+      }
+
+      /* 传 ?plain=1 时直接回数组（兼容老调用方），默认回带统计的对象 */
+      if (url.query.plain === '1') return sendJson(res, 200, rows);
+      return sendJson(res, 200, {
+        users: rows,
+        total: rows.length,
+        teamsReady: teams.ready()
+      });
     }
 
     if (p === '/api/auth/users' && method === 'POST') {

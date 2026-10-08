@@ -27,6 +27,11 @@ const SettingsModule = (() => {
     const outsourceRate = getStoredValue(LS_KEYS.outsourceRate, '30000');
     const alertThreshold = getStoredValue(LS_KEYS.alertThreshold, '10');
     const isDark = currentTheme === 'dark';
+    /* 用户管理只对管理员渲染。判断放在这里而不是用 CSS 藏 ——
+       非管理员连这段 HTML 都不该拿到，免得界面上一堆「点了必然 403」的按钮。
+       Platform 没有 isAdmin，只能看 role。 */
+    const _me = (typeof Platform !== 'undefined' && Platform.currentUser) ? Platform.currentUser() : null;
+    const isAdmin = !!(_me && _me.role === 'admin');
 
     container.innerHTML = `
       <div class="settings-page">
@@ -129,6 +134,27 @@ const SettingsModule = (() => {
           </div>
         </div>
 
+        ${isAdmin ? `
+        <h2 class="page-title" style="margin-top:32px">用户管理</h2>
+        <div class="settings-section">
+          <!-- 团队下拉的数据源是 teams.json（19 个团队分类），不是 users.department
+               （那是钉钉叶子部门名，68 个值，两个维度别混）。
+               搜索与筛选都走服务端，前端不自己过滤 —— 分页/权限口径只有一处。 -->
+          <div class="form-group">
+            <label class="form-label">团队</label>
+            <div class="form-control">
+              <select id="umDept" class="settings-input" style="text-align:left"><option value="">全部团队</option></select>
+              <input type="text" id="umQuery" class="settings-input" placeholder="搜姓名或工号" style="text-align:left;margin-left:8px">
+              <button class="btn" id="umRefresh" style="margin-left:8px">刷新</button>
+            </div>
+          </div>
+          <div id="umStat" style="font-size:13px;color:#6b7280;margin:4px 0 8px"></div>
+          <div id="umTable" style="max-height:520px;overflow:auto">
+            <p style="color:#6b7280">加载中...</p>
+          </div>
+        </div>
+        ` : ''}
+
         <h2 class="page-title" style="margin-top:32px">白名单管理</h2>
         <div class="settings-section" id="whitelistSection">
           <p style="color:#6b7280">加载中...</p>
@@ -152,6 +178,9 @@ const SettingsModule = (() => {
 
     // 加载审计日志
     loadAuditSection();
+
+    // 加载用户管理（仅管理员有这段 DOM，非管理员直接跳过）
+    if (isAdmin) loadUserSection();
   }
 
   /* ---------- 事件绑定 ---------- */
@@ -464,6 +493,233 @@ const SettingsModule = (() => {
         </table>
       </div>
     `;
+  }
+
+  /* ---------- 用户管理（仅 admin 渲染） ----------
+
+     为什么加在这：373 个号批量建出来之后，平台没有任何地方能看这张表。
+     改角色 / 停用 / 重置密码的接口早就有了（auth/routes.js），缺的是界面。
+     团队一列来自 teams.json 的姓名反查，接口返回时已经附好，前端不自己算。 */
+
+  let _umTeams = null;   // 团队清单缓存，加载过一次就不再请求
+  let _umTimer = null;   // 搜索防抖
+
+  function loadUserSection() {
+    const sel = document.getElementById('umDept');
+    if (!sel) return;
+
+    bindUserEvents();
+
+    fetch('/api/auth/teams', { credentials: 'same-origin' })
+      .then(r => r.json())
+      .then(d => {
+        _umTeams = d.teams || [];
+        /* 名单文件缺失/损坏时接口回 ready:false —— 下拉只留「全部团队」并说明原因，
+           列表照常加载，不因为筛选项缺了就整块白屏。 */
+        const opts = ['<option value="">全部团队</option>'];
+        if (!d.ready) {
+          opts.push('<option value="" disabled>团队名单未就绪</option>');
+        } else {
+          _umTeams.forEach(t => {
+            opts.push('<option value="' + SharedUI.esc(t.team) + '">' +
+              SharedUI.esc(t.team) + '（' + t.count + '）</option>');
+          });
+        }
+        sel.innerHTML = opts.join('');
+      })
+      .catch(function () { /* 下拉拉不到不影响下面的列表 */ });
+
+    loadUserList();
+  }
+
+  function bindUserEvents() {
+    const sel = document.getElementById('umDept');
+    if (sel) sel.addEventListener('change', loadUserList);
+
+    const q = document.getElementById('umQuery');
+    if (q) {
+      /* 防抖 250ms：372 个人名，每敲一个字母打一次接口没必要，但也不等回车 ——
+         输入即筛的手感更接近本地过滤。筛选本身仍在服务端做，口径只有一处。 */
+      q.addEventListener('input', function () {
+        if (_umTimer) clearTimeout(_umTimer);
+        _umTimer = setTimeout(loadUserList, 250);
+      });
+    }
+
+    const refresh = document.getElementById('umRefresh');
+    if (refresh) refresh.addEventListener('click', loadUserList);
+
+    const table = document.getElementById('umTable');
+    if (table) {
+      /* 事件委托：372 行 × 2 个按钮，逐行绑会挂 700+ 个监听器 */
+      table.addEventListener('click', onUserTableClick);
+      table.addEventListener('change', onUserTableChange);
+    }
+  }
+
+  function loadUserList() {
+    const box = document.getElementById('umTable');
+    if (!box) return;
+
+    const dept = (document.getElementById('umDept') || {}).value || '';
+    const q = (document.getElementById('umQuery') || {}).value || '';
+    const qs = [];
+    if (dept) qs.push('dept=' + encodeURIComponent(dept));
+    if (q.trim()) qs.push('q=' + encodeURIComponent(q.trim()));
+
+    fetch('/api/auth/users' + (qs.length ? '?' + qs.join('&') : ''), { credentials: 'same-origin' })
+      .then(r => r.json().then(d => ({ ok: r.ok, d: d })))
+      .then(function (r) {
+        if (!r.ok) {
+          box.innerHTML = '<p style="color:var(--warn)">' + SharedUI.esc((r.d && r.d.error) || '获取用户列表失败') + '</p>';
+          return;
+        }
+        renderUserList(r.d);
+      })
+      .catch(function () {
+        box.innerHTML = '<p style="color:var(--warn)">获取用户列表失败</p>';
+      });
+  }
+
+  const ROLE_OPTIONS = [
+    { v: 'viewer', t: '只读' },
+    { v: 'dev', t: '开发' },
+    { v: 'pm', t: '项目经理' },
+    { v: 'admin', t: '管理员' }
+  ];
+
+  function renderUserList(d) {
+    const box = document.getElementById('umTable');
+    if (!box) return;
+
+    const users = (d && d.users) || [];
+    const me = (typeof Platform !== 'undefined' && Platform.currentUser) ? Platform.currentUser() : null;
+
+    const stat = document.getElementById('umStat');
+    if (stat) {
+      stat.textContent = '共 ' + users.length + ' 人' +
+        (d && typeof d.unassigned === 'number' ? '，未归类 ' + d.unassigned + ' 人' : '') +
+        (d && d.teamsReady === false ? '（团队名单未就绪，团队一列不可用）' : '');
+    }
+
+    if (!users.length) {
+      box.innerHTML = '<p style="color:#6b7280">没有匹配的用户</p>';
+      return;
+    }
+
+    /* 列表不做分页：372 行纯文本对浏览器不算什么，分页反而多一层状态要维护。
+       真到卡的程度再加。 */
+    const rows = users.map(function (u) {
+      const self = !!(me && me.id === u.id);       // 自己那行：角色和启停都锁死（服务端也拒）
+      const roleSel = '<select class="settings-input" data-um-role="' + SharedUI.esc(u.id) + '"' +
+        (self ? ' disabled title="不能改自己的角色"' : '') + ' style="font-size:13px;padding:2px 6px">' +
+        ROLE_OPTIONS.map(o => '<option value="' + o.v + '"' + (o.v === u.role ? ' selected' : '') + '>' + o.t + '</option>').join('') +
+        '</select>';
+      const on = Number(u.enabled) === 1;
+      const toggleBtn = '<button class="link" data-um-toggle="' + SharedUI.esc(u.id) + '" data-on="' + (on ? '1' : '0') + '"' +
+        (self ? ' disabled title="不能停用自己"' : '') + ' style="color:' + (on ? 'var(--warn)' : 'var(--ok)') + '">' +
+        (on ? '停用' : '启用') + '</button>';
+      return '<tr>' +
+        '<td style="padding:6px 10px;border-bottom:1px solid var(--line);font-size:13px">' + SharedUI.esc(u.name || '') + '</td>' +
+        '<td style="padding:6px 10px;border-bottom:1px solid var(--line);font-size:13px">' + SharedUI.esc(u.id || '') + '</td>' +
+        '<td style="padding:6px 10px;border-bottom:1px solid var(--line);font-size:13px">' +
+          (u.team ? SharedUI.esc(u.team) : '<span style="color:#6b7280">未归类</span>') + '</td>' +
+        '<td style="padding:6px 10px;border-bottom:1px solid var(--line)">' + roleSel + '</td>' +
+        '<td style="padding:6px 10px;border-bottom:1px solid var(--line);font-size:13px">' +
+          (on ? '<span style="color:var(--ok)">正常</span>' : '<span style="color:var(--warn)">已停用</span>') + '</td>' +
+        /* 初始密码标记：372/373 都还挂着，这是「谁还没改密码」的唯一可视入口 */
+        '<td style="padding:6px 10px;border-bottom:1px solid var(--line);font-size:13px">' +
+          (Number(u.pwd_is_initial) === 1
+            ? '<span class="badge">初始密码</span> ' +
+              '<button class="link" data-um-reset="' + SharedUI.esc(u.id) + '">重置</button>'
+            : '') + '</td>' +
+        '<td style="padding:6px 10px;border-bottom:1px solid var(--line);font-size:13px">' + toggleBtn + '</td>' +
+      '</tr>';
+    }).join('');
+
+    box.innerHTML =
+      '<table style="width:100%;border-collapse:collapse">' +
+        '<thead><tr style="background:var(--bg);position:sticky;top:0">' +
+          '<th style="padding:8px 10px;text-align:left;font-size:13px;border-bottom:1px solid var(--line)">姓名</th>' +
+          '<th style="padding:8px 10px;text-align:left;font-size:13px;border-bottom:1px solid var(--line)">工号</th>' +
+          '<th style="padding:8px 10px;text-align:left;font-size:13px;border-bottom:1px solid var(--line)">团队</th>' +
+          '<th style="padding:8px 10px;text-align:left;font-size:13px;border-bottom:1px solid var(--line)">角色</th>' +
+          '<th style="padding:8px 10px;text-align:left;font-size:13px;border-bottom:1px solid var(--line)">状态</th>' +
+          '<th style="padding:8px 10px;text-align:left;font-size:13px;border-bottom:1px solid var(--line)">密码</th>' +
+          '<th style="padding:8px 10px;text-align:left;font-size:13px;border-bottom:1px solid var(--line)">操作</th>' +
+        '</tr></thead><tbody>' + rows + '</tbody>' +
+      '</table>';
+  }
+
+  function onUserTableChange(e) {
+    const sel = e.target.closest('[data-um-role]');
+    if (!sel) return;
+    const id = sel.dataset.umRole;
+    const role = sel.value;
+
+    fetch('/api/auth/users/role', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ id: id, role: role })
+    })
+      .then(r => r.json().then(d => ({ ok: r.ok, d: d })))
+      .then(function (r) {
+        if (!r.ok) SharedUI.toast((r.d && r.d.error) || '改角色失败', 'error');
+        else SharedUI.toast(id + ' 的角色已改为 ' + role, 'success');
+        loadUserList();   // 失败时也重拉，把下拉框拉回服务端的真实值
+      })
+      .catch(function () { SharedUI.toast('网络异常，角色未修改', 'error'); loadUserList(); });
+  }
+
+  function onUserTableClick(e) {
+    const toggle = e.target.closest('[data-um-toggle]');
+    if (toggle) return toggleUser(toggle.dataset.umToggle, toggle.dataset.on !== '1');
+    const reset = e.target.closest('[data-um-reset]');
+    if (reset) return resetUserPassword(reset.dataset.umReset);
+  }
+
+  /** 启用 / 停用。停用不影响已有会话的当前请求，但下次鉴权就会被挡。 */
+  function toggleUser(id, enabled) {
+    if (!window.confirm((enabled ? '启用 ' : '停用 ') + id + '？')) return;
+    fetch('/api/auth/users/enable', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ id: id, enabled: enabled })
+    })
+      .then(r => r.json().then(d => ({ ok: r.ok, d: d })))
+      .then(function (r) {
+        if (!r.ok) SharedUI.toast((r.d && r.d.error) || '操作失败', 'error');
+        else SharedUI.toast(id + (enabled ? ' 已启用' : ' 已停用'), 'success');
+        loadUserList();
+      })
+      .catch(function () { SharedUI.toast('网络异常，未生效', 'error'); });
+  }
+
+  /**
+   * 重置密码。★ 口令由用户当场输入，不由前端生成也不由服务端兜底 ——
+   * 前端生成等于把规则写在客户端（同批次同规则，正是 9/22 那次事故的成因）；
+   * 服务端兜底则会把明文密码写进日志。这里只负责把用户输入传给已有的接口。
+   */
+  function resetUserPassword(id) {
+    const pwd = window.prompt('给 ' + id + ' 设置新密码（至少 6 位）：');
+    if (pwd === null) return;
+    if (String(pwd).length < 6) { SharedUI.toast('密码至少 6 位', 'error'); return; }
+
+    fetch('/api/auth/users/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ id: id, password: pwd })
+    })
+      .then(r => r.json().then(d => ({ ok: r.ok, d: d })))
+      .then(function (r) {
+        if (!r.ok) SharedUI.toast((r.d && r.d.error) || '重置失败', 'error');
+        else SharedUI.toast(id + ' 的密码已重置', 'success');
+        loadUserList();
+      })
+      .catch(function () { SharedUI.toast('网络异常，密码未修改', 'error'); });
   }
 
   /* ---------- 模块接口 ---------- */

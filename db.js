@@ -213,8 +213,12 @@ function findUser(id) {
 }
 
 function listUsers() {
+  /* 带上 pwd_is_initial：373 个号里 372 个还在用批量建号发的初始密码，
+     管理页面必须能一眼看出「谁还没改密码」，否则这个数只能靠数库。
+     只 SELECT 展示需要的列，不含 password_hash。 */
   return get().prepare(
-    'SELECT id, name, role, department, dingtalk_id, enabled, created_at FROM users ORDER BY department, id'
+    'SELECT id, name, role, department, dingtalk_id, enabled, pwd_is_initial, created_at ' +
+    'FROM users ORDER BY department, id'
   ).all();
 }
 

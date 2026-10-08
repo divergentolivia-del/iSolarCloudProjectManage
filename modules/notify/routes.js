@@ -179,7 +179,9 @@ function handle(req, res, url) {
   }
 
   if (method === 'GET' && p === '/api/notify/resolve') {
-    const names = url.searchParams.get('names') || '';
+    /* 服务端传入的是 url.parse 旧式对象，没有 searchParams，自己包一层 */
+    const qs = new URL('http://x' + (url.pathname || '') + (url.search || '')).searchParams;
+    const names = qs.get('names') || '';
     if (!names.trim()) return sendJson(res, 400, { error: '需要 names 查询参数' });
     const r = checker.resolveUsers(names);
     /* 查人依赖 data/dingtalk/org.json 快照。没跑过同步时 users 为空，

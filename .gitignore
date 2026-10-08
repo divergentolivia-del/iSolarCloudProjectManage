@@ -45,6 +45,8 @@ data/dingtalk/org.json
 data/dingtalk/roster.csv
 data/dingtalk/leavers.csv
 data/dingtalk/report.txt
+# 对账报告：含全部账号的姓名/部门/角色，以及停用与建号明细，同属本机快照
+data/dingtalk/reconcile-report.txt
 
 # 公司 SSO 应用凭据（client_secret，绝不入库；模板见 docs/samples/sso-secret.sample.json）
 data/sso/

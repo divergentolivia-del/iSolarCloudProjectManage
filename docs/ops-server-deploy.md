@@ -105,6 +105,29 @@ git log --oneline -5        # 确认拿到的是最新提交
 > git clone --depth 1 -b dev/sgai https://github.com/divergentolivia-del/iSolarCloudProjectManage.git pmwork
 > ```
 
+#### ★ 到这里【还不能】做 SSO 验收 —— 必须先搬数据
+
+**`git checkout dev/sgai` 只解决「代码是最新的」，不解决「数据在不在」。**
+clone 出来的目录里**没有账号库、没有 SSO 凭据**（都在 `.gitignore` 里，git 拉不到），
+此时直接启动服务，表现是：
+
+| 现象 | 原因 |
+|---|---|
+| 登录页只有「工号+密码」，**没有「公司统一认证登录」按钮** | `data/sso/secret.json` 不存在 → `/sso/status` 返 `configured:false` → 前端不渲染按钮（刻意设计，不摆点了报错的按钮） |
+| 就算手输 `/sso/login` 跳过去、SSO 也认证成功了，回来是「**账号未开通**」 | `data/platform.db` 不存在 → 373 个账号一个都没有 → 换到的工号匹配不上 |
+
+**三个文件是硬前置**（缺一个 SSO 就验不成）：
+
+```bash
+ls -la data/platform.db        # 373 个账号在里面
+ls -la data/sso/secret.json    # client_id / client_secret / 四条 URL
+ls -la data/auth-config.json   # 密码规则（非 SSO 必需，但一起搬省事）
+```
+
+搬法见下一节，完整方案见 `docs/plan-server-migration.md`。
+
+> **⚠ 只拷 `data/` 目录、不要拷 `node_modules`**（本项目零依赖，没有这个目录，别从上位机带过来）。
+
 ### 2.3 clone 完你会看到什么（★ 重要）
 
 **clone 下来的是一个「没有数据、没有任何凭据」的代码骨架。** 这不是出错，是因为 `.gitignore` 把真实的工时数据、账号库、密钥都排除了。
@@ -494,7 +517,9 @@ node -e "require('./db').setRole('工号','pm'); console.log('已改')"
 - [ ] 9680 端口空闲
 - [ ] 代码 clone 到 `dev/sgai` 且是最新提交
 - [ ] `data/` 数据已搬，账号数 = 373
+- [ ] **`platform.db-wal` / `platform.db-shm` 也一起搬了**（只拷 `.db` 会静默丢掉最近的账号写入，见迁移文档坑 1）
 - [ ] `data/sso/secret.json`、`data/dingtalk/secret.json`、`data/tb/secret.json` 三个都在
+- [ ] **`curl http://localhost:9680/sso/status` 返回 `"configured":true`** —— 不检查这条就直接去点登录按钮，按钮压根不会出现
 - [ ] 前台启动一次，看到「服务已启动」，无报错
 - [ ] 服务器本机 `curl http://localhost:9680/login.html` 有返回
 - [ ] 笔记本浏览器能打开 `http://10.63.139.103:9680`

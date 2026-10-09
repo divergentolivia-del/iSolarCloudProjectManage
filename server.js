@@ -228,6 +228,12 @@ const AUTH_OPEN = [
   '/sso/login',
   '/sso/callback',
   '/sso/status',
+  /* /sso/logout 也必须在白名单里，而且理由是【必然发生】而不是以防万一：
+     前端退出是「先 POST /api/auth/logout 销毁会话 → 再跳 /sso/logout」，
+     跳过来的时候会话已经没了。不放行的话门禁会先把它 302 到登录页，
+     SSO 侧永远收不到登出通知 —— 表现为「平台退了，SSO 还登着」，
+     再点登录不用输密码就进来了，看着像没退干净。 */
+  '/sso/logout',
   /* 钉钉身份打通：这两个端点必须在【登录前】可访问 ——
      登录页要先问 status 才知道显不显示钉钉入口，login 本身就是登录动作。
      其余 /api/dingtalk/*（me / logout）仍需登录，照常走门禁。 */
@@ -357,8 +363,11 @@ const server = http.createServer((req, res) => {
   if (gate(req, res, u)) return;
 
   /* 公司 SSO 登录。挂在站点根路径（/sso/...）而不是 /api 下 ——
-     它是页面级 302 跳转，浏览器直接访问，不经过前端 fetch。 */
-  if (p === '/sso/login' || p === '/sso/callback' || p === '/sso/status') {
+     它是页面级 302 跳转，浏览器直接访问，不经过前端 fetch。
+     ★ 四个路径必须都在这里列出：漏一个就会落到末尾兜底返 404 JSON，
+       浏览器看到的是白屏。曾经漏过 /sso/logout，表现为「退出登录点不动」。 */
+  if (p === '/sso/login' || p === '/sso/callback' || p === '/sso/status'
+      || p === '/sso/logout') {
     return ssoMod.handle(req, res, u);
   }
 

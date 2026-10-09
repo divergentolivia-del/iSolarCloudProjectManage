@@ -79,64 +79,67 @@ const NotifyModule = (() => {
   function renderSend() {
     return `
       <div class="settings-section">
-        <h3 class="notify-sec-title">✉️ 单点发送（给具体的人发消息）</h3>
-        <div class="notify-hint">按姓名直接给同事发钉钉消息，不走群。支持多人，用逗号 / 顿号 / 空格分隔。发送前先点「解析」确认匹配到的人。</div>
-        <div class="form-group">
-          <label>收件人姓名</label>
-          <input type="text" id="notifySendNames" placeholder="如：王亚、李婷" />
-          <button class="btn" id="notifyResolveBtn" type="button">🔍 解析</button>
+        <h3 class="notify-sec-title">✉️ 单点发送</h3>
+        <div class="notify-hint">按姓名直接给同事发钉钉单聊（不进群）。支持多人，用逗号 / 顿号 / 空格分隔；建议先点「解析」确认匹配到谁。</div>
+        <div class="ng-field">
+          <div class="ng-labelrow"><label class="ng-label">收件人姓名</label><button class="btn sm" id="notifyResolveBtn" type="button">🔍 解析</button></div>
+          <input type="text" id="notifySendNames" class="ng-input" placeholder="如：王亚、李婷" />
           <div id="notifyResolveResult" class="notify-resolve"></div>
         </div>
-        <div class="form-group">
-          <label>消息内容</label>
-          <textarea id="notifySendText" rows="4" placeholder="要发给对方的话…"></textarea>
+        <div class="ng-field">
+          <label class="ng-label">消息内容</label>
+          <textarea id="notifySendText" class="ng-input" rows="4" placeholder="要发给对方的话…"></textarea>
         </div>
-        <button class="btn primary" id="notifySendBtn" type="button">📨 发送</button>
-        <span class="notify-hint">发送走企业内部应用机器人单聊（robot oToMessages），只需 appKey 即可，无需 agentId。</span>
+        <div class="ng-actions">
+          <button class="btn primary" id="notifySendBtn" type="button">📨 发送</button>
+          <span class="notify-hint">走企业内部应用机器人单聊，只需 appKey，无需 agentId</span>
+        </div>
       </div>`;
   }
 
   function renderConfig(cfg) {
     const hs = cfg.highSeverity || {};
     const rm = cfg.reminders || {};
-    const sc = cfg.schedule || {};
+    const sevCls = {
+      high: (hs.severities || ['high']).includes('high') ? 'on' : '',
+      medium: (hs.severities || ['high']).includes('medium') ? 'on' : '',
+      low: (hs.severities || ['high']).includes('low') ? 'on' : ''
+    };
     return `
       <div class="settings-section">
-        <h3 class="notify-sec-title">⚙️ 推送配置（保存即生效，不落 git）</h3>
-        <div class="form-group">
-          <label><input type="checkbox" id="notifyEnabled" ${cfg.enabled ? 'checked' : ''} /> 启用推送</label>
+        <h3 class="notify-sec-title">⚙️ 推送配置（保存即生效）</h3>
+        <div class="ng-field">
+          <div class="ng-labelrow"><label class="ng-label"><input type="checkbox" id="notifyEnabled" ${cfg.enabled ? 'checked' : ''} class="ng-check" /> 启用推送</label></div>
         </div>
-        <div class="form-group">
-          <label>群 openConversationId</label>
-          <input type="text" id="notifyGroupId" value="${esc(cfg.groupChatId || '')}" placeholder="cid…（留空则推送进待发队列）" />
+        <div class="ng-field">
+          <label class="ng-label">群 openConversationId</label>
+          <input type="text" id="notifyGroupId" class="ng-input" value="${esc(cfg.groupChatId || '')}" placeholder="cid…（留空则推送进待发队列）" />
           <div class="notify-hint">获取：把机器人拉进目标群 → 群内 @ 机器人任意消息 → 在钉钉开放平台后台消息记录里找该群的 openConversationId（形如 cidXXXX）。</div>
         </div>
-        <div class="form-group">
-          <label>agentId（可选）</label>
-          <input type="text" id="notifyAgentId" value="${esc(cfg.agentId || '')}" placeholder="留空则责任人单聊走机器人通道" />
-          <div class="notify-hint">填了之后提醒才发「工作通知」（App 内更正式的单聊），留空用机器人单聊。</div>
+        <div class="ng-field">
+          <label class="ng-label">agentId（可选）</label>
+          <input type="text" id="notifyAgentId" class="ng-input" value="${esc(cfg.agentId || '')}" placeholder="留空则责任人单聊走机器人通道" />
+          <div class="notify-hint">填了之后提醒发「工作通知」（更正式），留空走机器人单聊。</div>
         </div>
-        <div class="form-group">
-          <label><input type="checkbox" id="notifyHsOn" ${hs.on === false ? '' : 'checked'} /> 高严重度自动推群</label>
-          <div class="notify-inline">
-            <span>级别：</span>
-            ${['high', 'medium', 'low'].map(lv => `
-              <label class="notify-chip"><input type="checkbox" data-sev="${lv}" ${(hs.severities || ['high']).includes(lv) ? 'checked' : ''} /> ${lv === 'high' ? '高' : lv === 'medium' ? '中' : '低'}</label>`).join('')}
-            <span class="notify-hint">单次上限 <input type="number" id="notifyMaxPerRun" style="width:64px" value="${hs.maxPerRun || 8}" min="1" max="50" /> 条</span>
+        <div class="ng-field">
+          <div class="ng-labelrow"><label class="ng-label"><input type="checkbox" id="notifyHsOn" ${hs.on === false ? '' : 'checked'} class="ng-check" /> 高严重度自动推群</label><span class="notify-hint">单次上限 <input type="number" id="notifyMaxPerRun" class="ng-num" value="${hs.maxPerRun || 8}" min="1" max="50" /> 条</span></div>
+          <div class="ng-sevs">
+            ${['high', 'medium', 'low'].map(lv => `<label class="ng-sev ${sevCls[lv]}"><input type="checkbox" data-sev="${lv}" ${sevCls[lv] ? 'checked' : ''} /><span>${lv === 'high' ? '高' : lv === 'medium' ? '中' : '低'}</span></label>`).join('')}
           </div>
         </div>
-        <div class="form-group">
-          <label><input type="checkbox" id="notifyRmOn" ${rm.on === false ? '' : 'checked'} /> 智能提醒</label>
-          <div class="notify-inline">
-            <span>封版前</span><input type="text" id="notifySealDays" class="notify-days" value="${(rm.sealDays || [7, 3, 1]).join(',')}" placeholder="7,3,1" />
-            <span>上线前</span><input type="text" id="notifyOnlineDays" class="notify-days" value="${(rm.onlineDays || [3, 1]).join(',')}" placeholder="3,1" />
-            <span>里程碑前</span><input type="text" id="notifyDueDays" class="notify-days" value="${(rm.dueDays || [3, 1]).join(',')}" placeholder="3,1" />
-            <span class="notify-hint">（天，逗号分隔；到点提醒一次）</span>
+        <div class="ng-field">
+          <div class="ng-labelrow"><label class="ng-label"><input type="checkbox" id="notifyRmOn" ${rm.on === false ? '' : 'checked'} class="ng-check" /> 智能提醒</label><span class="notify-hint">到天提醒一次，逗号分隔</span></div>
+          <div class="ng-days">
+            <div class="ng-days-row"><span class="ng-days-k">封版前</span><input type="text" id="notifySealDays" class="ng-input" value="${(rm.sealDays || [7, 3, 1]).join(',')}" placeholder="7,3,1" /></div>
+            <div class="ng-days-row"><span class="ng-days-k">上线前</span><input type="text" id="notifyOnlineDays" class="ng-input" value="${(rm.onlineDays || [3, 1]).join(',')}" placeholder="3,1" /></div>
+            <div class="ng-days-row"><span class="ng-days-k">里程碑前</span><input type="text" id="notifyDueDays" class="ng-input" value="${(rm.dueDays || [3, 1]).join(',')}" placeholder="3,1" /></div>
           </div>
         </div>
-        <button class="btn primary" id="notifySaveBtn" type="button">💾 保存配置</button>
-        <button class="btn" id="notifyTestBtn" type="button">🧪 试发群消息</button>
-        <span class="notify-hint">改了检查间隔（schedule）需重启服务生效，其余立即生效。</span>
+        <div class="ng-actions">
+          <button class="btn primary" id="notifySaveBtn" type="button">💾 保存配置</button>
+          <button class="btn" id="notifyTestBtn" type="button">🧪 试发群消息</button>
+          <span class="notify-hint">改了检查间隔需重启服务，其余立即生效</span>
+        </div>
       </div>`;
   }
 
@@ -170,7 +173,6 @@ const NotifyModule = (() => {
       </div>`;
     loadAll();
   }
-
   /* ---------- 数据 ---------- */
 
   async function loadAll() {
@@ -180,7 +182,10 @@ const NotifyModule = (() => {
         api('/api/notify/status'),
         api('/api/notify/config')
       ]);
-      body.innerHTML = renderStatus(s) + renderSend() + renderConfig(cfg.config || {}) + renderOutbox(s.outbox ? { count: s.outboxCount, entries: s.outbox } : { count: 0, entries: [] });
+      body.innerHTML =
+        renderStatus(s) +
+        '<div class="notify-grid">' + renderSend() + renderConfig(cfg.config || {}) + '</div>' +
+        renderOutbox(s.outbox ? { count: s.outboxCount, entries: s.outbox } : { count: 0, entries: [] });
       bindEvents();
     } catch (e) {
       body.innerHTML = '<div class="notify-hint">加载失败：' + esc(e.message) + '</div>';
@@ -229,7 +234,7 @@ const NotifyModule = (() => {
     /* 保存配置 */
     const saveBtn = $('notifySaveBtn');
     if (saveBtn) saveBtn.addEventListener('click', async () => {
-      const sevs = Array.from(document.querySelectorAll('#notifyHsOn ~ .notify-inline input[data-sev]:checked')).map(i => i.getAttribute('data-sev'));
+      const sevs = Array.from(document.querySelectorAll('.ng-sevs input[data-sev]:checked')).map(i => i.getAttribute('data-sev'));
       const toNum = (s, def) => { const n = Number(s); return isNaN(n) ? def : n; };
       const patch = {
         enabled: $('notifyEnabled').checked,
@@ -307,33 +312,50 @@ const NotifyModule = (() => {
     const style = document.createElement('style');
     style.id = 'notifyPageCss';
     style.textContent = `
-      .notify-page { max-width: 860px; }
+      .notify-page { max-width: 1160px; }
       .notify-body { display: flex; flex-direction: column; gap: 16px; }
+      .notify-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+      @media (max-width: 1080px) { .notify-grid { grid-template-columns: 1fr; } }
       .notify-sec-title { margin: 0 0 12px; font-size: 15px; color: var(--text); }
-      .notify-hint { color: var(--muted); font-size: 12px; margin: 4px 0; }
+      .notify-hint { color: var(--muted); font-size: 12px; margin: 2px 0; line-height: 1.5; }
       .notify-status-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-      .notify-status-table td { padding: 6px 8px; border-bottom: 1px solid var(--border, rgba(0,0,0,.06)); }
+      .notify-status-table td { padding: 7px 10px; border-bottom: 1px solid var(--line, rgba(0,0,0,.06)); }
       .notify-k { color: var(--muted); width: 110px; white-space: nowrap; }
-      .notify-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; font-size: 13px; }
-      .notify-days { width: 84px; }
-      .notify-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--panel, #f5f6f8); border: 1px solid var(--border, rgba(0,0,0,.1)); border-radius: 10px; padding: 2px 8px; font-size: 12px; margin-right: 4px; }
+      /* —— 表单：纵向布局，label 在上，输入占满宽 —— */
+      .ng-field { margin-bottom: 14px; }
+      .ng-labelrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+      .ng-label { display: block; font-size: 13px; color: var(--text); margin-bottom: 6px; white-space: nowrap; }
+      .ng-labelrow .ng-label { margin-bottom: 0; }
+      .ng-check { margin-right: 6px; vertical-align: -2px; }
+      .ng-input { width: 100%; box-sizing: border-box; padding: 8px 10px; font-size: 13px; border: 1px solid var(--line, rgba(0,0,0,.12)); border-radius: 8px; background: var(--panel, #fff); color: var(--text); font-family: inherit; }
+      .ng-input:focus { outline: none; border-color: #4c7dff; box-shadow: 0 0 0 3px rgba(76,125,255,.12); }
+      .ng-num { width: 64px; padding: 3px 6px; font-size: 13px; border: 1px solid var(--line, rgba(0,0,0,.12)); border-radius: 6px; }
+      .ng-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+      /* —— 级别选择 chip —— */
+      .ng-sevs { display: flex; gap: 8px; flex-wrap: wrap; }
+      .ng-sev { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; border: 1px solid var(--line, rgba(0,0,0,.12)); border-radius: 99px; font-size: 13px; cursor: pointer; user-select: none; white-space: nowrap; }
+      .ng-sev input { display: none; }
+      .ng-sev.on { background: rgba(76,125,255,.1); border-color: #4c7dff; color: #2b54d4; font-weight: 600; }
+      /* —— 提醒阈值：三行 label+输入 —— */
+      .ng-days { display: flex; flex-direction: column; gap: 8px; }
+      .ng-days-row { display: flex; align-items: center; gap: 10px; }
+      .ng-days-k { width: 64px; flex: none; font-size: 13px; color: var(--muted); }
+      /* —— 解析结果 chip：不换行 —— */
+      .notify-resolve { margin-top: 8px; font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+      .notify-chip { display: inline-flex; align-items: center; gap: 5px; background: var(--panel, #f5f6f8); border: 1px solid var(--line, rgba(0,0,0,.1)); border-radius: 10px; padding: 3px 10px; font-size: 12px; white-space: nowrap; }
       .notify-chip.ok { background: rgba(31,163,138,.1); border-color: rgba(31,163,138,.35); }
       .notify-chip.bad { background: rgba(224,79,95,.08); border-color: rgba(224,79,95,.35); }
-      .notify-chip small { color: var(--muted); margin-left: 2px; }
-      .notify-resolve { margin-top: 8px; font-size: 13px; line-height: 24px; }
-      .notify-outbox-item { border: 1px solid var(--border, rgba(0,0,0,.1)); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
+      .notify-chip small { color: var(--muted); }
+      /* —— 待发队列 —— */
+      .notify-outbox-item { border: 1px solid var(--line, rgba(0,0,0,.1)); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; background: var(--panel, #fafbfc); }
       .notify-outbox-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-      .notify-outbox-text { white-space: pre-wrap; font-size: 12px; color: var(--muted); margin: 6px 0 0; max-height: 120px; overflow: auto; }
-      .notify-tag { font-size: 11px; padding: 1px 8px; border-radius: 8px; background: rgba(76,125,255,.12); color: #4c7dff; }
+      .notify-outbox-text { white-space: pre-wrap; font-size: 12px; color: var(--muted); margin: 8px 0 0; max-height: 140px; overflow: auto; line-height: 1.6; }
+      .notify-tag { font-size: 11px; padding: 2px 9px; border-radius: 99px; background: rgba(76,125,255,.12); color: #4c7dff; white-space: nowrap; }
       .notify-tag.reminder { background: rgba(245,154,36,.14); color: #d97a00; }
       .notify-tag.workNotice { background: rgba(139,108,255,.12); color: #8b6cff; }
       .notify-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 8px 16px; border-radius: 8px; font-size: 13px; opacity: 0; transition: opacity .3s; z-index: 9999; max-width: 70vw; }
       .notify-toast.ok { opacity: 1; }
       .notify-toast.error { opacity: 1; background: #c0392b; }
-      .notify-page .form-group { margin-bottom: 12px; }
-      .notify-page input[type="text"], .notify-page textarea { width: 100%; box-sizing: border-box; }
-      .notify-page textarea { font-family: inherit; }
-      .notify-page .btn { margin-right: 8px; }
     `;
     document.head.appendChild(style);
   }

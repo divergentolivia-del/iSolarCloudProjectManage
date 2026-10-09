@@ -51,24 +51,33 @@ const SECRET_FILE = path.join(SSO_DIR, 'secret.json');
 /* 默认值：授权端点从内部「评优材料评审系统」已跑通的实现照抄而来。
    若流程数字化中心给的是别的路径，改 secret.json 覆盖即可，不用改代码。 */
 const DEFAULTS = {
-  authorizeUrl: 'https://sso.sungrow.cn/sso/login',
-  /* ⚠ 下面两项内部文档里没有写明，必须向流程数字化中心确认后填进 secret.json：
-       tokenUrl   —— 用 code 换工号的接口地址
-       idField    —— 返回体里工号所在的字段名（empNo / jobNumber / account …） */
+  /* 生产环境。三条 URL 与《接入规范》2.2 / 2.3 / 2.4 节逐字对应。
+     ⚠ 注意 authorizeUrl 是【OAuth2 授权端点】，不是 SSO 门户登录页。
+       规范 2.2 原话：「此接口在未登录单点登录时会跳转到登录页」——
+       也就是说跳 /uaa/oauth/authorize 没登录时它自己会把用户送到登录页，
+       带齐参数跳完还能把 code 送回 redirect_uri。
+       而直接跳门户页 /sso/login 是一张没带 client_id / redirect_uri 的
+       普通页面，登录完 SSO 不知道该送回哪儿，拿不到 code。
+       （申请说明里写的「跳转到 https://sso.sungrow.cn/sso/login」说的是
+        用户肉眼看到的那一步，不是应用该请求的地址。） */
+  authorizeUrl: 'https://sso.sungrow.cn/uaa/oauth/authorize',
+  /* 换 token。规范 2.3：请求类型 POST，参数在 query 上。
+     下面两项留空是有意的 —— 配置缺失时 isConfigured() 返回 false、
+     登录页不显示按钮，比跳过去撞 503 好排查。 */
   tokenUrl: '',
   idField: '',
   responseType: 'code',
   scope: '',
-  /* 姓名与工号可能不在同一个返回体里（有的实现要再调一次 userinfo） */
-  userInfoUrl: '',
+  /* 规范 2.4：GET /uaa/parseJwt，Header 带 `Authorization: Bearer <access_token>`，
+     返回 { userCode, userNo, locale } —— 所以工号字段是 userNo（见 secret.json）。
+     留空则跳过这一步（只适用于换 token 接口直接返回工号的实现）。 */
+  userInfoUrl: 'https://sso.sungrow.cn/uaa/parseJwt',
   nameField: 'name',
   /* 回调地址必须与申请时登记的一字不差，见 docs/plan-identity-and-dingtalk.md */
   redirectUri: 'http://10.63.139.103:9680/sso/callback',
   /* 平台登出端点。规范 2.6：只有用户【主动退出】才调，业务系统自己过期不要调
      （过期要重新走授权拿 code）。留空则退出时不通知 SSO。
-     ★ 上线前必须确认：这个默认值指向的是哪套环境。授权/换 token 走哪套，
-       登出就必须走哪套 —— 混用会出现「SIT 登录、生产登出」，两边都没退干净。
-       要换环境改 secret.json 的 logoutUrl，不用改代码。 */
+     与上面三条同属生产环境 —— 授权走哪套、登出就必须走哪套。 */
   logoutUrl: 'https://sso.sungrow.cn/uaa/logout',
   /* 只读诊断模式：拿到 code 后不换工号建会话，只把结果打日志/页面。
      联调期用来定位接口问题，避免用错配置把人放进平台。 */
@@ -271,15 +280,29 @@ async function exchangeCode(code) {
     'client_secret=' + encodeURIComponent(CONFIG.clientSecret),
     'redirect_uri=' + encodeURIComponent(CONFIG.redirectUri)
   ].join('&');
+  const sep = CONFIG.tokenUrl.indexOf('?') >= 0 ? '&' : '?';
 
-  /* 先试 POST（标准），不成立再试 GET（部分内部实现只认 GET） */
-  let r = await httpJson('POST', CONFIG.tokenUrl, {
-    body: q, contentType: 'application/x-www-form-urlencoded'
-  });
-  if (r.status >= 400 || !r.json) {
-    const sep = CONFIG.tokenUrl.indexOf('?') >= 0 ? '&' : '?';
-    const r2 = await httpJson('GET', CONFIG.tokenUrl + sep + q, {});
-    if (r2.status < 400 && r2.json) r = r2;
+  /* 规范 2.3 写的是「请求类型：POST」，但给的示例 URL 把参数全挂在 query 上
+     （…/uaa/oauth/token?client_id=…&client_secret=…&grant_type=…&code=…）。
+     两处看起来矛盾，内部实现又不保证按标准来，所以三种形态依次试，
+     取第一个真正返回 JSON 的 —— 联调期少一轮往返。
+     顺序按「最可能」排：query 那版直接照抄规范示例，放第一个。 */
+  let r;
+  const attempts = [
+    /* ① POST，参数在 query（规范示例的字面形态） */
+    () => httpJson('POST', CONFIG.tokenUrl + sep + q, {}),
+    /* ② POST，参数在 body（OAuth2 标准形态） */
+    () => httpJson('POST', CONFIG.tokenUrl, {
+      body: q, contentType: 'application/x-www-form-urlencoded'
+    }),
+    /* ③ GET，参数在 query（部分内部实现只认 GET） */
+    () => httpJson('GET', CONFIG.tokenUrl + sep + q, {})
+  ];
+  for (const send of attempts) {
+    const resp = await send();
+    if (resp.status < 400 && resp.json) { r = resp; break; }
+    /* 没成功就留着最后一次的响应，报错时能看到最接近真相的那条 */
+    r = resp;
   }
 
   if (r.status >= 400 || !r.json) {

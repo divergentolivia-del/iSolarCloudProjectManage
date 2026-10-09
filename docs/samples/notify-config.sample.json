@@ -1,0 +1,44 @@
+{
+  "_说明": "钉钉主动推送与智能提醒配置【模板】。真正的配置在 data/notify/config.json，那份文件已 gitignore，每台机器各存各的。新环境部署时把本文件复制过去改名即可。改完无需重启，下一次定时检查自动生效。",
+  "_为什么config.json不入库": "webhook.url 里自带 access_token —— 拿到它就能以公司名义往群里发消息。跟 data/dingtalk/secret.json、data/sso/ 一样属于凭据，不进 git。",
+  "_配置位置": "平台 → AI 推送 → 配置区（仅平台 admin 可见可改）。也可以直接改本机 data/notify/config.json。",
+
+  "_webhook说明": "群自定义机器人（推荐通道）。钉钉群 → 群设置 → 智能群助手 → 添加机器人 → 自定义 → 复制 webhook 地址。安全设置三选一：关键词 / 加签 / IP 白名单，对应下面 keyword 与 secret，三者都没设钉钉会直接拒收（errcode 310000）。配了本项就不需要 groupChatId。",
+  "webhook": {
+    "url": "",
+    "secret": "",
+    "keyword": ""
+  },
+
+  "_groupChatId说明": "企业内部应用机器人通道（旧，保留兼容）。groupChatId = 群的 openConversationId（形如 cidXXXX）。需要把应用机器人拉进群，且要配好 data/dingtalk/secret.json。webhook.url 一旦填了，本项即被忽略。",
+  "groupChatId": "",
+
+  "_agentId说明": "企业内部应用 AgentId（应用后台「凭证与基础信息」）。填了之后智能提醒才会额外给责任人发工作通知（App 内单聊）；留空则责任人只收群消息。",
+  "agentId": "",
+
+  "enabled": true,
+
+  "highSeverity": {
+    "on": true,
+    "severities": ["high"],
+    "_severities说明": "推送哪些严重度的待确认项。可取值 high/medium/low。",
+    "maxPerRun": 8,
+    "_maxPerRun说明": "单次检查最多推送的条目数，防止刷屏。"
+  },
+
+  "reminders": {
+    "on": true,
+    "sealDays": [7, 3, 1],
+    "_sealDays说明": "距离封版（cycle.seal）还有这些天数时提醒一次。",
+    "onlineDays": [3, 1],
+    "_onlineDays说明": "距离上线（cycle.online）还有这些天数时提醒一次。",
+    "dueDays": [3, 1],
+    "_dueDays说明": "距离里程碑（plan.due）还有这些天数时提醒一次。"
+  },
+
+  "schedule": {
+    "intervalMinutes": 60,
+    "startupDelaySeconds": 45,
+    "_说明": "服务启动后延迟 startupDelaySeconds 秒做首次检查，之后每 intervalMinutes 分钟一次。改了 intervalMinutes 需重启服务才换节奏（重启其余不用）。"
+  }
+}

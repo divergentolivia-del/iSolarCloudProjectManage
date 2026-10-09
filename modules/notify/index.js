@@ -52,9 +52,15 @@ const NotifyModule = (() => {
     const c = s.config || {};
     const hs = s.lastSummary && s.lastSummary.highSeverity;
     const rm = s.lastSummary && s.lastSummary.reminders;
+    const chName = c.channel === 'webhook' ? '群自定义机器人 webhook'
+      : c.channel === 'app' ? '企业内部应用机器人（groupChatId）'
+      : '未配置';
     const rows = [
       ['总开关', c.enabled ? '✅ 已启用' : '⛔ 已停用'],
-      ['群推送', typeof c.groupChatId === 'string' ? c.groupChatId : (c.groupReady ? '已配置' : '未配置（推送进待发队列）')],
+      ['群推送通道', chName],
+      ['群推送', c.channel
+        ? '✅ 可发送（' + chName + '）'
+        : '未配置（推送进待发队列）'],
       ['责任人单聊', typeof c.agentId === 'string' ? c.agentId : (c.workNoticeReady ? '工作通知' : '机器人单聊（未配 agentId）')],
       ['调度节奏', c.schedule ? ('启动后 ' + c.schedule.startupDelaySeconds + 's 首查，每 ' + c.schedule.intervalMinutes + ' 分钟一次') : '—'],
       ['最近检查', fmtTime(s.lastCheckAt)]
@@ -97,30 +103,53 @@ const NotifyModule = (() => {
       </div>`;
   }
 
-  function renderConfig(cfg) {
+  function renderConfig(cfg, isAdmin) {
     const hs = cfg.highSeverity || {};
     const rm = cfg.reminders || {};
+    const wh = cfg.webhook || {};
     const sevCls = {
       high: (hs.severities || ['high']).includes('high') ? 'on' : '',
       medium: (hs.severities || ['high']).includes('medium') ? 'on' : '',
       low: (hs.severities || ['high']).includes('low') ? 'on' : ''
     };
-    return `
-      <div class="settings-section">
-        <h3 class="notify-sec-title">⚙️ 推送配置（保存即生效）</h3>
+    /* 凭据类字段（群机器人 webhook / groupChatId / agentId）只有 admin 渲染。
+       判断放在服务端回的 isAdmin 上，而不是前端自己读角色 ——
+       非 admin 连这些 HTML 都不该拿到，免得界面上全是「点了必然 403」的输入框。 */
+    const credBlock = !isAdmin ? `
         <div class="ng-field">
-          <div class="ng-labelrow"><label class="ng-label"><input type="checkbox" id="notifyEnabled" ${cfg.enabled ? 'checked' : ''} class="ng-check" /> 启用推送</label></div>
+          <div class="notify-hint">🔒 群机器人配置（webhook 地址 / 加签密钥 / 群 ID）仅平台管理员可见可改。需要调整请联系 admin。</div>
+        </div>` : `
+        <div class="ng-field">
+          <label class="ng-label">群自定义机器人 webhook 地址（推荐）</label>
+          <input type="text" id="notifyWebhookUrl" class="ng-input" value="${esc(wh.url || '')}" placeholder="https://oapi.dingtalk.com/robot/send?access_token=…" />
+          <div class="notify-hint">获取：目标群 → 群设置 → 智能群助手 → 添加机器人 → 自定义 → 复制 Webhook 地址。配了它就走这条通道（不需要 groupChatId）。</div>
         </div>
         <div class="ng-field">
-          <label class="ng-label">群 openConversationId</label>
-          <input type="text" id="notifyGroupId" class="ng-input" value="${esc(cfg.groupChatId || '')}" placeholder="cid…（留空则推送进待发队列）" />
-          <div class="notify-hint">获取：把机器人拉进目标群 → 群内 @ 机器人任意消息 → 在钉钉开放平台后台消息记录里找该群的 openConversationId（形如 cidXXXX）。</div>
+          <label class="ng-label">加签密钥（安全设置选「加签」时必填）</label>
+          <input type="text" id="notifyWebhookSecret" class="ng-input" value="${esc(wh.secret || '')}" placeholder="SEC…（安全设置选「关键词」或「IP 白名单」时留空）" />
+          <div class="notify-hint">自定义机器人安全设置三选一：关键词 / 加签 / IP 白名单。选加签才填这里；选关键词填下面那一项。</div>
+        </div>
+        <div class="ng-field">
+          <label class="ng-label">关键词（安全设置选「关键词」时必填）</label>
+          <input type="text" id="notifyWebhookKeyword" class="ng-input" value="${esc(wh.keyword || '')}" placeholder="如：阳光云（消息正文会自动带上它）" />
+          <div class="notify-hint">填了之后每条消息正文前会自动加这个词，否则钉钉拒收（errcode 310000）。</div>
+        </div>
+        <div class="ng-field">
+          <label class="ng-label">群 openConversationId（备用通道，可留空）</label>
+          <input type="text" id="notifyGroupId" class="ng-input" value="${esc(cfg.groupChatId || '')}" placeholder="cid…（留空则不走企业内部应用机器人通道）" />
+          <div class="notify-hint">只有不用 webhook、改走企业内部应用机器人时才需要：把机器人拉进目标群 → 群内 @ 机器人任意消息 → 在开放平台后台消息记录里找该群的 openConversationId。</div>
         </div>
         <div class="ng-field">
           <label class="ng-label">agentId（可选）</label>
           <input type="text" id="notifyAgentId" class="ng-input" value="${esc(cfg.agentId || '')}" placeholder="留空则责任人单聊走机器人通道" />
           <div class="notify-hint">填了之后提醒发「工作通知」（更正式），留空走机器人单聊。</div>
-        </div>
+        </div>`;
+    return `
+      <div class="settings-section">
+        <h3 class="notify-sec-title">⚙️ 推送配置（保存即生效）</h3>
+        <div class="ng-field">
+          <div class="ng-labelrow"><label class="ng-label"><input type="checkbox" id="notifyEnabled" ${cfg.enabled ? 'checked' : ''} class="ng-check" /> 启用推送</label></div>
+        </div>${credBlock}
         <div class="ng-field">
           <div class="ng-labelrow"><label class="ng-label"><input type="checkbox" id="notifyHsOn" ${hs.on === false ? '' : 'checked'} class="ng-check" /> 高严重度自动推群</label><span class="notify-hint">单次上限 <input type="number" id="notifyMaxPerRun" class="ng-num" value="${hs.maxPerRun || 8}" min="1" max="50" /> 条</span></div>
           <div class="ng-sevs">
@@ -182,11 +211,13 @@ const NotifyModule = (() => {
         api('/api/notify/status'),
         api('/api/notify/config')
       ]);
+      /* 是否 admin 以服务端回的为准（status 与 config 各回一个，取到即用） */
+      const isAdmin = !!(cfg.isAdmin || s.isAdmin);
       body.innerHTML =
         renderStatus(s) +
-        '<div class="notify-grid">' + renderSend() + renderConfig(cfg.config || {}) + '</div>' +
+        '<div class="notify-grid">' + renderSend() + renderConfig(cfg.config || {}, isAdmin) + '</div>' +
         renderOutbox(s.outbox ? { count: s.outboxCount, entries: s.outbox } : { count: 0, entries: [] });
-      bindEvents();
+      bindEvents(isAdmin);
     } catch (e) {
       body.innerHTML = '<div class="notify-hint">加载失败：' + esc(e.message) + '</div>';
     }
@@ -194,7 +225,7 @@ const NotifyModule = (() => {
 
   /* ---------- 交互 ---------- */
 
-  function bindEvents() {
+  function bindEvents(isAdmin) {
     const $ = id => document.getElementById(id);
 
     /* 解析收件人 */
@@ -238,8 +269,6 @@ const NotifyModule = (() => {
       const toNum = (s, def) => { const n = Number(s); return isNaN(n) ? def : n; };
       const patch = {
         enabled: $('notifyEnabled').checked,
-        groupChatId: $('notifyGroupId').value.trim(),
-        agentId: $('notifyAgentId').value.trim(),
         highSeverity: {
           on: $('notifyHsOn').checked,
           severities: sevs.length ? sevs : ['high'],
@@ -252,6 +281,17 @@ const NotifyModule = (() => {
           dueDays: $('notifyDueDays').value.split(/[,，]/).map(s => toNum(s.trim(), 0)).filter(n => n > 0)
         }
       };
+      /* 凭据类字段只在 admin 渲染了输入框，也只在 admin 时提交 ——
+         非 admin 若把这些键也带上，服务端会直接 403。 */
+      if (isAdmin) {
+        patch.webhook = {
+          url: ($('notifyWebhookUrl') || {}).value ? $('notifyWebhookUrl').value.trim() : '',
+          secret: ($('notifyWebhookSecret') || {}).value ? $('notifyWebhookSecret').value.trim() : '',
+          keyword: ($('notifyWebhookKeyword') || {}).value ? $('notifyWebhookKeyword').value.trim() : ''
+        };
+        patch.groupChatId = ($('notifyGroupId') || {}).value ? $('notifyGroupId').value.trim() : '';
+        patch.agentId = ($('notifyAgentId') || {}).value ? $('notifyAgentId').value.trim() : '';
+      }
       saveBtn.disabled = true; saveBtn.textContent = '保存中…';
       try {
         const r = await api('/api/notify/config', { method: 'POST', body: JSON.stringify(patch) });

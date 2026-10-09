@@ -10,9 +10,21 @@
  *   工作通知  POST https://oapi.dingtalk.com/topapi/message/corpconversation/asyncsend_v2
  *             token 放 query ?access_token=xxx
  *
+ * ── 群消息的两条通道（webhook 优先）────────────────────────────
+ *   ① 群自定义机器人 webhook（方案二，推荐）
+ *      POST https://oapi.dingtalk.com/robot/send?access_token=xxx
+ *      不需要 appKey、不需要 robotCode、不需要 openConversationId ——
+ *      「把机器人拉进群」这一步换成了「在群设置里加一个自定义机器人」。
+ *      安全设置三选一：关键词 / 加签 / IP 白名单，配置里对应 webhook.keyword 与
+ *      webhook.secret。三者都没设的话钉钉会直接拒收（errcode 310000）。
+ *   ② 企业内部应用机器人（原通道，保留兼容）
+ *      POST https://api.dingtalk.com/v1.0/robot/groupMessages/send
+ *      需要 groupChatId（openConversationId）+ robotCode（= appKey）。
+ *   两条只要配了 webhook.url 就走 ①；都没配则群消息进待发队列。
+ *
  * 配置：
- *   data/notify/config.json   — groupChatId / agentId / enabled
- *   data/dingtalk/secret.json — appKey / appSecret（复用 client.js 的 getToken）
+ *   data/notify/config.json   — webhook / groupChatId / agentId / enabled
+ *   data/dingtalk/secret.json — appKey / appSecret（复用 client.js 的 getToken，仅通道 ② 需要）
  *
  * 所有发送失败都【不抛异常】，返回 { ok:false, error } 由调用方决定
  * 是否入待发队列 —— 推送是锦上添花，绝不能因为推送故障拖垮主流程。
@@ -22,6 +34,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const dt = require('../../dingtalk/client');
 
@@ -42,14 +55,21 @@ function readConfig() {
   try { file = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); } catch (e) { /* 缺省 */ }
   const def = {
     enabled: true,
+    webhook: { url: '', secret: '', keyword: '' },
     groupChatId: '',
     agentId: '',
     highSeverity: { on: true, severities: ['high'], maxPerRun: 8 },
     reminders: { on: true, sealDays: [7, 3, 1], onlineDays: [3, 1], dueDays: [3, 1] },
     schedule: { intervalMinutes: 60, startupDelaySeconds: 45 }
   };
+  const wh = Object.assign({}, def.webhook, file.webhook || {});
   return {
     enabled: file.enabled !== false,
+    webhook: {
+      url: String(wh.url || '').trim(),
+      secret: String(wh.secret || '').trim(),
+      keyword: String(wh.keyword || '').trim()
+    },
     groupChatId: String(file.groupChatId || '').trim(),
     agentId: String(file.agentId || '').trim(),
     highSeverity: Object.assign({}, def.highSeverity, file.highSeverity || {}),
@@ -70,10 +90,25 @@ function robotCode() {
   return secret.robotCode || secret.appKey || '';
 }
 
-/** 目标群是否已配置（能真正发群消息） */
+/** 群自定义机器人 webhook 配置（方案二） */
+function webhookOf() {
+  return readConfig().webhook;
+}
+
+/** 目标群是否已配置（能真正发群消息）。
+ *  两条通道任一可用即可：自定义机器人 webhook 优先，其次企业内部应用机器人。 */
 function groupReady() {
   const cfg = readConfig();
-  return cfg.enabled && !!cfg.groupChatId;
+  return cfg.enabled && (!!cfg.webhook.url || !!cfg.groupChatId);
+}
+
+/** 群消息走哪条通道（供前端/状态页显示） */
+function groupChannel() {
+  const cfg = readConfig();
+  if (!cfg.enabled) return '';
+  if (cfg.webhook.url) return 'webhook';
+  if (cfg.groupChatId) return 'app';
+  return '';
 }
 
 /** 工作通知是否已配置（有 agentId 才发责任人单聊） */
@@ -109,10 +144,72 @@ function splitText(text) {
 /* ---------- 发送 ---------- */
 
 /**
- * 发群消息（企业内部应用机器人 → 群）。
+ * 加签（安全设置选了「加签」时必需）。
+ * 算法：stringToSign = timestamp + '\n' + secret，HMAC-SHA256 → base64 → urlencode。
+ * 注意 secret 是【自定义机器人】的安全设置密钥，与企业内部应用的 appSecret 是两个东西。
+ */
+function signWebhook(url, secret) {
+  if (!secret) return url;
+  const ts = Date.now();
+  const stringToSign = ts + '\n' + secret;
+  const sign = crypto.createHmac('sha256', secret).update(stringToSign, 'utf8').digest('base64');
+  const sep = url.includes('?') ? '&' : '?';
+  return url + sep + 'timestamp=' + ts + '&sign=' + encodeURIComponent(sign);
+}
+
+/** 安全设置选「关键词」时，消息正文里必须含该关键词，否则 errcode 310000 */
+function withKeyword(content, keyword) {
+  const k = String(keyword || '').trim();
+  if (!k) return content;
+  return content.includes(k) ? content : k + '\n' + content;
+}
+
+/**
+ * 发群消息 —— 群自定义机器人 webhook（方案二）。
+ * 这条通道不取企业 token、不依赖 appKey，只认 URL 里的 access_token。
+ * @returns {Promise<{ok:boolean, error?:string, sent?:number, detail?:object}>}
+ */
+async function sendGroupWebhook(text, wh) {
+  const cfg = readConfig();
+  const w = wh || cfg.webhook;
+  if (!cfg.enabled) return { ok: false, error: '推送未启用（config.enabled=false）' };
+  if (!w.url) return { ok: false, error: '未配置 webhook.url，已跳过推送' };
+  if (!/^https:\/\/oapi\.dingtalk\.com\/robot\/send/i.test(w.url)) {
+    return { ok: false, error: 'webhook.url 不是钉钉自定义机器人地址（应形如 https://oapi.dingtalk.com/robot/send?access_token=…）' };
+  }
+
+  const target = signWebhook(w.url, w.secret);
+  const parts = splitText(text);
+  const sent = [];
+  for (const part of parts) {
+    /* 老版 oapi 接口：HTTP 恒为 200，成败看响应体的 errcode */
+    const r = await dt.req('POST', target, {
+      body: { msgtype: 'text', text: { content: withKeyword(part, w.keyword) } }
+    });
+    const body = r.json || {};
+    if (r.status >= 200 && r.status < 300 && body.errcode === 0) {
+      sent.push(body);
+    } else {
+      /* 310000 是安全设置不匹配的专用码，单独说清楚，省得去猜是不是 URL 抄错了 */
+      const hint = body.errcode === 310000
+        ? '（安全设置不匹配：机器人选的是关键词/加签/IP 白名单，与配置对不上。关键词要出现在正文里；选加签必须填 webhook.secret）'
+        : '';
+      return {
+        ok: false,
+        error: '群 webhook 发送失败（HTTP ' + r.status + '，errcode=' + body.errcode + '）：' +
+          (body.errmsg || String(r.text || '').slice(0, 200)) + hint,
+        sent: sent.length
+      };
+    }
+  }
+  return { ok: true, sent: sent.length, detail: sent };
+}
+
+/**
+ * 发群消息（企业内部应用机器人 → 群，通道 ②）。
  * @returns {Promise<{ok:boolean, error?:string, detail?:object}>}
  */
-async function sendGroupText(text) {
+async function sendGroupAppText(text) {
   const cfg = readConfig();
   if (!cfg.enabled) return { ok: false, error: '推送未启用（config.enabled=false）' };
   if (!cfg.groupChatId) return { ok: false, error: '未配置 groupChatId，已跳过推送' };
@@ -149,6 +246,25 @@ async function sendGroupText(text) {
     }
   }
   return { ok: true, sent: sent.length, detail: sent };
+}
+
+/**
+ * 发群消息（统一入口）。
+ * 配了 webhook.url 走自定义机器人（通道 ①），否则回落到企业内部应用机器人（通道 ②）。
+ * 这样 checker 等上层调用方不用关心通道差异 —— 和改造前是同一个签名。
+ * @returns {Promise<{ok:boolean, error?:string, detail?:object, channel?:string}>}
+ */
+async function sendGroupText(text) {
+  const cfg = readConfig();
+  if (!cfg.enabled) return { ok: false, error: '推送未启用（config.enabled=false）' };
+  if (cfg.webhook.url) {
+    const r = await sendGroupWebhook(text, cfg.webhook);
+    r.channel = 'webhook';
+    return r;
+  }
+  const r = await sendGroupAppText(text);
+  r.channel = 'app';
+  return r;
 }
 
 /**
@@ -244,6 +360,6 @@ async function sendWorkNotice(userIds, text) {
 }
 
 module.exports = {
-  readConfig, groupReady, workNoticeReady, splitText,
-  sendGroupText, sendUserText, sendWorkNotice
+  readConfig, webhookOf, groupReady, groupChannel, workNoticeReady, splitText,
+  signWebhook, sendGroupWebhook, sendGroupText, sendGroupAppText, sendUserText, sendWorkNotice
 };

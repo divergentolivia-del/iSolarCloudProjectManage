@@ -49,12 +49,37 @@ function readBody(req) {
 /* 允许配置页修改的字段白名单（_ 开头的说明字段一律不动） */
 const CONFIG_WHITELIST = {
   enabled: v => v === true || v === false,
+  webhook: v => v && typeof v === 'object',
   groupChatId: v => typeof v === 'string',
   agentId: v => typeof v === 'string',
   highSeverity: v => v && typeof v === 'object',
   reminders: v => v && typeof v === 'object',
   schedule: v => v && typeof v === 'object'
 };
+
+/* ---------- 凭据类字段：只有 admin 能看能改 ----------
+ *
+ * 为什么不能只靠权限点：notify:write 现在是给 pm 的（db.js:96），
+ * 而这一组字段里 webhook.url 自带 access_token —— 拿到它就能以公司名义往群里发消息。
+ *
+ * 为什么不能靠改权限矩阵：seedPermissions 是逐条 INSERT OR IGNORE（db.js:163），
+ * 只给旧库【补】缺失的行，不清也不覆盖已有的行 —— 服务器上 pm 那行 notify:write
+ * 早就存在且 allowed=1，把默认值里这一条删掉对旧库完全无效。
+ * 所以真正生效的判定必须在这里。
+ */
+const CREDENTIAL_KEYS = ['webhook', 'groupChatId', 'agentId'];
+
+function currentUserOf(req) {
+  try { return require('../auth/routes').currentUser(req); } catch (e) { return null; }
+}
+
+/** 是否管理员。取不到用户时【放行】—— 与 server.js 的 gate() 在 AUTH_REQUIRED
+ *  未启用时不生效保持一致，否则本机开发会被自己的门禁卡死。 */
+function isAdmin(req) {
+  const me = currentUserOf(req);
+  if (!me) return true;
+  return me.role === 'admin';
+}
 
 function saveConfig(patch) {
   const file = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
@@ -63,7 +88,16 @@ function saveConfig(patch) {
     if (k === 'enabled') file.enabled = !!patch.enabled;
     else if (k === 'groupChatId') file.groupChatId = String(patch.groupChatId || '').trim();
     else if (k === 'agentId') file.agentId = String(patch.agentId || '').trim();
-    else file[k] = Object.assign({}, file[k], patch[k]);
+    else if (k === 'webhook') {
+      /* 逐子键合并：只传 url 时不要把 secret / keyword 一并抹掉 */
+      const cur = file.webhook || {};
+      const p = patch.webhook || {};
+      file.webhook = {
+        url: p.url === undefined ? String(cur.url || '').trim() : String(p.url).trim(),
+        secret: p.secret === undefined ? String(cur.secret || '').trim() : String(p.secret).trim(),
+        keyword: p.keyword === undefined ? String(cur.keyword || '').trim() : String(p.keyword).trim()
+      };
+    } else file[k] = Object.assign({}, file[k], patch[k]);
   }
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(file, null, 2), 'utf8');
   return file;
@@ -77,15 +111,26 @@ function handle(req, res, url) {
     const cfg = pusher.readConfig();
     const ns = checker.notifyState();
     const q = checker.outbox();
+    const admin = isAdmin(req);
+    const channel = pusher.groupChannel();
+    const wh = cfg.webhook || {};
     return sendJson(res, 200, {
       config: {
         enabled: cfg.enabled,
+        /* 群通道现在是两条：自定义机器人 webhook（方案二）优先，其次企业内部应用机器人。
+           状态行要说清走的是哪条，否则页面显示「未配置」但消息实际发得出去，最费解。 */
+        channel: channel,
         groupChatId: cfg.groupChatId ? '已配置（' + String(cfg.groupChatId).slice(0, 8) + '…）' : '未配置（推送将进入待发队列）',
+        webhookUrl: cfg.webhook.url ? '已配置' : '未配置',
         agentId: cfg.agentId ? '已配置' : '未配置（责任人仅收群消息，不收单聊）',
         highSeverity: cfg.highSeverity,
         reminders: cfg.reminders,
         schedule: cfg.schedule
       },
+      /* 凭据类字段只回给 admin：状态页的「已配置/未配置」人人可见，
+         但具体值（webhook.keyword 之类）不回给非管理员。 */
+      webhook: admin ? { keyword: wh.keyword || '', hasSecret: !!wh.secret } : null,
+      isAdmin: admin,
       lastCheckAt: ns.lastCheckAt || null,
       lastSummary: ns.lastSummary || null,
       outbox: q.map(x => ({ kind: x.kind, key: x.key || x.resultId || '', at: x.at, error: x.error || '' })),
@@ -103,8 +148,8 @@ function handle(req, res, url) {
   if (method === 'POST' && p === '/api/notify/test') {
     return pusher.sendGroupText('✅ 这是一条来自平台「AI 推送」的测试消息。\n如果你在群里看到它，说明钉钉主动推送配置成功。')
       .then(r => {
-        if (r.ok) return sendJson(res, 200, { ok: true, detail: r.detail });
-        return sendJson(res, 200, { ok: false, error: r.error });
+        if (r.ok) return sendJson(res, 200, { ok: true, detail: r.detail, channel: r.channel || '' });
+        return sendJson(res, 200, { ok: false, error: r.error, channel: r.channel || '' });
       })
       .catch(e => sendJson(res, 500, { ok: false, error: String(e && e.message || e) }));
   }
@@ -146,28 +191,50 @@ function handle(req, res, url) {
 
   if (method === 'GET' && p === '/api/notify/config') {
     /* 返回原文，供设置页表单回填。密钥不在这份文件里（在 data/dingtalk/secret.json），
-       但仍做一次白名单过滤，避免 _ 说明字段之外的东西被前端原样回写。 */
+       但仍做一次白名单过滤，避免 _ 说明字段之外的东西被前端原样回写。
+       非 admin：凭据类字段（webhook / groupChatId / agentId）整体不回传 ——
+       webhook.url 里带 access_token，拿到就等于能以公司名义往群里发消息。 */
+    const admin = isAdmin(req);
     let file;
     try { file = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); }
     catch (e) { return sendJson(res, 500, { ok: false, error: '读取 config.json 失败：' + (e && e.message || e) }); }
     const out = {};
-    for (const k of Object.keys(CONFIG_WHITELIST)) if (k in file) out[k] = file[k];
-    return sendJson(res, 200, { ok: true, config: out });
+    for (const k of Object.keys(CONFIG_WHITELIST)) {
+      if (!(k in file)) continue;
+      if (!admin && CREDENTIAL_KEYS.indexOf(k) >= 0) continue;
+      out[k] = file[k];
+    }
+    return sendJson(res, 200, { ok: true, config: out, isAdmin: admin });
   }
 
   if (method === 'POST' && p === '/api/notify/config') {
+    const admin = isAdmin(req);
     return readBody(req).then(body => {
+      const b = body || {};
+      const touched = CREDENTIAL_KEYS.filter(k => k in b);
+      if (!admin && touched.length) {
+        return sendJson(res, 403, {
+          ok: false,
+          error: '只有管理员能改群机器人配置（' + touched.join(' / ') + '）。请联系平台 admin。'
+        });
+      }
       let saved;
-      try { saved = saveConfig(body || {}); }
+      try { saved = saveConfig(b); }
       catch (e) { return sendJson(res, 500, { ok: false, error: '保存 config.json 失败：' + (e && e.message || e) }); }
       /* 配置改动不重启即生效：调度和推送每次读盘（readConfig 无缓存）。
          但调度间隔是启动时算好的一次性定时器，改了 intervalMinutes 要重启才换节奏。 */
+      const wh = saved.webhook || {};
       return sendJson(res, 200, {
         ok: true,
         config: {
           enabled: saved.enabled,
           groupChatId: saved.groupChatId ? '已配置（' + String(saved.groupChatId).slice(0, 8) + '…）' : '未配置（推送将进入待发队列）',
           agentId: saved.agentId ? '已配置' : '未配置（责任人仅收群消息，不收单聊）',
+          webhook: {
+            url: wh.url ? '已配置（' + String(wh.url).slice(0, 40) + '…）' : '未配置',
+            secret: wh.secret ? '已配置' : '未配置',
+            keyword: wh.keyword || ''
+          },
           highSeverity: saved.highSeverity,
           reminders: saved.reminders,
           schedule: saved.schedule

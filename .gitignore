@@ -88,6 +88,12 @@ backups/
 data/pradapter/
 data/skill/
 
-# 钉钉主动推送运行时状态（待发队列含业务内容，不入库；config.json 是配置，要入库）
+# 钉钉主动推送：状态与配置【全部】不入库
+#   state.json / outbox.json —— 运行时状态，含业务内容
+#   config.json —— 之前是入库的，2026-10-09 改成不入库：webhook.url 里自带 access_token，
+#                 拿到就能以公司名义往群里发消息，性质同 data/dingtalk/secret.json。
+#                 模板见 docs/samples/notify-config.sample.json（复制改名即可）。
+#                 注意：服务器上这份文件是手配的，git pull 会删掉它 —— 拉之前先备份再还原。
 data/notify/state.json
 data/notify/outbox.json
+data/notify/config.json

@@ -395,6 +395,6 @@ async function flushOutbox() {
 
 module.exports = {
   checkAll, checkHighSeverity, checkReminders, flushOutbox,
-  outbox, notifyState, resolveUsers, sendToUsers,
+  outbox, clearOutbox, notifyState, resolveUsers, sendToUsers,
   _internal: { parseMD, daysUntil, ownerName, userIdOf, teamOwnerUserIds, sevOf }
 };

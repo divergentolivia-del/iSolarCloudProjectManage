@@ -180,6 +180,48 @@ node -v
 > 能直接用；**第 5.1 节做常驻服务时必须写全路径** `/Olivia/node22/bin/node`，
 > 否则服务起来会报 `exec: node: not found`。
 
+#### ★ 2026-10-09 在 eco-dev-micro4 上实测：上面这行**不够**，新窗口仍是 Node 16
+
+**现象**：`/etc/profile` 里加了 PATH、`source` 之后当前窗口 `node -v` 是 v22.23.3，
+但**新开的 SSH 窗口里 `which node` 又变回 `/soft/nodejs16/bin/node`**、`node -v` 回到 v16.20.2。
+此时敲 `node -e "require('node:sqlite')"` 报
+`ERR_UNKNOWN_BUILTIN_MODULE: No such built-in module: node:sqlite`。
+
+**根因（谁在抢）**：`/root/.bashrc:13` 有这么一行 ——
+```bash
+export PATH="/soft/nodejs16/bin:$PATH"
+```
+`.bashrc` 由 `.bash_profile` source，**晚于** `/etc/profile` 和 `/etc/profile.d/*` 执行，
+所以它虽然也是「追加到最前」，但它后写、它赢。
+**先定位再动手，别猜**：
+```bash
+grep -rn "nodejs16" /etc/profile /etc/profile.d/ /etc/bashrc /root/.bash_profile /root/.bashrc 2>/dev/null
+```
+
+**两条修复路线，按这台机器是不是共用选**：
+
+| | A. 只影响自己的窗口 | B. 账号级一劳永逸 |
+|---|---|---|
+| 做法 | 每个新窗口手动 `export PATH=/Olivia/node22/bin:$PATH` | `echo 'export PATH=/Olivia/node22/bin:$PATH' >> /root/.bashrc` |
+| 影响范围 | 仅当前窗口 | **所有用 root 登录的人**（`.bashrc` 是账号级的，别的账号读不到） |
+| 一劳永逸 | ❌ 每个新窗口都得重敲 | ✅ |
+
+> ⚠️ **共用机器上（很多人用 root 登录）选 A**，别改 `.bashrc` ——
+> 那会把别人的 Node 16 一起换掉，别人正在跑的东西可能因此崩。
+> 代价只是每个诊断窗口多敲一行 `export`，或者干脆写绝对路径。
+>
+> **`/usr/local/bin` 软链是最差的选项** —— 覆盖全机器所有人，包括不归你管的进程，不要用。
+>
+> **也别去删 `/etc/profile` 里那行** —— 它先执行、随后被 `.bashrc` 压过，留着无害；
+> 删了反而破坏「登录后一瞬间能拿到 Node 22」的现状。
+
+**★ 由此引出一个必须记住的坑：新窗口里 `node server.js 9680` 会启动即崩**，
+因为拿到的是 Node 16。**重启服务要么先 `export`，要么写绝对路径：**
+```bash
+/Olivia/node22/bin/node /Olivia/pmwork/server.js 9680
+```
+做成 systemd（5.1 节）之后就没这个烦恼了 —— `ExecStart` 本来就是绝对路径。
+
 > ⚠️ **绝对不要去升级系统 glibc。** 那是能把机器搞挂的操作（可能连带 yum、ssh 一起坏掉），
 > 而 `glibc-217` 构建就是为了让你不必碰它。
 
@@ -954,6 +996,42 @@ pkill -f "node server.js"
 > 第一次点 SSO 登录，页面上会显示「联调模式（未登录）」+ 你的工号。
 > **确认这个工号和你在 `users` 表里的账号对得上**，再把 `debug` 改成 `false` 重启服务，
 > 才能真正登进去。这样设计是为了避免「配置写错了但症状是『人进去了、看到的却是别人的数据』」。
+
+### ★ 2026-10-09 eco-dev-micro4 实测：本条已通过
+
+**验收结论：SSO 全链路打通。** 实测记录：
+
+| 项 | 结果 |
+|---|---|
+| `/sso/status` | `{"configured":true,"missing":[],"redirectUri":"http://10.63.139.103:9680/sso/callback","debug":true,"logoutConfigured":true}` |
+| `clientSecret` 长度 | **6** —— 不是占位符，是流程数字化中心给的真值，短但可用 |
+| 联调模式换到的工号 | `10017968`，与 `users` 表里的账号一致 |
+| 正式登录审计 | `"details": "SSO（角色 admin，会话 7199s 取自 expires_in）"` |
+| `expires_in` | ✅ 取到了（7199s），满足规范「会话有效期必须跟随 SSO」的硬要求 |
+| 登出 | ✅ 审计里有 `登出` 记录，说明 `/sso/logout` 通知到了 SSO |
+
+**两个实测踩到的坑（都会让人误以为"平台坏了"）**：
+
+1. **不开 `AUTH_REQUIRED` 时看不到登录页，也看不到 SSO 按钮。**
+   表现：浏览器打开 `http://10.63.139.103:9680` **直接进平台**，页面上有个「本地昵称输入」——
+   那**不是登录**，是平台原有的轻量身份标记（存 localStorage，谁都能改）。
+   手动访问 `/login.html` 会被 **302 轰回 `/`** —— `server.js:376` 有意这么做：
+   未启用登录时登录页是死页，「省得用户以为登录坏了」。
+   点「退出登录」也退不掉，是同一个根因：退出后跳 `/login.html`，又撞上那条 302 被送回首页。
+   **解法：`AUTH_REQUIRED=1 node server.js 9680`。开了之后门禁才生效。**
+
+2. **`node -e` 诊断命令要用绝对路径，或先 `export PATH`。**
+   新 SSH 窗口里的 `node` 是系统自带的 v16，敲诊断命令会报
+   `ERR_UNKNOWN_BUILTIN_MODULE`。原因见〇.2 的 PATH 那一节。
+   统一写法：`/Olivia/node22/bin/node -e "..."`。
+
+> **开 `AUTH_REQUIRED=1` 之前先给自己留一把备用钥匙** —— 万一 SSO 配置有问题，
+> 不至于把自己关在门外：
+> ```bash
+> cd /Olivia/pmwork
+> node -e "require('./db').setPassword('你的工号','一次性密码'); console.log('已设置')"
+> ```
+> ⚠️ 这个密码会写进 `data/platform.db`，**不要用你在别的系统在用的密码**。
 
 ---
 

@@ -13,12 +13,85 @@
 | 项 | 要求 | 怎么确认 | 不满足会怎样 |
 |---|---|---|---|
 | **Node.js** | **≥ v22.5** | `node -v` | 启动即报 `Cannot find module 'node:sqlite'`，服务起不来 |
-| **端口 9680** | 服务器上没被占用 | `netstat -ano \| findstr :9680`（Windows）<br>`ss -lntp \| grep 9680`（Linux） | 启动报 `EADDRINUSE` |
-| **代码仓库权限** | 能 clone 到 `dev/sgai` | 见步骤 2 | 拉不到代码 |
+| **glibc** | **≥ 2.28**，否则改用 glibc-217 构建 | `getconf GNU_LIBC_VERSION` | 见 〇.2 —— 老系统装不了官方 Node 22 |
+| **端口 9680** | 服务器上没被占用 | `ss -lntp \| grep 9680`（Linux）<br>`netstat -ano \| findstr :9680`（Windows） | 启动报 `EADDRINUSE` |
+| **能访问外网** | github.com / nodejs.org 可达 | `curl -sI https://nodejs.org \| head -1` | 拉不到代码也装不了 Node |
 
 > **为什么 Node 要 22.5 以上**：`db.js` 用的是 Node 内置的 `node:sqlite` 模块，这是 22.5 才引入的。本机跑的是 v24.12.0。注意 `start.sh` 里那段安装脚本装的是 v20，**不够用**，别照抄。
 >
 > 版本够了之后，每次启动仍会有一行 `ExperimentalWarning: SQLite is an experimental feature`。**这是正常的**，不是错误。
+
+> **好消息**：本项目**零依赖**（`package.json` 的 `dependencies` 是空的），
+> **不需要 `npm install`**，也不需要编译任何原生模块。老服务器上只要能跑起
+> `node` 这一个二进制就够了。
+
+### 〇.1 系统体检（先跑这四条，再决定怎么装）
+
+```bash
+cat /etc/os-release          # 什么发行版
+uname -m                     # 架构，x86_64 才对应 linux-x64 包
+getconf GNU_LIBC_VERSION     # ★ glibc 版本，决定装哪一种 Node
+ss -lntp | grep 9680         # 端口空不空（没输出 = 空着）
+```
+
+**怎么读 glibc 那一行**：
+
+| 输出 | 含义 | 走哪条路 |
+|---|---|---|
+| `glibc 2.17` | CentOS 7 / RHEL 7 一类的老系统 | **〇.2 路线 A**（glibc-217 构建） |
+| `glibc 2.28` 及以上 | 较新的系统 | **〇.2 路线 B**（官方包） |
+
+> **怎么看出是 CentOS 7**：`cat /etc/os-release` 里 `VERSION="7 (Core)"`。
+> 另一个旁证是 `git --version` —— CentOS 7 出厂的 git 是 `1.8.3.1`，见到这个版本号
+> 基本可以断定是老系统。
+
+### 〇.2 装 Node 22
+
+**路线 A · glibc 2.17（老系统）**
+
+Node 官方专门为老系统构建了 `glibc-217` 版本 —— **代码和官方一致，只是换了个
+编译目标**，直接解压就能跑。
+
+```bash
+# 挑一个 v22.x 版本号替换（22 整条线都 ≥ 22.5，满足要求）
+VER=v22.20.0
+
+mkdir -p /opt/node/22 && cd /opt/node
+curl -LO "https://unofficial-builds.nodejs.org/download/release/${VER}/node-${VER}-linux-x64-glibc-217.tar.gz"
+tar -xzf "node-${VER}-linux-x64-glibc-217.tar.gz" -C /opt/node/22 --strip-components=1
+
+/opt/node/22/bin/node -v      # 能打印版本号才算解压对了
+```
+
+版本号自己去这个目录列表挑一个：`https://unofficial-builds.nodejs.org/download/release/`
+
+装上 PATH：
+
+```bash
+echo 'export PATH=/opt/node/22/bin:$PATH' >> /etc/profile
+source /etc/profile
+node -v
+```
+
+> ⚠️ **绝对不要去升级系统 glibc。** 那是能把机器搞挂的操作（可能连带 yum、ssh 一起坏掉），
+> 而 `glibc-217` 构建就是为了让你不必碰它。
+
+**路线 B · glibc ≥ 2.28（较新系统）**
+
+```bash
+curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
+sudo yum install -y nodejs
+node -v
+```
+
+**★ 装完必须验这一条** —— 唯一能证明「平台起得来」的测试：
+
+```bash
+node -e "const {DatabaseSync}=require('node:sqlite'); console.log('node:sqlite 可用')"
+```
+
+**打印出「node:sqlite 可用」才算过。** 报 `Cannot find module 'node:sqlite'`
+说明版本还是不够，回上面对一下 `node -v`。
 
 ---
 
@@ -108,13 +181,17 @@ node -v
 git --version
 
 # 端口空不空（有人占了就得先处理）
-# Windows：
-netstat -ano | findstr :9680
-# Linux：
+# ★ 服务器是 Linux 就用这一条：
 ss -lntp | grep 9680
+# ⚠️ 只有当服务器确实是 Windows 时，才用下面这条
+#    （findstr 是 Windows 命令，Linux 上会报 findstr: command not found）
+# netstat -ano | findstr :9680
 ```
 
 **没输出 = 端口空着 = 可以往下走。**
+
+> **Node 版本不对就别往下走了** —— v22.5 以下平台起不来。
+> 装法见 **〇.2**，先跑 `getconf GNU_LIBC_VERSION` 确认走 A 还是 B。
 
 ---
 
@@ -183,6 +260,56 @@ bef512e fix(sso): 切到生产环境 sso.sungrow.cn
 > ```bash
 > git clone --depth 1 -b dev/sgai https://github.com/divergentolivia-del/iSolarCloudProjectManage.git .
 > ```
+
+#### ★ 如果 git 太老，clone 失败 —— 绕开 git 直接下包
+
+先在服务器上跑 `git --version` 看一眼。**`1.8.3.1` 是 CentOS 7 的出厂版本**（约 2011 年），
+底层 openssl 大多还能协商 TLS 1.2，所以**大概率能用**；但万一报下面这类错，
+说明是 git 太老谈不拢，**别再折腾 git，直接下压缩包**：
+
+```
+error: SSL connect error
+fatal: unable to access '...': SSL certificate problem
+fatal: HTTP request failed
+error: RPC failed; result=22, HTTP code = 0
+```
+
+**绕行做法**（`curl` 走的是系统 openssl，比老 git 内嵌的那套靠谱得多）：
+
+```bash
+cd /opt/pmwork
+
+curl -L -o pmwork.tar.gz \
+  "https://codeload.github.com/divergentolivia-del/iSolarCloudProjectManage/tar.gz/refs/heads/dev/sgai"
+
+tar -xzf pmwork.tar.gz --strip-components=1
+rm pmwork.tar.gz
+
+ls server.js data/      # 有 server.js 就对了
+```
+
+**代价要说清楚**：
+
+| | 用 git clone | 用 tarball |
+|---|---|---|
+| 首次拿到代码 | ✅ | ✅ |
+| 以后升级 | `git pull` 一条命令 | ❌ 改动会覆盖，**得重新下包** |
+| 看提交历史 | ✅ `git log` | ❌ 没有 `.git`，看不到 |
+| 切分支 | ✅ | ❌ 包就是 dev/sgai 那一个快照 |
+
+所以 **tarball 是兜底，不是首选**。真要走这条路，**第一件事是先把 git 升上去**：
+
+```bash
+yum install -y https://repo.ius.io/ius-release-el7.rpm
+yum install -y git236
+git --version        # 看到 2.x 就成了，以后就能正常 clone / pull
+```
+
+（或者直接下源码编译。升完 git 后想改用 clone，把 `/opt/pmwork` 清空重来一遍即可。）
+
+> ⚠️ **用 tarball 时要格外注意「别覆盖自己的改动」**。因为升级时是「重新下包 + 解压」，
+> 会**直接盖掉已在服务器上改过的文件**。服务器上应该只有 `data/` 是本地产生的内容
+> （且 `data/` 不在包里，不会被覆盖），代码本身**不要在服务器上手改** —— 改在本地改完推上来。
 
 #### ★ 到这里【还不能】做 SSO 验收 —— 必须先搬数据
 

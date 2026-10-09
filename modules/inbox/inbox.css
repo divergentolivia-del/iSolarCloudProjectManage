@@ -38,6 +38,23 @@
 .ib-section-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 10px; }
 .ib-section-head .ib-section-title { margin-bottom: 0; }
 
+/* ══════════ Skill 状态摘要条（紧凑版，替代 12 行明细） ══════════ */
+.ib-skillbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 10px 16px; margin-bottom: 22px; box-shadow: var(--shadow);
+  font-size: 12px; color: var(--muted);
+}
+.ib-skillbar-ic { font-size: 15px; }
+.ib-skillbar-text { flex: 1 1 auto; }
+.ib-skillbar-text b { color: var(--text); font-weight: 600; }
+.ib-skillbar-on { color: var(--blue) !important; font-weight: 600 !important; }
+.ib-skillbar-link {
+  flex: 0 0 auto; font-size: 12px; color: var(--blue);
+  text-decoration: none; white-space: nowrap;
+}
+.ib-skillbar-link:hover { text-decoration: underline; }
+
 /* ══════════ 各 Skill 状态行 ══════════ */
 .ib-skills {
   background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);

@@ -152,6 +152,19 @@ const InboxModule = (() => {
       </div>`;
   }
 
+  function renderSkillBar() {
+    const rows = (data && data.bySkill) || [];
+    if (!rows.length) return '';
+    const totalRuns = rows.reduce((a, s) => a + (s.runs || 0), 0);
+    const pend = rows.filter(s => s.pendingCount > 0).map(s => s.name + ' ' + s.pendingCount).join('、');
+    return `
+      <div class="ib-skillbar">
+        <span class="ib-skillbar-ic">🤖</span>
+        <span class="ib-skillbar-text"><b>${rows.length}</b> 个 Skill · 累计运行 ${totalRuns} 次 · 当前待确认：<b class="${pend ? 'ib-skillbar-on' : ''}">${pend || '无'}</b></span>
+        <a class="ib-skillbar-link" href="dataflow.html">查看明细 / 手动运行 →</a>
+      </div>`;
+  }
+
   function renderSkillRow(s) {
     const rate = s.adoptRate != null ? s.adoptRate + '%' : '—';
     return `
@@ -221,10 +234,7 @@ const InboxModule = (() => {
     container.innerHTML = `
       <div class="ib-page">
         ${renderStats()}
-        <div class="ib-section">
-          <div class="ib-section-title">AI 能力现状</div>
-          <div class="ib-skills">${((data && data.bySkill) || []).map(renderSkillRow).join('')}</div>
-        </div>
+        ${renderSkillBar()}
         <div class="ib-section">
           <div class="ib-section-head">
             <div class="ib-section-title">待你拍板</div>

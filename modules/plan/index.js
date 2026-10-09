@@ -371,7 +371,7 @@ const PlanModule = (() => {
     }).join('');
     return `
     <div class="cs-panel pl-dash-panel">
-      <h4>需要关注的计划 <small>按关注度排序（逾期里程碑×3 + 逾期/受阻任务×2 + 未闭环风险 + 待办问题）</small></h4>
+      <h4>需要关注的计划 <i class="tip-ic" data-tip="按关注度排序：逾期里程碑×3 + 逾期/受阻任务×2 + 未闭环风险 + 待办问题。带「当前阶段」，点击直达详情。">i</i></h4>
       <div class="table-wrapper pl-attention-wrap">
         <table class="data-table pl-attention-table">
           <thead><tr>
@@ -524,7 +524,7 @@ const PlanModule = (() => {
         <div class="pl-list-count">${filtered.length !== plans.length ? `匹配 ${fmtNum(filtered.length)} / ${fmtNum(plans.length)}` : `共 ${fmtNum(plans.length)} 个`}</div>
       </div>
     </div>
-    ${filtered.length === 0 ? `<div class="pl-empty"><div class="pl-empty-ic">🗓️</div><p>${plans.length === 0 ? '还没有计划，点击右上角「新建计划」开始' : '没有匹配的计划'}</p></div>`
+    ${filtered.length === 0 ? `<div class="pl-empty"><div class="pl-empty-ic">🗓️</div><p>${plans.length === 0 ? '还没有计划，点页面顶部「＋ 新建计划」开始' : '没有匹配的计划'}</p></div>`
       : `<div class="pl-card-grid">${filtered.map(s => renderPlanCard(s)).join('')}</div>`}
     ${plans.length === 0 ? renderDashboardEmptyGuide() : ''}`;
   }

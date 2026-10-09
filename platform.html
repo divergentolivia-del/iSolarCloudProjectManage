@@ -130,6 +130,7 @@
 <script src="modules/inbox/index.js?v=20260922a"></script>
 <script src="modules/skill/client.js?v=20260923a"></script>
 <script src="modules/notify/index.js?v=20261009a"></script>
+<script src="modules/help/index.js?v=20261009a"></script>
 
 <!-- Platform orchestrator (must be last — calls Platform.init) -->
 <script src="platform.js?v=20261008a"></script>
@@ -137,7 +138,7 @@
 <!-- Initialize platform with all modules -->
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    Platform.init([DashboardModule, InboxModule, IterationModule, ProjectModule, CsEnergyModule, PlanModule, NotifyModule]);
+    Platform.init([DashboardModule, InboxModule, IterationModule, ProjectModule, CsEnergyModule, PlanModule, NotifyModule, HelpModule]);
   });
 </script>
 </body>

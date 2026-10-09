@@ -472,6 +472,27 @@ body.dark-theme .dashboard-heading { background-image: none; }
   color: var(--text);
 }
 
+/* 通用说明角标：悬浮显示说明文案（替代正文中的长说明） */
+.tip-ic {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%; margin-left: 6px;
+  background: var(--panel-soft, #eef1f5); color: var(--muted);
+  font-size: 11px; font-style: normal; cursor: help; flex: none; vertical-align: -2px;
+}
+.tip-ic::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 8px); right: -10px;
+  width: max-content; max-width: 340px;
+  background: #303338; color: #fff;
+  font-size: 12px; font-weight: 400; line-height: 1.6;
+  padding: 8px 12px; border-radius: 8px;
+  opacity: 0; visibility: hidden; transition: opacity .15s;
+  z-index: 80; pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0,0,0,.18);
+  white-space: normal;
+}
+.tip-ic:hover::after { opacity: 1; visibility: visible; }
+
 .dashboard-lead {
   max-width: 720px;
   margin: 6px 0 0;
@@ -510,7 +531,7 @@ body.dark-theme .dashboard-heading { background-image: none; }
   transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
 }
 
-/* Decorative top border gradient */
+/* Top accent bar — 统一品牌色，不再逐卡彩虹渐变 */
 .metric-card::before {
   content: '';
   position: absolute;
@@ -519,8 +540,8 @@ body.dark-theme .dashboard-heading { background-image: none; }
   background: linear-gradient(90deg, var(--accent), var(--blue));
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
-.metric-card:nth-child(2)::before { background: linear-gradient(90deg, var(--blue), var(--purple)); }
-.metric-card:nth-child(3)::before { background: linear-gradient(90deg, var(--purple), var(--pink)); }
+.metric-card:nth-child(2)::before { background: linear-gradient(90deg, var(--accent), var(--blue)); }
+.metric-card:nth-child(3)::before { background: linear-gradient(90deg, var(--accent), var(--blue)); }
 
 .metric-card:hover {
   box-shadow: var(--shadow-lg);

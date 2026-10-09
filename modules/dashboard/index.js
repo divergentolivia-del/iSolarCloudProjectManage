@@ -123,8 +123,7 @@ const DashboardModule = (() => {
       const moreLink = data.alertsTotal > 5 ? '<div class="alerts-more"><a href="#/dashboard">查看全部</a></div>' : '';
       alertsHtml = `
         <div class="quick-section alerts-section">
-          <h3 class="section-title">待办/告警</h3>
-          <p class="section-note">${SharedUI.esc(alertSourceNote)}</p>
+          <h3 class="section-title">待办/告警<i class="tip-ic" data-tip="来源：项目里程碑逾期、预算超支、Token 超限。超过阈值的项会自动出现在这里。">i</i></h3>
           <ul class="alert-list">${alertItems}</ul>
           ${moreLink}
         </div>
@@ -132,8 +131,7 @@ const DashboardModule = (() => {
     } else {
       alertsHtml = `
         <div class="quick-section alerts-section">
-          <h3 class="section-title">待办/告警</h3>
-          <p class="section-note">${SharedUI.esc(alertSourceNote)}</p>
+          <h3 class="section-title">待办/告警<i class="tip-ic" data-tip="来源：项目里程碑逾期、预算超支、Token 超限。超过阈值的项会自动出现在这里。">i</i></h3>
           <p class="empty-hint">暂无告警</p>
         </div>
       `;

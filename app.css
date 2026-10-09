@@ -40,7 +40,7 @@ body {
 .btn {
   padding: 7px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm);
   background: #fff; color: var(--text); cursor: pointer; font-size: 13px; font-weight: 500;
-  transition: all .15s;
+  transition: all .15s; white-space: nowrap; flex-shrink: 0;
 }
 .btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .btn.primary {
@@ -58,7 +58,7 @@ body {
 .tab {
   padding: 11px 16px; border: 0; background: none; cursor: pointer;
   color: var(--muted); font-size: 14px; border-bottom: 2px solid transparent;
-  transition: color .15s;
+  transition: color .15s; white-space: nowrap; flex-shrink: 0;
 }
 .tab:hover { color: var(--accent); }
 .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }

@@ -731,52 +731,167 @@ cd "E:/PMWork/Project Materials/iSolarCloudProject/迭代版本/iSolarCloudProje
 ls -la data/platform.db-wal
 ```
 
-**② 【笔记本】打包**：
+**② 【笔记本】给 `platform.db` 做单文件快照**：
+
+停服后理论上 WAL 会自动合并，但**不要依赖这一点** —— 2026-10-09 那次搬迁时，
+主库停在 258KB，WAL 里躺着 4.1MB 真实数据，只拷主库会丢掉几乎所有账号和审计记录。
+
+先看一眼：
 
 ```bash
-tar -czf pmwork-data.tar.gz \
-  data/platform.db data/platform.db-wal data/platform.db-shm \
-  data/iteration data/archive data/plan data/project data/budget \
-  data/token data/skill data/pradapter data/notify data/sso \
-  data/dingtalk data/tb data/auth-config.json data/state.json \
-  --exclude='data/iteration/state.json.CORRUPT-*'
-
-ls -lh pmwork-data.tar.gz      # 预期 20~40 MB
+ls -la data/platform.db data/platform.db-wal 2>/dev/null
 ```
 
-> `--exclude` 排掉的是 2026-09-24 那次事故留下的 171 字节损坏样本，别把坏数据带上服务器。
->
-> **如果 `data/platform.db-wal` 不存在**（已经 checkpoint 掉了），`tar` 会报
-> `Cannot stat: No such file or directory`。把这一项从命令里删掉再打一次。
+**只要 `-wal` 还在且不为 0，就必须走快照**：
 
-**③ 【笔记本】传过去**：
+```bash
+mkdir -p .scratch/migrate
+cp data/platform.db data/platform.db-wal data/platform.db-shm .scratch/migrate/ 2>/dev/null
+
+cat > .scratch/migrate/snapshot.js <<'EOF'
+/* VACUUM INTO 把 WAL 里未合并的数据一并写进单文件快照，
+   避免"主库 + WAL + SHM 三件套"跨机器搬运时配不上对。 */
+const path = require('path');
+const fs = require('fs');
+const { DatabaseSync } = require('node:sqlite');
+const SRC = path.join(__dirname, 'platform.db');
+const DST = path.join(__dirname, 'platform.snapshot.db');
+if (fs.existsSync(DST)) fs.unlinkSync(DST);
+const db = new DatabaseSync(SRC);
+db.exec("VACUUM INTO '" + DST.replace(/\\/g, '/') + "'");
+console.log('账号数:', db.prepare('SELECT COUNT(*) AS n FROM users').get().n);
+db.close();
+EOF
+
+node .scratch/migrate/snapshot.js
+```
+
+> 输出 `账号数: 373` 才对。不是 373 就是源库本身不对，别往下走。
+
+**③ 【笔记本】打包**：
+
+```bash
+# ★ --exclude 必须写在文件列表【前面】。tar 是按顺序生效的，
+#   写在后面等于没写。
+# ★ data/platform.db-wal / -shm 不再单独打包 —— ② 的快照已经把
+#   WAL 内容合进去了，再带上旧的三件套反而会在服务器上配错对。
+# ★ data/sso 必须排除，见下面的说明。
+tar -czf pmwork-data.tar.gz \
+  --exclude='data/iteration/state.json.CORRUPT-*' \
+  --exclude='data/sso' \
+  data/platform.snapshot.db \
+  data/iteration data/archive data/plan data/project data/budget \
+  data/token data/skill data/pradapter data/notify \
+  data/dingtalk data/tb data/auth-config.json data/state.json
+
+ls -lh pmwork-data.tar.gz      # 预期 3~4 MB（快照是压缩后的，比原库小）
+```
+
+> **`--exclude` 写在文件列表后面会失效**，`tar` 从左到右处理参数，遇到
+> `--exclude` 时前面的文件已经进去了。这次搬迁就是靠事后 `tar -tzf | grep`
+> 才发现的。
+>
+> `--exclude='data/iteration/state.json.CORRUPT-*'` 排掉的是 2026-09-24 那次事故
+> 留下的 171 字节损坏样本，别把坏数据带上服务器。
+>
+> **⚠️ 为什么必须排除 `data/sso`** —— 本机的 `data/sso/secret.json` 里
+> `debug: true`（联调模式），而服务器上验过的那份是 `debug: false`（生产模式）。
+> 打包带过去会把服务器打回联调模式：**SSO 能跳转、能显示工号，但不会建 session，
+> 表现为"登录成功却还是进不去"**，且日志不报错，极难查。
+> `data/sso` 属于**机器级配置**，不是业务数据，本来就该各管各的。
+
+**④ 【笔记本】打包后自检**（这一步别省，成本极低）：
+
+```bash
+# ① 坏样本没进去
+tar -tzf pmwork-data.tar.gz | grep CORRUPT && echo '★ 有坏样本，重打' || echo '✓ 干净'
+
+# ② data/sso 没进去
+tar -tzf pmwork-data.tar.gz | grep 'data/sso' && echo '★ 混进了 sso，重打' || echo '✓ 干净'
+
+# ③ 记下校验值，服务器上要对比
+md5sum pmwork-data.tar.gz
+tar -xzOf pmwork-data.tar.gz data/platform.snapshot.db | md5sum
+```
+
+**⑤ 【笔记本】传过去**：
 
 ```bash
 scp pmwork-data.tar.gz 你的用户名@10.63.139.103:/Olivia/pmwork/
 ```
 
-**④ 【服务器】解包**：
+**⑥ 【服务器】停服 + 先备份现状**（改数据前留后路，出事能整套回退）：
+
+```bash
+systemctl stop pmwork
+cd /Olivia/pmwork
+cp -r data data.bak-before-full-migrate
+```
+
+**⑦ 【服务器】校验包完整再解包**：
 
 ```bash
 cd /Olivia/pmwork
-tar -xzf ../pmwork-data.tar.gz
-
-# 三个关键文件都在
-ls -la data/platform.db data/iteration/state.json data/sso/secret.json
-
-# 账号数还是 373
-node -e "const db=require('./db');console.log('账号数:',db.listUsers().length)"
-
-# 归档数量和本机一致（本机现在是 3）
-ls data/archive/*.json | wc -l
+md5sum pmwork-data.tar.gz      # 与 ④ 记下的值对比
+gzip -t pmwork-data.tar.gz && echo '✓ 压缩包完整'
+tar -tzf pmwork-data.tar.gz | head -5
 ```
 
-**⑤ 【服务器】重启服务让新数据生效**：
+**⑧ 【服务器】解包并改名**：
+
+```bash
+cd /Olivia/pmwork
+tar -xzf pmwork-data.tar.gz
+
+# 快照库改成平台正式用的名字
+mv data/platform.snapshot.db data/platform.db
+
+# ★ 关键：删掉旧的 WAL/SHM。-wal 是绑定到某一具体主库的，
+#   换了主库还留着旧 -wal，SQLite 会直接判库损坏。
+rm -f data/platform.db-wal data/platform.db-shm
+```
+
+**⑨ 【服务器】验收**（六项全过才算搬对）：
+
+```bash
+cd /Olivia/pmwork
+
+# ① 库的校验值与本机快照一致
+md5sum data/platform.db
+
+# ② 账号数 373
+node -e "const db=require('./db');console.log('账号数:',db.listUsers().length)"
+
+# ③ 钉钉通讯录在（这个文件是 gitignore 的，只能靠搬）
+ls -la data/dingtalk/org.json          # 预期 103200 字节
+
+# ④ SSO 仍是生产模式 ★ 别漏
+grep '"debug"' data/sso/secret.json    # 预期 false
+
+# ⑤ 归档份数与本机一致（本机现在是 3）
+ls data/archive/*.json | wc -l
+
+# ⑥ 工时数据在（本机约 319740 字节）
+ls -la data/iteration/state.json
+```
+
+**⑩ 【服务器】重启服务让新数据生效**：
 
 ```bash
 systemctl restart pmwork      # 如果已经做成 systemd 服务（见第五节）
 # 还没做成服务的话，把前台那个 Ctrl+C 掉重新 node server.js 9680
 ```
+
+**⑪ 【笔记本】清理临时文件**：
+
+```bash
+scp pmwork-data.tar.gz 你的用户名@10.63.139.103:/tmp/   # 已传过就算了
+rm -f pmwork-data.tar.gz
+rm -rf .scratch/migrate/
+```
+
+> `.scratch/migrate/` 里是 `platform.db` 的副本和快照 —— **含真实账号数据，
+> 不要留在工作区**（`.scratch/` 没进 gitignore 也别指望）。
 
 ---
 
@@ -990,12 +1105,19 @@ pkill -f "node server.js"
    node -e "const d=require('./db');console.log(d.getAudit(10).filter(a=>a.module==='auth'))"
    ```
 
-**先在联调模式跑一遍更好**：若 `secret.json` 里 `debug: true`，SSO 回调后**只把工号显示在页面上，不建会话、不让人进平台**。第一次接通时挂着它确认工号对得上，再改回 `false`。
+**联调模式（`debug: true`）怎么用**：SSO 回调后**只把工号显示在页面上，不建会话、不让人进平台**。
+第一次接通时挂着它确认工号对得上，再改回 `false`。
 
-> 当前 `data/sso/secret.json` 里 `debug` 就是 `true` —— 这是**有意的**。
-> 第一次点 SSO 登录，页面上会显示「联调模式（未登录）」+ 你的工号。
-> **确认这个工号和你在 `users` 表里的账号对得上**，再把 `debug` 改成 `false` 重启服务，
-> 才能真正登进去。这样设计是为了避免「配置写错了但症状是『人进去了、看到的却是别人的数据』」。
+> **⚠️ 2026-10-09 之后的现状：服务器上是 `debug: false`（生产模式），已经改回来了。**
+> 联调那一步在部署当天就走过了（换到的工号 `10017968` 与 `users` 表一致），
+> 见下面的实测记录。**所以现在的正确状态是 `false`，不要照着早日志再改回 `true`。**
+>
+> 这个值最大的坑不在代码上，在**搬迁**：
+> 笔记本上那份 `data/sso/secret.json` 至今仍是 `debug: true`。
+> 全量搬迁时如果把它打进包里（`docs/plan-server-migration.md` 早年那版清单就列了它），
+> 服务器会被打回联调模式 —— **症状是「登录成功却还是进不去」，且日志不报错**。
+> 所以 §3.5 的打包命令**显式排除 `data/sso`**，验收里也有一条专门 `grep '"debug"'`。
+> `data/sso` 属于机器级配置，各管各的。
 
 ### ★ 2026-10-09 eco-dev-micro4 实测：本条已通过
 
@@ -1124,14 +1246,87 @@ journalctl -u pmwork -n 50      # 确认启动无报错
 
 服务器上的 `data/` 现在是**唯一数据源**，必须备份。
 
+**用仓库自带的 `backup.js`**（根目录，已在 `backup.sh` / `backup-data.bat` 里调过），
+不要另写 tar 命令 —— 它比裸 tar 多做两件关键的事：
+
+1. 先对 `platform.db` 做 `PRAGMA wal_checkpoint(TRUNCATE)`，把 WAL 合并回主库，
+   保证复制出来的库是自洽的
+2. 复制完做校验，关键文件缺失/为空会告警
+
+**① 建目录 + 手动跑一次**（先验证再挂 cron）：
+
 ```bash
-# Linux：加进 crontab -e
-mkdir -p /Olivia/backup        # ★ 先建目录，tar 不会自己建
-0 2 * * * tar -czf /Olivia/backup/pmwork-$(date +\%Y\%m\%d).tar.gz /Olivia/pmwork/data
-find /Olivia/backup -name 'pmwork-*.tar.gz' -mtime +30 -delete     # 保留 30 天
+mkdir -p /Olivia/backup
+cd /Olivia/pmwork
+
+# ★ 必须用 /Olivia/node22/bin/node —— backup.js 依赖 node:sqlite（Node ≥22.5），
+#   系统默认那个 node 版本不一定够
+BACKUP_DIR=/Olivia/backup /Olivia/node22/bin/node backup.js
+
+ls -lh /Olivia/backup
 ```
 
-⚠️ **备份 `platform.db` 时要连 `-wal` `-shm` 一起**，或者先停服再备。只备 `.db` 会缺最近的写入。
+预期输出（备份成功时）：
+
+```
+WAL 已合并：/Olivia/pmwork/data/platform.db
+备份完成：/Olivia/backup/backup-2026-10-09T10-15-52
+  文件数：609，大小：67585 KB
+```
+
+`(node:xxxxx) ExperimentalWarning: SQLite is an experimental feature` 是
+`node:sqlite` 的固定噪声，**不是错误**，忽略。
+
+**② 校验副本与生产库是同一份**：
+
+```bash
+md5sum /Olivia/pmwork/data/platform.db \
+       /Olivia/backup/backup-<上面那串时间戳>/data/platform.db
+```
+
+两个哈希**一致**才算备份有效。
+
+**③ 挂 cron**：
+
+```bash
+(crontab -l 2>/dev/null; echo '0 2 * * * cd /Olivia/pmwork && BACKUP_DIR=/Olivia/backup /Olivia/node22/bin/node backup.js >> /Olivia/backup/backup.log 2>&1') | crontab -
+crontab -l      # 确认写进去了
+```
+
+> 用 `crontab -e` 也行，但它默认调 vi（`i` 编辑 → `Esc` → `:wq` 保存退出），
+> 不熟悉容易卡住。上面这条管道命令不需要进编辑器。
+>
+> **cron 里必须写全路径**：`cd /Olivia/pmwork` 不能省（`backup.js` 用
+> `__dirname` 定位 `data/`，相对路径会跑偏），`node` 也必须写全路径
+> （cron 的 `PATH` 极简，找不到 `/Olivia/node22/bin/node`）。
+
+**④ 关于备份目录和保留策略**：
+
+- 默认备份到 `./backups/`（项目目录内），**用 `BACKUP_DIR` 挪到 `/Olivia/backup`**。
+  放项目目录内的话，一次误删项目目录就双杀
+- 每次产出 `backup-<UTC时间戳>/` 一个整目录，恢复时 `cp -r` 回去即可
+- 自动保留最近 **30 份**，每份约 66MB，**峰值约 2GB，确认 `/Olivia` 余量**
+- 目录名是 **UTC 时间**，本地凌晨 2 点跑出来的名字是**前一天**的 UTC 日期，
+  别以为没跑
+
+**⑤ 恢复**：
+
+```bash
+systemctl stop pmwork
+cd /Olivia/pmwork
+mv data data.broken-$(date +%Y%m%d)
+cp -r /Olivia/backup/backup-2026-10-09T10-15-52/data ./
+systemctl start pmwork
+journalctl -u pmwork -n 30
+```
+
+> **如果自己写 tar 备份，两条铁律**：
+> ① `platform.db` 是 SQLite，**服务在跑时直接 tar 会拷出半截库，恢复时打不开**；
+> ② `--exclude` 必须写在文件列表**前面**，写在后面等于没写。
+> `backup.js` 已经把 ① 处理掉了，这也是推荐用它而不是裸 tar 的原因。
+
+**⑥ 已知风险（暂不处理）**：`/Olivia/backup` 与 `/Olivia/pmwork` 同盘，
+盘挂了两个一起没。哪天有独立盘或 NAS，再加一条异地拷贝。
 
 ### 9.3 账号管理
 
@@ -1195,18 +1390,33 @@ node -e "require('./db').setRole('工号','pm'); console.log('已改')"
 
 ### 第二趟：全量数据（大家准备切过去时再做）
 
+> ★ **2026-10-09 已实际执行完成**，下面是**修正后**的清单。
+> 早年那版有两处错（打包带 `data/sso`、依赖停服合并 WAL），会踩坑，别照旧版做。
+
 - [ ] 已通知相关人，本机服务已停
-- [ ] `pmwork-data.tar.gz` 已打包（20~40 MB）并传到服务器
+- [ ] `data/sso/secret.json` 的 `debug` 是 **`false`**（生产）—— **本机那份是 `true`，所以 `data/sso` 不打包**
+- [ ] 停服后 WAL 仍在（**不要假设停服会合并**）：`ls -la data/platform.db data/platform.db-wal`
+- [ ] `VACUUM INTO` 单文件快照已生成，**账号数 373**
+- [ ] 用 `inspect.js` 对拍过「主库单文件」vs「主库+WAL」，**两边 `users` / `audit_log` 行数一致**（当时 373 / 781）—— 这是唯一能证明快照没丢 WAL 数据的手段
+- [ ] `pmwork-data.tar.gz` 已打包并传到服务器（**3~4 MB**，不是 20~40 MB —— 快照比原库小）
+- [ ] 打包后自检：`tar -tzf | grep CORRUPT` 无输出、`tar -tzf | grep 'data/sso'` **无输出**
+- [ ] 传输后 `md5sum` 与本机一致，`gzip -t` 通过
+- [ ] 服务器上 `cp -r data data.bak-before-full-migrate` 已执行（回退后路）
+- [ ] 服务器上 `mv data/platform.snapshot.db data/platform.db` 已执行
+- [ ] 服务器上旧的 `data/platform.db-wal` / `-shm` **已删除**（换库后旧 WAL 会导致判损）
 - [ ] 服务器上账号数仍 = 373，归档数与本机一致（本机当前 **3**）
+- [ ] 服务器上 `data/dingtalk/org.json` 在（**103200 字节**）—— 「按姓名推送」靠它
+- [ ] 服务器上 `grep '"debug"' data/sso/secret.json` = **`false`** ★
+- [ ] 服务器上 `data/iteration/state.json` 在（约 **319740 字节**）
 - [ ] 首页数据与本机一致，各 Tab 不空
-- [ ] `platform.db-wal` / `platform.db-shm` 是**与 `.db` 同一时刻**的一组（第二趟是三个一起拷的，不是 `VACUUM INTO` 单文件）
 
 ### 收尾
 
 - [ ] 做成 systemd / nssm 常驻服务，开机自启
 - [ ] 钉钉免登走通（`corpId` 填好后，见第八节）
-- [ ] 备份定时任务已配
+- [ ] **备份定时任务已配** —— `backup.js` + `BACKUP_DIR=/Olivia/backup`，先手动跑一次并 `md5sum` 对拍，再挂 cron（见 §9.2）
 - [ ] **本机停止写入**（否则两边数据分叉，见迁移文档第七节）
+- [ ] 本机 `.scratch/migrate/` 已清理（里面有 `platform.db` 副本，含真实密码哈希）
 
 ---
 

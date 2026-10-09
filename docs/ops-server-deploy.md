@@ -5,6 +5,19 @@
 > ⚠️ **端口 9680 不是随便定的** —— 它是公司 SSO 回调白名单里**登记过的值**（`http://10.63.139.103:9680/sso/callback`）。改端口必须同步去「流程数字化中心」变更回调地址，否则 SSO 跳到旧端口会被拒绝。详见 `docs/plan-identity-and-dingtalk.md`。
 >
 > 数据搬迁见另一份：`docs/plan-server-migration.md`。本文只讲**从零把服务跑起来**。
+>
+> **本文所有路径都在 `/Olivia` 下**（`eco-dev-micro4` 是共用机器，不占 `/opt` 等系统目录）。
+> 三个位置，先记住：
+>
+> | 放什么 | 路径 |
+> |---|---|
+> | 代码 + 数据 | `/Olivia/pmwork` |
+> | Node 运行时 | `/Olivia/node22` |
+> | 数据包 / 备份 | `/Olivia/pmwork-data.tar.gz`、`/Olivia/backup/` |
+>
+> **命令按 `root` 登录写，一律不加 `sudo`。** 服务器给的账号就是 `root`
+> （提示符 `[root@eco-dev-micro4 ~]#`）；CentOS 7 最小化安装未必带 `sudo`，
+> 加了反而可能报 `sudo: command not found`。若换用普通账号登录，每条命令前自行加 `sudo`。
 
 ---
 
@@ -56,22 +69,39 @@ Node 官方专门为老系统构建了 `glibc-217` 版本 —— **代码和官�
 # 挑一个 v22.x 版本号替换（22 整条线都 ≥ 22.5，满足要求）
 VER=v22.20.0
 
-mkdir -p /opt/node/22 && cd /opt/node
+mkdir -p /Olivia/node22 && cd /Olivia
 curl -LO "https://unofficial-builds.nodejs.org/download/release/${VER}/node-${VER}-linux-x64-glibc-217.tar.gz"
-tar -xzf "node-${VER}-linux-x64-glibc-217.tar.gz" -C /opt/node/22 --strip-components=1
+tar -xzf "node-${VER}-linux-x64-glibc-217.tar.gz" -C /Olivia/node22 --strip-components=1
+rm -f "node-${VER}-linux-x64-glibc-217.tar.gz"
 
-/opt/node/22/bin/node -v      # 能打印版本号才算解压对了
+/Olivia/node22/bin/node -v      # 能打印版本号才算解压对了
 ```
 
-版本号自己去这个目录列表挑一个：`https://unofficial-builds.nodejs.org/download/release/`
+> **`unofficial-builds` 用 `-LO` 而不是 `-L`**：`-O` 是按远端文件名落地，
+> 后面 `tar` 那条直接引用文件名，省得自己起名起错。
+
+**★ 动手前先确认这个包真的存在**（一条命令，服务器能出网就一定测得出来）：
+
+```bash
+VER=v22.20.0
+curl -sI "https://unofficial-builds.nodejs.org/download/release/${VER}/node-${VER}-linux-x64-glibc-217.tar.gz" | head -1
+```
+
+**`HTTP/1.1 200 OK` 才能往下走。** 如果是 `403` / `404`，说明这个版本号没有
+glibc-217 构建 —— 去 `https://unofficial-builds.nodejs.org/download/release/`
+列一下目录，换个有 `glibc-217` 字样的 v22.x 版本号重试。
 
 装上 PATH：
 
 ```bash
-echo 'export PATH=/opt/node/22/bin:$PATH' >> /etc/profile
+echo 'export PATH=/Olivia/node22/bin:$PATH' >> /etc/profile
 source /etc/profile
 node -v
 ```
+
+> ⚠️ **systemd 不读 `/etc/profile`。** 上面这行只为让你在 SSH 窗口里敲 `node`
+> 能直接用；**第 5.1 节做常驻服务时必须写全路径** `/Olivia/node22/bin/node`，
+> 否则服务起来会报 `exec: node: not found`。
 
 > ⚠️ **绝对不要去升级系统 glibc。** 那是能把机器搞挂的操作（可能连带 yum、ssh 一起坏掉），
 > 而 `glibc-217` 构建就是为了让你不必碰它。
@@ -79,8 +109,8 @@ node -v
 **路线 B · glibc ≥ 2.28（较新系统）**
 
 ```bash
-curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
-sudo yum install -y nodejs
+curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
+yum install -y nodejs
 node -v
 ```
 
@@ -203,27 +233,34 @@ ss -lntp | grep 9680
 
 | 系统 | 项目目录 | 打包文件放哪 |
 |---|---|---|
-| Linux | `/opt/pmwork` | `/opt/pmwork-data.tar.gz`（项目目录的**上一级**） |
+| Linux | `/Olivia/pmwork` | `/Olivia/pmwork-data.tar.gz`（项目目录的**上一级**） |
 | Windows | `D:\pmwork` | `D:\pmwork-data.tar.gz` |
 
 ```bash
-# Linux
-sudo mkdir -p /opt/pmwork && sudo chown -R $USER /opt/pmwork
-cd /opt/pmwork
-pwd            # 必须是 /opt/pmwork
+# Linux（root 登录，无需 sudo）
+mkdir -p /Olivia/pmwork
+cd /Olivia/pmwork
+pwd            # 必须是 /Olivia/pmwork
 
 # Windows（管理员 CMD）
 mkdir D:\pmwork && cd /d D:\pmwork
 ```
 
-> **为什么强调「一层」**：数据包要落在项目目录的**上一级**，解包时才能 `tar -xzf ../pmwork-data.tar.gz` 一步到位。如果套成 `/opt/pmwork/pmwork`（clone 时不加结尾那个点就会变成这样），包和解包路径都要多一级，容易和本文档后续命令对不上。
+> **`/Olivia` 这个目录名是随意的**，本文后面所有命令都写死它。**改了名要全文同步替换**，
+> 否则 `cd /Olivia/pmwork` 会报 `No such file or directory`。
+> 想换个名字的话，把本文档下载下来批量替换一遍再照着敲。
+>
+> **不要放在 `/opt` 或 `/usr/local` 下** —— 这是共用机器（`eco-dev-micro4`），
+> 系统目录归运维管，你的东西放自己目录里，出事好清理也不碍别人的事。
+
+> **为什么强调「一层」**：数据包要落在项目目录的**上一级**，解包时才能 `tar -xzf ../pmwork-data.tar.gz` 一步到位。如果套成 `/Olivia/pmwork/pmwork`（clone 时不加结尾那个点就会变成这样），包和解包路径都要多一级，容易和本文档后续命令对不上。
 
 ### 2.2 clone 代码
 
 **Linux 服务器（SSH 登录后，就在 SSH 窗口里执行）**：
 
 ```bash
-cd /opt/pmwork
+cd /Olivia/pmwork
 
 git clone https://github.com/divergentolivia-del/iSolarCloudProjectManage.git .
 #            ↑ 注意结尾这个点：把代码直接放进当前目录，
@@ -247,11 +284,11 @@ edb3c38 docs(deploy): 补齐 SSH 登录/拉码/验收全流程 —— 登录数�
 > 这三条是**写文档时的样子**，你拉的时候多半已经更新了 ——
 > **关键不是逐字对上，而是确认第一行是个较新的提交、且分支是 `dev/sgai`**。
 
-> **`git clone` 末尾那个点是什么意思**：不加点会建出 `/opt/pmwork/iSolarCloudProjectManage/` 一层子目录，和本文档后面所有 `cd /opt/pmwork` 都对不上。加了点就是「克隆到当前目录」。
+> **`git clone` 末尾那个点是什么意思**：不加点会建出 `/Olivia/pmwork/iSolarCloudProjectManage/` 一层子目录，和本文档后面所有 `cd /Olivia/pmwork` 都对不上。加了点就是「克隆到当前目录」。
 >
-> **如果 `/opt/pmwork` 已经非空**（比如上一级已有文件），`git clone` 到当前目录会报 `destination path '.' already exists and is not an empty directory`。那就反过来做：
+> **如果 `/Olivia/pmwork` 已经非空**（比如上一级已有文件），`git clone` 到当前目录会报 `destination path '.' already exists and is not an empty directory`。那就反过来做：
 > ```bash
-> cd /opt/pmwork
+> cd /Olivia/pmwork
 > git clone https://github.com/divergentolivia-del/iSolarCloudProjectManage.git
 > mv iSolarCloudProjectManage/* iSolarCloudProjectManage/.git .
 > rmdir iSolarCloudProjectManage
@@ -280,7 +317,7 @@ error: RPC failed; result=22, HTTP code = 0
 **绕行做法**（`curl` 走的是系统 openssl，比老 git 内嵌的那套靠谱得多）：
 
 ```bash
-cd /opt/pmwork
+cd /Olivia/pmwork
 
 curl -L -o pmwork.tar.gz \
   "https://codeload.github.com/divergentolivia-del/iSolarCloudProjectManage/tar.gz/refs/heads/dev/sgai"
@@ -308,7 +345,7 @@ yum install -y git236
 git --version        # 看到 2.x 就成了，以后就能正常 clone / pull
 ```
 
-（或者直接下源码编译。升完 git 后想改用 clone，把 `/opt/pmwork` 清空重来一遍即可。）
+（或者直接下源码编译。升完 git 后想改用 clone，把 `/Olivia/pmwork` 清空重来一遍即可。）
 
 > ⚠️ **用 tarball 时要格外注意「别覆盖自己的改动」**。因为升级时是「重新下包 + 解压」，
 > 会**直接盖掉已在服务器上改过的文件**。服务器上应该只有 `data/` 是本地产生的内容
@@ -370,7 +407,7 @@ ls data/iteration/state.json # ⚠ 这个【会存在】，但内容不对，见
 
 ```bash
 # Linux
-chmod -R u+rwX /opt/pmwork/data
+chmod -R u+rwX /Olivia/pmwork/data
 ```
 
 Windows 上一般用管理员账号运行，不需要额外设置。
@@ -478,18 +515,20 @@ ls -lh login-pack.tar.gz      # 预期 60~120 KB（实测 86 KB）
 
 ```bash
 # 换成你在 1.1 里用的那个用户名
-scp login-pack.tar.gz 你的用户名@10.63.139.103:/opt/pmwork/
+scp login-pack.tar.gz 你的用户名@10.63.139.103:/Olivia/pmwork/
 
 # 会要一次密码，输完看到进度条 + 100% 就是传完了
 ```
 
 > **`scp` 是独立的命令，用的是和 `ssh` 同一套账号密码**，不需要等 SSH 连上再敲。
 >
-> **如果 `scp` 报 `Permission denied`**：`/opt/pmwork` 不是你这个账号可写的目录。
-> 先在服务器上把它改成可写（1.1 那个窗口里执行）：
+> **如果 `scp` 报 `Permission denied`**：目标目录不是你这个账号可写的。
+> 你是 `root` 登录的话不该出现；若换了普通账号，先在服务器上把它改成可写
+> （1.1 那个窗口里执行）：
 > ```bash
-> sudo chown -R $USER /opt/pmwork
+> chown -R $USER /Olivia/pmwork
 > ```
+> （`$USER` 在服务器上展开的是**服务器账号**，不是笔记本账号。）
 
 ---
 
@@ -498,8 +537,8 @@ scp login-pack.tar.gz 你的用户名@10.63.139.103:/opt/pmwork/
 **回到那个 SSH 窗口**（用 `hostname` 确认一下是在服务器上）：
 
 ```bash
-cd /opt/pmwork
-pwd        # 预期 /opt/pmwork
+cd /Olivia/pmwork
+pwd        # 预期 /Olivia/pmwork
 
 tar -xzf ../login-pack.tar.gz
 ls -la login-pack.db data/sso/secret.json data/auth-config.json
@@ -530,7 +569,7 @@ ls -la data/platform.db data/sso/secret.json
 ### 3.4 【服务器】校验：账号数必须是 373
 
 ```bash
-cd /opt/pmwork
+cd /Olivia/pmwork
 
 node -e "const db=require('./db');console.log('账号数:',db.listUsers().length)"
 ```
@@ -594,13 +633,13 @@ ls -lh pmwork-data.tar.gz      # 预期 20~40 MB
 **③ 【笔记本】传过去**：
 
 ```bash
-scp pmwork-data.tar.gz 你的用户名@10.63.139.103:/opt/pmwork/
+scp pmwork-data.tar.gz 你的用户名@10.63.139.103:/Olivia/pmwork/
 ```
 
 **④ 【服务器】解包**：
 
 ```bash
-cd /opt/pmwork
+cd /Olivia/pmwork
 tar -xzf ../pmwork-data.tar.gz
 
 # 三个关键文件都在
@@ -616,7 +655,7 @@ ls data/archive/*.json | wc -l
 **⑤ 【服务器】重启服务让新数据生效**：
 
 ```bash
-sudo systemctl restart pmwork      # 如果已经做成 systemd 服务（见第五节）
+systemctl restart pmwork      # 如果已经做成 systemd 服务（见第五节）
 # 还没做成服务的话，把前台那个 Ctrl+C 掉重新 node server.js 9680
 ```
 
@@ -629,7 +668,7 @@ sudo systemctl restart pmwork      # 如果已经做成 systemd 服务（见第�
 **这一步一定要在前台跑** —— 只有在前台你才能第一时间看到报错。
 
 ```bash
-cd /opt/pmwork
+cd /Olivia/pmwork
 
 # 前台启动，日志直接打在屏幕上
 node server.js 9680
@@ -671,10 +710,10 @@ curl http://localhost:9680/login.html
 
 ```bash
 # Linux（firewalld）
-sudo firewall-cmd --add-port=9680/tcp --permanent && sudo firewall-cmd --reload
+firewall-cmd --add-port=9680/tcp --permanent && firewall-cmd --reload
 
 # Linux（ufw）
-sudo ufw allow 9680/tcp
+ufw allow 9680/tcp
 
 # Windows（管理员 CMD）
 netsh advfirewall firewall add rule name="pmwork-9680" dir=in action=allow protocol=TCP localport=9680
@@ -703,8 +742,10 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/pmwork
-ExecStart=/usr/bin/node /opt/pmwork/server.js 9680
+WorkingDirectory=/Olivia/pmwork
+# ★ 必须写【完整路径】—— systemd 不读 /etc/profile，
+#   只写 node 会报 exec: node: not found
+ExecStart=/Olivia/node22/bin/node /Olivia/pmwork/server.js 9680
 Restart=always
 RestartSec=5
 
@@ -713,7 +754,7 @@ Environment=AUTH_REQUIRED=1
 
 # ★ 数据放项目目录下，与 .gitignore 和代码里的路径一致
 #   不要指向别处 —— 有几个脚本写死了 data/ 路径，不跟随 DATA_DIR
-# Environment=DATA_DIR=/opt/pmwork/data
+# Environment=DATA_DIR=/Olivia/pmwork/data
 
 [Install]
 WantedBy=multi-user.target
@@ -722,19 +763,19 @@ WantedBy=multi-user.target
 启用：
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable pmwork     # 开机自启
-sudo systemctl start pmwork
-sudo systemctl status pmwork     # 确认是 active (running)
+systemctl daemon-reload
+systemctl enable pmwork     # 开机自启
+systemctl start pmwork
+systemctl status pmwork     # 确认是 active (running)
 ```
 
 日常操作：
 
 ```bash
-sudo systemctl restart pmwork            # 重启
-sudo systemctl stop pmwork               # 停止
-sudo journalctl -u pmwork -f             # 实时看日志（排障必用）
-sudo journalctl -u pmwork --since "10 min ago"   # 看最近 10 分钟
+systemctl restart pmwork            # 重启
+systemctl stop pmwork               # 停止
+journalctl -u pmwork -f             # 实时看日志（排障必用）
+journalctl -u pmwork --since "10 min ago"   # 看最近 10 分钟
 ```
 
 ### 5.2 Windows Server（nssm）
@@ -910,16 +951,16 @@ node -e "console.log('登录配置齐全:',require('./modules/dingtalk/client').
 ### 9.1 升级代码
 
 ```bash
-cd /opt/pmwork
-sudo systemctl stop pmwork           # 先停，避免 data/ 写入到一半
+cd /Olivia/pmwork
+systemctl stop pmwork           # 先停，避免 data/ 写入到一半
 
 git fetch origin dev/sgai
 git log HEAD..origin/dev/sgai --oneline    # 看看要更新什么
 git pull origin dev/sgai
 
 # data/ 目录不要动 —— 代码升级不动数据，数据格式向后兼容
-sudo systemctl start pmwork
-sudo journalctl -u pmwork -n 50      # 确认启动无报错
+systemctl start pmwork
+journalctl -u pmwork -n 50      # 确认启动无报错
 ```
 
 > ⚠️ **`git pull` 前先确认本地没有未提交改动**（`git status`）。服务器上**不应该**改代码 —— 所有改动都在本机做完、推到 `dev/sgai`，服务器只负责拉。
@@ -930,7 +971,7 @@ sudo journalctl -u pmwork -n 50      # 确认启动无报错
 
 ```bash
 # Linux：加进 crontab -e
-0 2 * * * tar -czf /backup/pmwork-$(date +\%Y\%m\%d).tar.gz /opt/pmwork/data
+0 2 * * * tar -czf /Olivia/backup/pmwork-$(date +\%Y\%m\%d).tar.gz /Olivia/pmwork/data
 find /backup -name 'pmwork-*.tar.gz' -mtime +30 -delete     # 保留 30 天
 ```
 
@@ -943,7 +984,7 @@ find /backup -name 'pmwork-*.tar.gz' -mtime +30 -delete     # 保留 30 天
 界面进不去时走命令行：
 
 ```bash
-cd /opt/pmwork
+cd /Olivia/pmwork
 
 # 看所有用户
 node -e "const d=require('./db');console.table(d.listUsers())"

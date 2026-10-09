@@ -24,13 +24,55 @@
 
 ## 一、登录服务器
 
-### 1.1 Linux 服务器
+> **本文假设服务器是 Linux，你在自己的笔记本上开终端 SSH 连过去操作。**
+>
+> 登录方式：`ssh 用户名@10.63.139.103` + 密码（服务器管理员给你的那套）。
+> 连上之后，下面**所有命令都在这个 SSH 窗口里敲**，命令提示符会从你笔记本的
+> 变成服务器的主机名 —— 这是判断「我现在是在服务器上还是在本机」的最直接依据。
+>
+> ⚠️ **最容易出错的地方就在这一步**：你笔记本上也要开一个终端来打包数据（第三节）。
+> 两个窗口长得一样，敲错窗口的后果是命令作用在本机或服务器上完全反了。
+> 建议**服务器窗口**的标题或背景色改一下，并在动手前用 `hostname` 确认一次。
+
+### 1.1 从笔记本连上去
+
+在**笔记本**上开终端（Windows 用 PowerShell / CMD / Git Bash 都行）：
 
 ```bash
 ssh 你的用户名@10.63.139.103
-# 首次连接会问是否信任主机指纹，输入 yes
-# 然后输入密码（或走密钥）
 ```
+
+会依次看到：
+
+```
+The authenticity of host '10.63.139.103' can't be established.
+ED25519 key fingerprint is SHA256:xxxxx...
+Are you sure you want to continue connecting (yes/no/[fingerprint])?
+```
+
+**输入 `yes` 回车**（只在首次连接时问一次）。然后：
+
+```
+你的用户名@10.63.139.103's password:
+```
+
+**输入密码**（敲的时候屏幕上不显示任何字符，这是正常的，不是卡住），回车。
+
+成功后提示符会变成类似：
+
+```
+[用户名@服务器主机名 ~]$
+```
+
+**看到这个才说明登进去了。**
+
+> **密码里有哪些字符要小心**：如果密码含 `!` `$` `` ` `` `\` 等，在某些终端里会被解释。
+> 直接输密码时不受影响（走的是终端密码通道，不做 shell 展开）；但**不要**用
+> `ssh 用户@IP -p'密码'` 这类写法，那会真的展开。
+>
+> **连接超时/拒绝**（`Connection timed out` / `Connection refused`）：
+> 说明 22 端口到不了服务器，找服务器管理员确认 SSH 端口和网络策略，
+> 或者改用远程桌面（1.2）。
 
 如果公司要求走跳板机：
 
@@ -38,11 +80,15 @@ ssh 你的用户名@10.63.139.103
 ssh -J 跳板机用户名@跳板机地址 你的用户名@10.63.139.103
 ```
 
-### 1.2 Windows 服务器
+### 1.2 如果服务器是 Windows（走远程桌面）
 
-用 **远程桌面（mstsc）**：Win+R → `mstsc` → 计算机填 `10.63.139.103` → 输入账号密码。
+服务器管理员确认是 Windows 的话，SSH 那条路不一定通（要额外装 OpenSSH Server），
+改用远程桌面：
 
-之后所有命令在**服务器上的** PowerShell 或 CMD 里执行。
+Win+R → `mstsc` → 计算机填 `10.63.139.103` → 输入账号密码。
+
+进去之后所有命令在**服务器上的** PowerShell 或 CMD 里执行 —— 这种情况下
+**没有「本地/服务器」两个窗口的问题**，因为你不是从笔记本传过去的，是在服务器本机上操作。
 
 > ⚠️ PowerShell 不认 `set` 命令（会当成查看变量、静默什么都不设）。设置环境变量用：
 > - CMD：`set AUTH_REQUIRED=1`
@@ -76,33 +122,66 @@ ss -lntp | grep 9680
 
 ### 2.1 选目录
 
-约定用 `/opt/pmwork`（Linux）或 `D:\pmwork`（Windows）。本文统一写作 `/opt/pmwork`，Windows 上对应替换。
+**项目目录就一层，不要套两层。** 约定：
+
+| 系统 | 项目目录 | 打包文件放哪 |
+|---|---|---|
+| Linux | `/opt/pmwork` | `/opt/pmwork-data.tar.gz`（项目目录的**上一级**） |
+| Windows | `D:\pmwork` | `D:\pmwork-data.tar.gz` |
 
 ```bash
 # Linux
 sudo mkdir -p /opt/pmwork && sudo chown -R $USER /opt/pmwork
 cd /opt/pmwork
+pwd            # 必须是 /opt/pmwork
 
 # Windows（管理员 CMD）
 mkdir D:\pmwork && cd /d D:\pmwork
 ```
 
+> **为什么强调「一层」**：数据包要落在项目目录的**上一级**，解包时才能 `tar -xzf ../pmwork-data.tar.gz` 一步到位。如果套成 `/opt/pmwork/pmwork`（clone 时不加结尾那个点就会变成这样），包和解包路径都要多一级，容易和本文档后续命令对不上。
+
 ### 2.2 clone 代码
 
+**Linux 服务器（SSH 登录后，就在 SSH 窗口里执行）**：
+
 ```bash
-git clone https://github.com/divergentolivia-del/iSolarCloudProjectManage.git pmwork
-cd pmwork
+cd /opt/pmwork
+
+git clone https://github.com/divergentolivia-del/iSolarCloudProjectManage.git .
+#            ↑ 注意结尾这个点：把代码直接放进当前目录，
+#              不要再建一层 pmwork 子目录 —— 见 2.1 的说明
 
 # ★ 切到 dev/sgai —— 所有改动都在这条线上，main 是验收快照
 git checkout dev/sgai
-git log --oneline -5        # 确认拿到的是最新提交
+git log --oneline -3        # 确认拿到的是最新提交
 ```
+
+**`git log` 看到这三条就对上了**（新 → 旧）：
+
+```
+4d18aac fix(sso): 补齐 /sso/logout 的分发与门禁白名单
+bef512e fix(sso): 切到生产环境 sso.sungrow.cn
+7f6546e feat(dingtalk): 钉钉身份打通 + 权限透传（免登）
+```
+
+看到的是别的提交 = 没拉到最新，回头检查分支和网络。
+
+> **`git clone` 末尾那个点是什么意思**：不加点会建出 `/opt/pmwork/iSolarCloudProjectManage/` 一层子目录，和本文档后面所有 `cd /opt/pmwork` 都对不上。加了点就是「克隆到当前目录」。
+>
+> **如果 `/opt/pmwork` 已经非空**（比如上一级已有文件），`git clone` 到当前目录会报 `destination path '.' already exists and is not an empty directory`。那就反过来做：
+> ```bash
+> cd /opt/pmwork
+> git clone https://github.com/divergentolivia-del/iSolarCloudProjectManage.git
+> mv iSolarCloudProjectManage/* iSolarCloudProjectManage/.git .
+> rmdir iSolarCloudProjectManage
+> ```
 
 > **为什么是 `dev/sgai` 而不是 `main`**：按项目约定，所有改动一律推 `origin/dev/sgai`，用户验收通过后才合并回 `main`。`main` 上的代码是「上次验收时冻结的样子」，不是最新的。
 >
 > commit 太多导致 clone 慢的话，可以只拉最近一次历史：
 > ```bash
-> git clone --depth 1 -b dev/sgai https://github.com/divergentolivia-del/iSolarCloudProjectManage.git pmwork
+> git clone --depth 1 -b dev/sgai https://github.com/divergentolivia-del/iSolarCloudProjectManage.git .
 > ```
 
 #### ★ 到这里【还不能】做 SSO 验收 —— 必须先搬数据
@@ -135,12 +214,25 @@ ls -la data/auth-config.json   # 密码规则（非 SSO 必需，但一起搬省
 对照检查：
 
 ```bash
-ls data/platform.db          # 预期：不存在
-ls data/iteration/state.json # 预期：不存在
-ls data/sso/secret.json      # 预期：不存在
+ls data/platform.db          # 预期：不存在  ← 没有账号库
+ls data/sso/secret.json      # 预期：不存在  ← 没有 SSO 凭据
+ls data/iteration/state.json # ⚠ 这个【会存在】，但内容不对，见下
 ```
 
-**这三个都不存在是正常的**，靠 `docs/plan-server-migration.md` 那份文档搬过来。
+> **`data/iteration/state.json` 是个例外，要看仔细。** 它的名字同时出现在
+> `.gitignore` 里**和** git 的跟踪列表里（历史遗留），所以 clone 会带一份**上次提交时的旧版本**，
+> **不是你现在的实时工时数据**。它是三个文件里唯一「看起来有、其实不对」的那个 ——
+> 用 `ls` 判断会误以为数据齐了。
+>
+> 判断方法：看时间戳。
+> ```bash
+> ls -la data/iteration/state.json     # clone 下来的那份时间是「上次有人提交它」的时刻
+> ```
+>
+> **第一趟搬登录数据不含它**，所以这时候 `state.json` 还是旧的 —— 不影响 SSO 验收
+> （SSO 只依赖账号库和凭据）。第二趟全量搬会覆盖成正确的。
+
+**这三个都当「缺失」处理**，靠第三节搬过来。
 
 ### 2.4 目录权限
 
@@ -148,7 +240,7 @@ ls data/sso/secret.json      # 预期：不存在
 
 ```bash
 # Linux
-chmod -R u+rwX /opt/pmwork/pmwork/data
+chmod -R u+rwX /opt/pmwork/data
 ```
 
 Windows 上一般用管理员账号运行，不需要额外设置。
@@ -159,22 +251,244 @@ Windows 上一般用管理员账号运行，不需要额外设置。
 
 **没有数据，服务能起来但没人能登录、页面全空。**
 
-完整步骤见 `docs/plan-server-migration.md`，这里只给最小路径：
+本节分两趟走，**先做第一趟就够你验 SSO 了**：
+
+| | 第一趟：登录必需 | 第二趟：全量搬 |
+|---|---|---|
+| 传什么 | 账号库 + SSO 凭据 | 全部业务数据（工时、归档、Skill…） |
+| 大小 | **约 300 KB** | **约 25 MB**（打包后；解开 72 MB） |
+| 要停本机服务吗 | **不用** | **要** |
+| 能验什么 | 账号密码登录 + **SSO 登录全流程** | 首页数据、历史归档、各 Tab |
+| 什么时候做 | 现在 | 服务跑通、大家准备切过去时 |
+
+> **为什么第一趟不用停服**：数据库用 `VACUUM INTO` 生成一致快照 —— 它让 SQLite 在
+> **一个只读事务里**把当前数据完整导出成新文件，服务同时在写也不影响。这比
+> 「停服让 WAL 落盘」温和得多，也**不需要**碰 `platform.db-wal` / `-shm`
+> （快照已经把它们的内容算进去了）。
+>
+> ⚠️ 但你本机平台**现在还在用着**（你 2026-09-24 交代过「云服务迭代版本那里
+> 现在服务还启着用着更新着呢」）。第一趟全程不停服，放心做。
+
+---
+
+### 3.1 【笔记本】第一趟：打包登录必需的数据
+
+**在笔记本上新开一个终端**（不要用那个 SSH 到服务器的窗口，见 1.1 开头的提醒），
+进项目目录：
 
 ```bash
-cd /opt/pmwork/pmwork
+cd "E:/PMWork/Project Materials/iSolarCloudProject/迭代版本/iSolarCloudProjectManage"
+pwd        # 确认路径对，末尾应该是 iSolarCloudProjectManage
+```
 
-# 从上一步的 tar 包解出来（包是 scp 传过来的）
-tar -xzf /opt/pmwork/pmwork-data.tar.gz
+**① 生成数据库一致快照**（服务运行中也能做）：
 
-# 关键三件套必须都在
-ls -la data/platform.db data/iteration/state.json data/sso/secret.json
+```bash
+mkdir -p .scratch && rm -f .scratch/login-pack.db
 
-# 账号数应该是 373
+node -e "
+const {DatabaseSync}=require('node:sqlite');
+const d=new DatabaseSync('data/platform.db');
+d.exec(\"VACUUM INTO '.scratch/login-pack.db'\");
+d.close();
+console.log('快照已生成');
+"
+
+ls -lh .scratch/login-pack.db      # 预期 200~400 KB
+```
+
+> **末尾那行 `ExperimentalWarning: SQLite is an experimental feature` 是正常的**，
+> 不是错误。
+>
+> **为什么用 `VACUUM INTO` 而不是直接拷 `platform.db`**：直接拷主库会漏掉还在
+> `platform.db-wal` 里的**最近写入**（眼下有 4.1 MB 未落盘），而且**不报错** ——
+> 查出来就是少几条账号、少几条审计，最难发现的那种。`VACUUM INTO` 出来的快照
+> 是**完整且自洽**的，服务器上打开就能用。
+
+**② 确认快照是对的**（别跳过，这是唯一一次在传之前发现问题的机会）：
+
+```bash
+node -e "
+const {DatabaseSync}=require('node:sqlite');
+const t=new DatabaseSync('.scratch/login-pack.db');
+console.log('账号数:', t.prepare('SELECT COUNT(*) n FROM users').get().n);
+console.log('审计条数:', t.prepare('SELECT COUNT(*) n FROM audit_log').get().n);
+t.close();
+"
+```
+
+**预期输出**：
+
+```
+账号数: 373
+审计条数: 781
+```
+
+**两个数字都对上才往下走。** 对不上说明快照没生成对，重跑 ①。
+
+**③ 打包**：
+
+```bash
+tar -czf login-pack.tar.gz \
+  -C .scratch login-pack.db \
+  -C .. "data/sso/secret.json" "data/auth-config.json"
+
+ls -lh login-pack.tar.gz      # 预期 60~120 KB（实测 86 KB）
+```
+
+> **上面这条命令容易看岔**：`-C` 是「切到这个目录再取后面的文件」，所以
+> `-C .scratch login-pack.db` 取的是 `.scratch/login-pack.db`，
+> `-C ..` 之后取的是项目目录下的 `data/sso/secret.json`。
+> 打包时**没有把 `.scratch/` 这层目录带进去** —— 解包后会直接在目标目录下看到
+> `login-pack.db`，方便后面改名。
+
+---
+
+### 3.2 【笔记本】传到服务器
+
+```bash
+# 换成你在 1.1 里用的那个用户名
+scp login-pack.tar.gz 你的用户名@10.63.139.103:/opt/pmwork/
+
+# 会要一次密码，输完看到进度条 + 100% 就是传完了
+```
+
+> **`scp` 是独立的命令，用的是和 `ssh` 同一套账号密码**，不需要等 SSH 连上再敲。
+>
+> **如果 `scp` 报 `Permission denied`**：`/opt/pmwork` 不是你这个账号可写的目录。
+> 先在服务器上把它改成可写（1.1 那个窗口里执行）：
+> ```bash
+> sudo chown -R $USER /opt/pmwork
+> ```
+
+---
+
+### 3.3 【服务器】解包并对号入座
+
+**回到那个 SSH 窗口**（用 `hostname` 确认一下是在服务器上）：
+
+```bash
+cd /opt/pmwork
+pwd        # 预期 /opt/pmwork
+
+tar -xzf ../login-pack.tar.gz
+ls -la login-pack.db data/sso/secret.json data/auth-config.json
+```
+
+三个文件都 `ls` 得出来，就往下走。接着**把快照放到它该在的位置**：
+
+```bash
+# ① 备份 clone 里可能存在的旧库（正常情况下不存在，有就留着别删）
+[ -f data/platform.db ] && mv data/platform.db data/platform.db.from-clone
+
+# ② 快照改名成平台认的库名
+mv login-pack.db data/platform.db
+
+# ③ 把 WAL/SHM 清掉 —— 它们是【本机那份库】的附属文件，
+#    和新搬来的库不是一对。混着用会损坏数据库
+rm -f data/platform.db-wal data/platform.db-shm
+
+# ④ 确认到位
+ls -la data/platform.db data/sso/secret.json
+```
+
+> **③ 这一步是最容易埋雷的地方**。如果你用的是「三个文件一起拷」的老办法，
+> 那三个文件**必须来自同一时刻**；而这里是 `VACUUM INTO` 出来的**单文件自洽快照**，
+> 天然不需要 `-wal` / `-shm`。如果 clone 时带过来一份旧的 `-wal`，它和快照对不上，
+> SQLite 会试图重放，轻则数据错乱重则开不了库。**所以一定要删掉。**
+
+### 3.4 【服务器】校验：账号数必须是 373
+
+```bash
+cd /opt/pmwork
+
 node -e "const db=require('./db');console.log('账号数:',db.listUsers().length)"
 ```
 
-**`账号数: 373` 对上了再往下走。** 对不上说明 `platform.db` 没搬对（常见原因：只拷了 `.db` 漏了 `-wal`，见迁移文档坑 1）。
+**`账号数: 373` 对上了再往下走。**
+
+再顺手看一眼 SSO 凭据读没读到（不打印任何密钥值）：
+
+```bash
+curl -s localhost:9680/sso/status
+```
+
+> ⚠️ 这条要**服务起来之后**才有输出（第四节）。现在没起服务的话会
+> `Connection refused`，是正常的，到 4.1 起服务后再回来补这一条。
+
+对不上怎么办：
+
+| 现象 | 最可能的原因 | 怎么办 |
+|---|---|---|
+| `账号数: 0` | `data/platform.db` 不存在，`db.js` 自动建了个空库 | 回到 3.3 检查 `mv login-pack.db data/platform.db` 有没有执行到 |
+| 账号数不是 373 但大于 0 | 搬到的是 clone 里那份**旧库**（见 2.3） | 确认 3.3 的 `mv` 覆盖成功了；`ls -la data/platform.db` 看时间戳是不是刚才 |
+
+---
+
+### 3.5 【笔记本 → 服务器】第二趟：全量搬（服务跑通后再做）
+
+> ★ **这一趟要停你本机的服务**，因为要动的是**实时业务数据**（工时、归档），
+> 那些不是数据库、没有 `VACUUM INTO` 这种快照机制。做之前先在群里说一声。
+>
+> **第一趟做完、SSO 验过了，再回来做这一趟。** 现在可以跳过，直接去第四节。
+
+完整清单和三个坑见 `docs/plan-server-migration.md`，这里是可执行版本。
+
+**① 【笔记本】停服**（在跑着 `node server.js` 的那个窗口按 `Ctrl+C`），然后：
+
+```bash
+cd "E:/PMWork/Project Materials/iSolarCloudProject/迭代版本/iSolarCloudProjectManage"
+
+# 停服后 WAL 会自动合并，这个文件应该缩到很小或消失
+ls -la data/platform.db-wal
+```
+
+**② 【笔记本】打包**：
+
+```bash
+tar -czf pmwork-data.tar.gz \
+  data/platform.db data/platform.db-wal data/platform.db-shm \
+  data/iteration data/archive data/plan data/project data/budget \
+  data/token data/skill data/pradapter data/notify data/sso \
+  data/dingtalk data/tb data/auth-config.json data/state.json \
+  --exclude='data/iteration/state.json.CORRUPT-*'
+
+ls -lh pmwork-data.tar.gz      # 预期 20~40 MB
+```
+
+> `--exclude` 排掉的是 2026-09-24 那次事故留下的 171 字节损坏样本，别把坏数据带上服务器。
+>
+> **如果 `data/platform.db-wal` 不存在**（已经 checkpoint 掉了），`tar` 会报
+> `Cannot stat: No such file or directory`。把这一项从命令里删掉再打一次。
+
+**③ 【笔记本】传过去**：
+
+```bash
+scp pmwork-data.tar.gz 你的用户名@10.63.139.103:/opt/pmwork/
+```
+
+**④ 【服务器】解包**：
+
+```bash
+cd /opt/pmwork
+tar -xzf ../pmwork-data.tar.gz
+
+# 三个关键文件都在
+ls -la data/platform.db data/iteration/state.json data/sso/secret.json
+
+# 账号数还是 373
+node -e "const db=require('./db');console.log('账号数:',db.listUsers().length)"
+
+# 归档数量和本机一致（本机现在是 3）
+ls data/archive/*.json | wc -l
+```
+
+**⑤ 【服务器】重启服务让新数据生效**：
+
+```bash
+sudo systemctl restart pmwork      # 如果已经做成 systemd 服务（见第五节）
+# 还没做成服务的话，把前台那个 Ctrl+C 掉重新 node server.js 9680
+```
 
 ---
 
@@ -185,7 +499,7 @@ node -e "const db=require('./db');console.log('账号数:',db.listUsers().length
 **这一步一定要在前台跑** —— 只有在前台你才能第一时间看到报错。
 
 ```bash
-cd /opt/pmwork/pmwork
+cd /opt/pmwork
 
 # 前台启动，日志直接打在屏幕上
 node server.js 9680
@@ -259,8 +573,8 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/pmwork/pmwork
-ExecStart=/usr/bin/node /opt/pmwork/pmwork/server.js 9680
+WorkingDirectory=/opt/pmwork
+ExecStart=/usr/bin/node /opt/pmwork/server.js 9680
 Restart=always
 RestartSec=5
 
@@ -269,7 +583,7 @@ Environment=AUTH_REQUIRED=1
 
 # ★ 数据放项目目录下，与 .gitignore 和代码里的路径一致
 #   不要指向别处 —— 有几个脚本写死了 data/ 路径，不跟随 DATA_DIR
-# Environment=DATA_DIR=/opt/pmwork/pmwork/data
+# Environment=DATA_DIR=/opt/pmwork/data
 
 [Install]
 WantedBy=multi-user.target
@@ -298,11 +612,11 @@ sudo journalctl -u pmwork --since "10 min ago"   # 看最近 10 分钟
 下载 nssm（nssm.cc），管理员 CMD 执行：
 
 ```cmd
-nssm install pmwork "C:\Program Files\nodejs\node.exe" "D:\pmwork\pmwork\server.js"
-nssm set pmwork AppDirectory D:\pmwork\pmwork
+nssm install pmwork "C:\Program Files\nodejs\node.exe" "D:\pmwork\server.js"
+nssm set pmwork AppDirectory D:\pmwork
 nssm set pmwork AppEnvironmentExtra AUTH_REQUIRED=1
-nssm set pmwork AppStdout D:\pmwork\pmwork\server.log
-nssm set pmwork AppStderr D:\pmwork\pmwork\server-error.log
+nssm set pmwork AppStdout D:\pmwork\server.log
+nssm set pmwork AppStderr D:\pmwork\server-error.log
 nssm start pmwork
 nssm status pmwork
 ```
@@ -359,22 +673,39 @@ pkill -f "node server.js"
 
 ### 验收步骤
 
-1. **先确认凭据齐全**。`data/sso/secret.json` 里 `clientSecret` **不能还是占位符**（占位符会让 `/sso/login` 直接返 503）：
+1. **先确认凭据齐全**（不打印任何密钥值，只看长度和地址）：
    ```bash
-   node -e "const s=require('./data/sso/secret.json');console.log('clientId:',s.clientId);console.log('secret长度:',String(s.clientSecret||'').length)"
+   node -e "const s=require('./data/sso/secret.json');console.log('clientId:',s.clientId);console.log('clientSecret 长度:',String(s.clientSecret||'').length);console.log('authorizeUrl:',s.authorizeUrl);console.log('tokenUrl:',s.tokenUrl);console.log('debug:',s.debug)"
    ```
-   真实密钥应该是几十位的串。若只有 6 个字符，说明还是占位符，要先去「流程数字化中心」拿真值。
+   预期看到 `clientId: aic3431485b7a541768b9391be0bbff132`、三条 URL 都是
+   `https://sso.sungrow.cn/...`（**生产**，不是 `sso-sit`）。
 
-2. **确认三条 URL 指向的是你要验的环境**。见第八节 —— 当前值指向 SIT 环境，需要你确认这是不是有意为之。
+   若 `clientSecret 长度` 是 0，说明 `data/sso/secret.json` 没搬过来（回 3.3 检查）。
 
-3. 浏览器打开 `http://10.63.139.103:9680`，登录页应出现「公司统一认证登录」按钮（配好了才显示）。
-4. 点击 → 跳到公司 SSO 认证页 → 输入公司账号 → 回跳到平台。
+2. **确认 SSO 状态接口说配置齐全**：
+   ```bash
+   curl -s localhost:9680/sso/status
+   ```
+   预期：
+   ```json
+   {"configured":true,"missing":[],"redirectUri":"http://10.63.139.103:9680/sso/callback","debug":true,"logoutConfigured":true}
+   ```
+   - `configured:false` → 登录页**不会显示**「公司统一认证登录」按钮，先解决这个再往下
+   - `redirectUri` 必须**逐字**是 `http://10.63.139.103:9680/sso/callback`
+
+3. 浏览器打开 `http://10.63.139.103:9680`，登录页应出现「公司统一认证登录」按钮。
+4. 点击 → 跳到公司 SSO 认证页（`sso.sungrow.cn`）→ 输入公司账号 → 回跳到平台。
 5. **看审计日志确认登录方式**：
    ```bash
    node -e "const d=require('./db');console.log(d.getAudit(10).filter(a=>a.module==='auth'))"
    ```
 
 **先在联调模式跑一遍更好**：若 `secret.json` 里 `debug: true`，SSO 回调后**只把工号显示在页面上，不建会话、不让人进平台**。第一次接通时挂着它确认工号对得上，再改回 `false`。
+
+> 当前 `data/sso/secret.json` 里 `debug` 就是 `true` —— 这是**有意的**。
+> 第一次点 SSO 登录，页面上会显示「联调模式（未登录）」+ 你的工号。
+> **确认这个工号和你在 `users` 表里的账号对得上**，再把 `debug` 改成 `false` 重启服务，
+> 才能真正登进去。这样设计是为了避免「配置写错了但症状是『人进去了、看到的却是别人的数据』」。
 
 ---
 
@@ -449,7 +780,7 @@ node -e "console.log('登录配置齐全:',require('./modules/dingtalk/client').
 ### 9.1 升级代码
 
 ```bash
-cd /opt/pmwork/pmwork
+cd /opt/pmwork
 sudo systemctl stop pmwork           # 先停，避免 data/ 写入到一半
 
 git fetch origin dev/sgai
@@ -469,7 +800,7 @@ sudo journalctl -u pmwork -n 50      # 确认启动无报错
 
 ```bash
 # Linux：加进 crontab -e
-0 2 * * * tar -czf /backup/pmwork-$(date +\%Y\%m\%d).tar.gz /opt/pmwork/pmwork/data
+0 2 * * * tar -czf /backup/pmwork-$(date +\%Y\%m\%d).tar.gz /opt/pmwork/data
 find /backup -name 'pmwork-*.tar.gz' -mtime +30 -delete     # 保留 30 天
 ```
 
@@ -482,7 +813,7 @@ find /backup -name 'pmwork-*.tar.gz' -mtime +30 -delete     # 保留 30 天
 界面进不去时走命令行：
 
 ```bash
-cd /opt/pmwork/pmwork
+cd /opt/pmwork
 
 # 看所有用户
 node -e "const d=require('./db');console.table(d.listUsers())"
@@ -502,10 +833,13 @@ node -e "require('./db').setRole('工号','pm'); console.log('已改')"
 |---|---|---|
 | 启动报 `Cannot find module 'node:sqlite'` | Node < 22.5 | 升级 Node |
 | 启动报 `EADDRINUSE` | 9680 被占 | `netstat -ano \| findstr :9680` 找进程，或换端口（**但换端口要同步改 SSO 回调登记**） |
-| 页面打开但没人能登录 | `platform.db` 没搬对 | 查账号数是不是 373，见迁移文档坑 1 |
-| 登录页没有 SSO 按钮 | `clientSecret` 还是占位符 | 去拿真实凭据，见 7.1 |
+| 页面打开但没人能登录 | `platform.db` 没搬对 | 查账号数是不是 373，见 3.4 |
+| 账号数是 **0** 不是 373 | `data/platform.db` 不存在，`db.js` 自动建了空库 | 回 3.3 确认 `mv login-pack.db data/platform.db` 执行到了 |
+| 登录页没有 SSO 按钮 | `data/sso/secret.json` 没搬过来 | 回 3.3，`curl localhost:9680/sso/status` 看 `configured` |
 | 登录页没有钉钉按钮 | `corpId` 没填 | 去钉钉后台拿，见 8.1 |
 | SSO 登录报 state 校验失败 | 在笔记本上验的 | 必须在服务器上验，见第七节 |
+| SSO 跳到 `sso.sungrow.cn` 后报应用不存在/回调不合法 | 回调地址与登记值不符 | 核对 `secret.json` 的 `redirectUri` 逐字等于 `http://10.63.139.103:9680/sso/callback` |
+| SSO 登录后页面显示「联调模式（未登录）」 | 这是有意的 | 确认工号对得上后，把 `secret.json` 的 `debug` 改成 `false` 重启 |
 | 钉钉点了没反应 | 不在钉钉客户端里打开的 | 从钉钉工作台卡片进入，见 8.3 |
 | 每次启动都有 ExperimentalWarning | 正常的 | 忽略 |
 
@@ -513,23 +847,39 @@ node -e "require('./db').setRole('工号','pm'); console.log('已改')"
 
 ## 十、验收清单（打勾用）
 
+### 第一趟：能登录 + 能验 SSO（做这些就够）
+
 - [ ] 服务器 Node 版本 ≥ v22.5
 - [ ] 9680 端口空闲
-- [ ] 代码 clone 到 `dev/sgai` 且是最新提交
-- [ ] `data/` 数据已搬，账号数 = 373
-- [ ] **`platform.db-wal` / `platform.db-shm` 也一起搬了**（只拷 `.db` 会静默丢掉最近的账号写入，见迁移文档坑 1）
-- [ ] `data/sso/secret.json`、`data/dingtalk/secret.json`、`data/tb/secret.json` 三个都在
+- [ ] 代码 clone 到 `dev/sgai` 且是最新提交（`git log` 看到 `4d18aac`）
+- [ ] 本机 `VACUUM INTO` 快照生成成功，**账号数 373 / 审计 781**
+- [ ] `login-pack.tar.gz` 已 scp 到服务器并解包
+- [ ] `mv login-pack.db data/platform.db` 已执行，`data/platform.db-wal` / `-shm` **已删除**
+- [ ] 服务器上 `node -e "require('./db').listUsers().length"` = **373**
+- [ ] `data/sso/secret.json` 在，且三条 URL 都是 `https://sso.sungrow.cn/...`（**生产**，不是 sit）
 - [ ] **`curl http://localhost:9680/sso/status` 返回 `"configured":true`** —— 不检查这条就直接去点登录按钮，按钮压根不会出现
 - [ ] 前台启动一次，看到「服务已启动」，无报错
 - [ ] 服务器本机 `curl http://localhost:9680/login.html` 有返回
 - [ ] 笔记本浏览器能打开 `http://10.63.139.103:9680`
 - [ ] 防火墙放行 9680（如需）
-- [ ] 做成 systemd / nssm 常驻服务，开机自启
 - [ ] 用现有账号密码能登录进去
-- [ ] 首页数据与本机一致
-- [ ] SSO 真实登录走通（在服务器上验）
-- [ ] 钉钉免登走通（`corpId` 填好后）
+- [ ] **SSO 真实登录走通**（在服务器上验，见第七节）
+- [ ] `secret.json` 的 `debug` 已从 `true` 改回 `false`，重启后能真正登进平台
+
+### 第二趟：全量数据（大家准备切过去时再做）
+
+- [ ] 已通知相关人，本机服务已停
+- [ ] `pmwork-data.tar.gz` 已打包（20~40 MB）并传到服务器
+- [ ] 服务器上账号数仍 = 373，归档数与本机一致（本机当前 **3**）
+- [ ] 首页数据与本机一致，各 Tab 不空
+- [ ] `platform.db-wal` / `platform.db-shm` 是**与 `.db` 同一时刻**的一组（第二趟是三个一起拷的，不是 `VACUUM INTO` 单文件）
+
+### 收尾
+
+- [ ] 做成 systemd / nssm 常驻服务，开机自启
+- [ ] 钉钉免登走通（`corpId` 填好后，见第八节）
 - [ ] 备份定时任务已配
+- [ ] **本机停止写入**（否则两边数据分叉，见迁移文档第七节）
 
 ---
 

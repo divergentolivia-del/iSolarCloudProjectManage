@@ -1,4 +1,11 @@
 node_modules/
+
+# ⚠️ 服务器搬迁的数据包，在【项目根目录】生成，里面含 SSO/钉钉/TB 密钥 + 账号库。
+# 按 docs/ops-server-deploy.md 第三节操作时会产生这两个文件，
+# 谁顺手一个 `git add .` 就会把密钥推上 GitHub。
+login-pack.tar.gz
+pmwork-data.tar.gz
+
 data/iteration/state.json
 data/iteration/state.json.bak
 data/iteration/state.json.broken

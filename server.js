@@ -620,7 +620,7 @@ server.listen(PORT, () => {
   Object.keys(nets).forEach(k => (nets[k] || []).forEach(n => {
     if (n.family === 'IPv4' && !n.internal) ips.push(n.address);
   }));
-  console.log('人力产能工作台已启动');
+  console.log('阳光云项目管理工作台已启动');
   console.log('  本机访问：http://localhost:' + PORT);
   ips.forEach(ip => console.log('  同事访问：http://' + ip + ':' + PORT));
   console.log('  数据文件：' + STATE_FILE);

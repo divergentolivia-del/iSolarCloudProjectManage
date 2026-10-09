@@ -237,12 +237,15 @@ git log --oneline -3        # 确认拿到的是最新提交
 **`git log` 看到这三条就对上了**（新 → 旧）：
 
 ```
-4d18aac fix(sso): 补齐 /sso/logout 的分发与门禁白名单
-bef512e fix(sso): 切到生产环境 sso.sungrow.cn
-7f6546e feat(dingtalk): 钉钉身份打通 + 权限透传（免登）
+f8e7f24 docs(deploy): 按服务器实况修正 —— 补齐 Node 升级路径与 git 过旧的兜底
+edb3c38 docs(deploy): 补齐 SSH 登录/拉码/验收全流程 —— 登录数据可不停服搬
+4d18aac fix(sso): 补齐 /sso/logout 的分发与门禁白名单 —— 退出登录点了没反应
 ```
 
 看到的是别的提交 = 没拉到最新，回头检查分支和网络。
+
+> 这三条是**写文档时的样子**，你拉的时候多半已经更新了 ——
+> **关键不是逐字对上，而是确认第一行是个较新的提交、且分支是 `dev/sgai`**。
 
 > **`git clone` 末尾那个点是什么意思**：不加点会建出 `/opt/pmwork/iSolarCloudProjectManage/` 一层子目录，和本文档后面所有 `cd /opt/pmwork` 都对不上。加了点就是「克隆到当前目录」。
 >

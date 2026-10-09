@@ -1048,8 +1048,9 @@ journalctl -u pmwork -n 50      # 确认启动无报错
 
 ```bash
 # Linux：加进 crontab -e
+mkdir -p /Olivia/backup        # ★ 先建目录，tar 不会自己建
 0 2 * * * tar -czf /Olivia/backup/pmwork-$(date +\%Y\%m\%d).tar.gz /Olivia/pmwork/data
-find /backup -name 'pmwork-*.tar.gz' -mtime +30 -delete     # 保留 30 天
+find /Olivia/backup -name 'pmwork-*.tar.gz' -mtime +30 -delete     # 保留 30 天
 ```
 
 ⚠️ **备份 `platform.db` 时要连 `-wal` `-shm` 一起**，或者先停服再备。只备 `.db` 会缺最近的写入。

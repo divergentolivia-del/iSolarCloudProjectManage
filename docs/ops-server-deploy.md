@@ -63,12 +63,25 @@ ss -lntp | grep 9680         # 端口空不空（没输出 = 空着）
 **路线 A · glibc 2.17（老系统）**
 
 Node 官方专门为老系统构建了 `glibc-217` 版本 —— **代码和官方一致，只是换了个
-编译目标**，直接解压就能跑。
+编译目标**，直接解压就能跑。`x64-glibc-217` 这条线**覆盖 v18 / v20 / v22**，
+所以 Node 22 拿得到。
+
+**★ 第一步：确认这个版本号真的有包**（先做这步，别直接下）：
 
 ```bash
-# 挑一个 v22.x 版本号替换（22 整条线都 ≥ 22.5，满足要求）
-VER=v22.20.0
+VER=v22.23.3
+curl -sI "https://unofficial-builds.nodejs.org/download/release/${VER}/node-${VER}-linux-x64-glibc-217.tar.gz" | head -1
+```
 
+**必须看到 `HTTP/1.1 200 OK`。** 不是 200 就换个版本号重试：
+
+- `404` → 这个版本号没有 glibc-217 构建，去
+  `https://unofficial-builds.nodejs.org/download/release/` 换个带 `glibc-217` 字样的 v22.x
+- `403` / 超时 → 被公司网络策略拦了，找运维加白名单（域名 `unofficial-builds.nodejs.org`）
+
+确认 200 之后再下载解压：
+
+```bash
 mkdir -p /Olivia/node22 && cd /Olivia
 curl -LO "https://unofficial-builds.nodejs.org/download/release/${VER}/node-${VER}-linux-x64-glibc-217.tar.gz"
 tar -xzf "node-${VER}-linux-x64-glibc-217.tar.gz" -C /Olivia/node22 --strip-components=1
@@ -77,19 +90,16 @@ rm -f "node-${VER}-linux-x64-glibc-217.tar.gz"
 /Olivia/node22/bin/node -v      # 能打印版本号才算解压对了
 ```
 
-> **`unofficial-builds` 用 `-LO` 而不是 `-L`**：`-O` 是按远端文件名落地，
-> 后面 `tar` 那条直接引用文件名，省得自己起名起错。
-
-**★ 动手前先确认这个包真的存在**（一条命令，服务器能出网就一定测得出来）：
-
-```bash
-VER=v22.20.0
-curl -sI "https://unofficial-builds.nodejs.org/download/release/${VER}/node-${VER}-linux-x64-glibc-217.tar.gz" | head -1
-```
-
-**`HTTP/1.1 200 OK` 才能往下走。** 如果是 `403` / `404`，说明这个版本号没有
-glibc-217 构建 —— 去 `https://unofficial-builds.nodejs.org/download/release/`
-列一下目录，换个有 `glibc-217` 字样的 v22.x 版本号重试。
+> **`curl -LO` 里的 `-O`**：按远端文件名落地，后面 `tar` 那条直接引用文件名，不用自己起名。
+>
+> **懒得挑版本号的话**，官方那个脚本会自己检测 glibc 并选对构建：
+> ```bash
+> curl -fsSL https://unofficial-builds.nodejs.org/install-node.sh -o install-node.sh
+> cat install-node.sh        # ★ 先看一眼内容再执行，别盲跑网上的脚本
+> bash install-node.sh --line 22
+> ```
+> 它默认装到 `~/.local/node`，和我们约定的 `/Olivia/node22` 不一致 ——
+> 想统一路径的话还是走上面手动那几步。
 
 装上 PATH：
 

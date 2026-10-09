@@ -101,6 +101,73 @@ rm -f "node-${VER}-linux-x64-glibc-217.tar.gz"
 > 它默认装到 `~/.local/node`，和我们约定的 `/Olivia/node22` 不一致 ——
 > 想统一路径的话还是走上面手动那几步。
 
+#### ★ 如果服务器连不上 `unofficial-builds.nodejs.org`
+
+**2026-10-09 在 `eco-dev-micro4` 上实测遇到**：`curl` 探测**没有任何输出**、
+`-w "%{http_code}"` 也拿不到状态码、加 `--max-time` 后超时退出。
+这台机器能连 `github.com`（返回 200），但**连不上这个域名** ——
+公司网络按白名单放行，`unofficial-builds` 太冷门，不在名单里。
+
+> **一条命令区分「被拦」和「文件不存在」**（`-s` 会把错误信息也吞掉，所以必须显式打印状态码）：
+> ```bash
+> curl -s --max-time 20 -o /dev/null -w "%{http_code}\n" \
+>   https://unofficial-builds.nodejs.org/download/release/v22.23.3/node-v22.23.3-linux-x64-glibc-217.tar.gz; echo "退出码=$?"
+> ```
+> `000` + 退出码非 0 = **连不上**（不是 404）；退出码 `28` = 超时，同样是被拦。
+
+**这时候别在服务器上耗着，改从笔记本中转**（不依赖服务器外网）：
+
+**① 【服务器】先把目录建好** —— `scp` **不会**自动创建目录，
+目标目录不存在会直接报 `scp: /Olivia/: No such file or directory`：
+
+```bash
+mkdir -p /Olivia/pmwork /Olivia/node22
+ls -ld /Olivia /Olivia/pmwork /Olivia/node22     # 三条都打印出来才算建好
+```
+
+**② 【笔记本】下载** —— 用浏览器最省事：把网址粘进地址栏即可。
+
+> ⚠️ **PowerShell 里的 `curl` 不是真的 curl** —— 它被别名成了
+> `Invoke-WebRequest`，用 `-LO` 会报「找不到与参数名称"LO"匹配的参数」。
+> 要用真 curl 必须写全名 `curl.exe -LO "..."`，
+> 或者用 PowerShell 原生的 `Invoke-WebRequest -Uri "..." -OutFile "..."`。
+
+**③ 【笔记本】确认包没下错**（下成 HTML 错误页是最常见的坑）：
+
+```powershell
+cd $HOME\Downloads
+Get-Item .\node-v22.23.3-linux-x64-glibc-217.tar.gz | Select-Object Name, Length
+```
+
+`Length` 应为**四十几 MB**。只有几万字节 = 下到的是错误页，重下。
+
+**④ 【笔记本】传到服务器**：
+
+```powershell
+scp .\node-v22.23.3-linux-x64-glibc-217.tar.gz root@10.63.139.103:/Olivia/
+```
+
+**⑤ 【服务器】确认传到了** —— 大小要和笔记本上一致，不一致说明传断了：
+
+```bash
+ls -lh /Olivia/node-v22.23.3-linux-x64-glibc-217.tar.gz
+```
+
+**⑥ 【服务器】解压**（**替代前面那条 `curl -LO`**，其余不变）：
+
+```bash
+cd /Olivia
+tar -xzf node-v22.23.3-linux-x64-glibc-217.tar.gz -C /Olivia/node22 --strip-components=1
+rm -f node-v22.23.3-linux-x64-glibc-217.tar.gz
+
+/Olivia/node22/bin/node -v      # 能打印版本号才算成
+```
+
+后续的 PATH 设置与 `node:sqlite` 判定两条，**和上面完全一样**，接着做即可。
+
+> **另一条备选**：让运维把 `unofficial-builds.nodejs.org` 加进白名单，
+> 之后就能直接在服务器上下载。但走笔记本中转更快，不用等流程。
+
 装上 PATH：
 
 ```bash

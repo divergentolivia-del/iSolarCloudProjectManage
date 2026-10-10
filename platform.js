@@ -788,14 +788,9 @@ const Platform = (() => {
     // Bind 账号下拉（改密码 / 退出登录）
     bindUserMenu();
 
-    // Bind sidebar help link — show toast instead of navigating
-    const helpLink = document.getElementById('sidebarHelp');
-    if (helpLink) {
-      helpLink.addEventListener('click', (event) => {
-        event.preventDefault();
-        SharedUI.toast('帮助文档建设中', 'info');
-      });
-    }
+    // 侧栏「使用帮助」走正常路由跳转（#/help → HelpModule）。
+    // 2026-10-10 移除旧拦截：此处原有一段 preventDefault + 「帮助文档建设中」的
+    // 占位处理，help 模块接进来后它会把跳转整个吃掉，页面点不进去。
 
     // Close notification dropdown on outside click
     document.addEventListener('click', (e) => {

@@ -1,16 +1,22 @@
 /* modules/settings/index.js — 系统设置客户端模块
    渲染为仪表盘子页面 (#/dashboard/settings)。
-   提供：主题切换、外包人月单价、偏差告警阈值、数据路径显示、清除缓存、版本信息。
+   提供：主题切换、数据路径显示、清除缓存、版本信息。
 */
 
 // eslint-disable-next-line no-unused-vars
 const SettingsModule = (() => {
   'use strict';
 
+  /* 2026-10-10 去掉「外包人月单价」「偏差告警阈值」两项。
+     原因：两个输入框都只写 localStorage，没有任何地方读：
+       - outsource_rate      → 预算模块实际读的是 state.costConfig.outsourceRate
+                               （modules/budget/index.js:77，默认 30000）
+       - platform_alert_threshold → 偏差判定用的是写死的 DEVIATION_TOLERANCE
+                               （config.js:60 = 0.10），从不读这个键
+     留着能改但不生效，比没有更糟，故整项移除（含保存逻辑）。
+     要改单价/阈值：找平台管理员改数据文件或 config.js。 */
   const LS_KEYS = {
-    theme: 'platform_theme',
-    outsourceRate: 'outsource_rate',
-    alertThreshold: 'platform_alert_threshold'
+    theme: 'platform_theme'
   };
 
   /* ---------- 渲染 ---------- */
@@ -24,8 +30,6 @@ const SettingsModule = (() => {
 
     // 读取当前设置
     const currentTheme = getStoredValue(LS_KEYS.theme, 'light');
-    const outsourceRate = getStoredValue(LS_KEYS.outsourceRate, '30000');
-    const alertThreshold = getStoredValue(LS_KEYS.alertThreshold, '10');
     const isDark = currentTheme === 'dark';
     /* 用户管理只对管理员渲染。判断放在这里而不是用 CSS 藏 ——
        非管理员连这段 HTML 都不该拿到，免得界面上一堆「点了必然 403」的按钮。
@@ -95,20 +99,6 @@ const SettingsModule = (() => {
                 <span class="toggle-slider"></span>
               </label>
               <span class="toggle-label" id="themeLabel">${isDark ? '暗色' : '亮色(默认)'}</span>
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">外包人月单价 (元)</label>
-            <div class="form-control">
-              <input type="number" id="settingOutsourceRate" value="${SharedUI.esc(outsourceRate)}" min="0" step="1000" class="settings-input">
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">偏差告警阈值 (%)</label>
-            <div class="form-control">
-              <input type="number" id="settingAlertThreshold" value="${SharedUI.esc(alertThreshold)}" min="1" max="100" step="1" class="settings-input">
             </div>
           </div>
 
@@ -207,26 +197,6 @@ const SettingsModule = (() => {
       });
     }
 
-    // 外包人月单价
-    const rateInput = document.getElementById('settingOutsourceRate');
-    if (rateInput) {
-      rateInput.addEventListener('change', function () {
-        const val = Number(this.value) || 30000;
-        setStoredValue(LS_KEYS.outsourceRate, String(val));
-        SharedUI.toast('设置已保存', 'success');
-      });
-    }
-
-    // 偏差告警阈值
-    const thresholdInput = document.getElementById('settingAlertThreshold');
-    if (thresholdInput) {
-      thresholdInput.addEventListener('change', function () {
-        const val = Number(this.value) || 10;
-        setStoredValue(LS_KEYS.alertThreshold, String(val));
-        SharedUI.toast('设置已保存', 'success');
-      });
-    }
-
     // 清除缓存
     const clearBtn = document.getElementById('settingClearCache');
     if (clearBtn) {
@@ -234,7 +204,9 @@ const SettingsModule = (() => {
         try {
           const platformKeys = Object.values(LS_KEYS);
           // Also clear known platform keys
-          const allKeys = [...platformKeys, 'sidebar_collapsed', 'wb_who', 'workbench-user'];
+          const allKeys = [...platformKeys, 'sidebar_collapsed', 'wb_who', 'workbench-user',
+            // 已废弃的两个设置项对应的键，顺手清掉老用户 localStorage 里的残留
+            'outsource_rate', 'platform_alert_threshold'];
           allKeys.forEach(key => localStorage.removeItem(key));
           SharedUI.toast('本地缓存已清除', 'success');
         } catch (e) {

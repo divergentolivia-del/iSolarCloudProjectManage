@@ -179,24 +179,56 @@ git add -f "docs/samples/钉钉项目计划.xlsx"
 ### 连通性验证脚本：`dingtalk-ping.js`（2026-09-22 已就位）
 
 ```bash
-node dingtalk-ping.js                    # 默认读 A1:F20
-node dingtalk-ping.js --range A1:H50     # 指定区间
+node dingtalk-ping.js                    # Excel：默认读 A1:F20
+node dingtalk-ping.js --range A1:H50     # Excel：指定区间
 node dingtalk-ping.js --sheet 3          # 指定第几个 sheet（1 起）
+node dingtalk-ping.js --rows 30          # 智能表格(.able)：读前 30 条记录
 ```
 
 只读、无副作用，可反复跑。三跳分别报成功/失败，失败时打印原因提示。
 
-**2026-09-22 实测结果：**
+**2026-10-10 实测结果（最新）：**
 
 | 跳 | 状态 | 说明 |
 |---|---|---|
-| 0 凭据体检 | ⚠️ 部分 | `appKey` / `appSecret` 已填；**`operatorId` 与 `docUrl` 仍空** |
+| 0 凭据体检 | ✅ 通过 | `appKey` / `appSecret` / `operatorId` / `docUrl` **四项都已填** |
+| 1 换 token | ✅ 通过 | 出网正常，鉴权通过，token 有效期 7200 秒 |
+| 2 解析文档链接 | ✅ 通过 | `nodeId=Obva6QBXJwnzvj20UM5a6Z9vVn4qY5Pr`，名称「Agent平台智能体项目管理计划.able」，类型 `able` |
+| 3 读表格内容 | ❌ 缺权限点 | `Notable.Base.Read.All`（中文名「AI 表格应用读权限」） |
+
+**第 3 跳的处理**：钉钉在 403 响应体里直接给出了要开哪个权限和申请链接，照做即可：
+
+```
+https://open-dev.dingtalk.com/appscope/apply?content=ding7fftog1u6msq3x15%23Notable.Base.Read.All
+```
+
+开通路径：`open-dev.dingtalk.com` → 找 appKey 为 `ding7fftog1u6msq3x15` 的应用 →
+**权限管理** → 勾「AI 表格应用读权限」→ **版本管理与发布 → 发布新版本**（不发版不生效）。
+联系人：数字化运营（应用是他们建的）；若被归为「敏感权限」还需企业管理员审批。
+
+> ⚠️ **别把这个 403 和运维申请混为一谈**。两件独立的事：
+> - **出网白名单**（运维）：这台机器能不能连上 `api.dingtalk.com` → 管第 1 跳
+> - **应用权限点**（钉钉后台）：这个应用有没有读表格的权限 → 管第 3 跳
+>
+> 权限点在哪台机器上跑都一样会 403，**不必等运维申请**即可推进。
+
+**2026-09-22 实测结果（历史，已过期）：**
+
+| 跳 | 状态 | 说明 |
+|---|---|---|
+| 0 凭据体检 | ⚠️ 部分 | `appKey` / `appSecret` 已填；`operatorId` 与 `docUrl` 仍空 |
 | 1 换 token | ✅ 通过 | 出网正常，鉴权通过，token 有效期 7200 秒 |
 | 2 解析文档链接 | ⏸ 跳过 | 缺 `docUrl` |
 | 3 读表格区间 | ⏸ 跳过 | 缺 `nodeId` |
 
-结论：**出网与鉴权这一跳已经证明了**，剩下两跳纯粹卡在缺 `operatorId` / `docUrl` 两个值。
-补齐后重跑即可，不需要改代码。
+**2026-10-10 补记：原「补齐两个值即可、不用改代码」的结论是错的。** 值补齐后暴露了三层问题：
+① `operatorId` 填的值不属于本企业（60121）；② 目标文档是 `.able` 智能表格，
+原代码走的是 Excel 工作簿接口（`notWorkbook`）；③ `.gitignore` 漏了 `secret.json.*`。
+三处都已修（commit `af7b4e6`），完整排查过程见 `handoff.md` C 节「钉钉文档同步 2b 排查结论」。
+
+> ⚠️ **最容易误判的一步**：`/v1.0/contact/users/{id}` 的路径参数要的是 **unionId**，
+> 拿 userId 去查连真实员工也全 404 —— 很容易误读成「钉钉没有 userId→unionId 的反查接口」。
+> 真正能反查的是 `POST oapi.dingtalk.com/topapi/v2/user/get`（传 `userid`，响应带 `unionid`）。
 
 > 注：清单第二节第 5 项那条 `curl` 自测可以不做了——第 1 跳已经在真实接口上验过连通性。
 

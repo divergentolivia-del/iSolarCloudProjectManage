@@ -663,9 +663,12 @@ console.log(s.includes('_nonces: _nonces'));
 4. `data/pradapter/config.json` 的 `teams: []` 仍为空 —— 要填真实仓库→团队映射，
    偏差表的「佐证」列才有内容
 
-**已放下（不再追）**：钉钉文档同步的 `operatorId` 需要真 unionId，
-钉钉没有反查接口，扫了 15252 条档案无匹配。SSO 返回的工号直接匹配 `users.id`，
-这条线对平台要解决的问题没有额外价值。详见 `docs/plan-identity-and-dingtalk.md` B1。
+**~~已放下（不再追）~~ —— 2026-10-10 推翻，这条线重新激活**：原文写「`operatorId` 需要真 unionId，
+钉钉没有反查接口，扫了 15252 条档案无匹配」。**「钉钉没有反查接口」是错的**——`POST oapi.dingtalk.com/topapi/v2/user/get`
+就是反查接口（传 userId、回 unionid），只是当时拿 `/v1.0/contact/users/{id}` 去试，
+而那个路径参数要的是 unionId，所以真实员工也全 404，才得出「换不了」的结论。
+现已换到有效 unionId，文档同步前两跳打通，只剩一个权限点待开通（见 C 节「钉钉文档同步 2b 排查结论」）。
+SSO 返回的工号直接匹配 `users.id` 这一条仍然成立、仍然够用，不受影响。
 
 
 # 交接文档 v8 · 批5（分支收敛 + 团队名单落库 + 三条线进度盘点）
@@ -799,18 +802,62 @@ total     : 372
 |---|---|
 | **(a) 通讯录拉取** | ✅ **已完成**。`dingtalk-sync.js`/`dingtalk-roster.js` 跑通，产物全在（`org.json` 85 部门 + 372 人、`roster.csv`、`leavers.csv`、`report.txt`） |
 | **(a) 通讯录 → `users` 表对账（P1-3）** | ❌ **没写**。平台账号与钉钉通讯录是**两套并行数据，没连起来** |
-| **(b) 钉钉文档同步 2b** | ⏸ 卡在 `operatorId` / `docUrl` **两个空值**。`dingtalk-ping.js` 已就位，第 1 跳换 token **已实测通过**（出网+鉴权已证明），补齐后重跑即可，**不用改代码** |
-| **(c) 钉钉免登（扫码登录）** | ❌ 没开始（D7 定的顺序是先 P1 通讯录 → 再 P2 免登） |
-| **(d) `modules/dingtalk/` 无 `routes.js`** | ⚠️ **结构问题**。加载器扫描 `routes.js` 找不到就**静默跳过**（`module-loader.js:33`），所以钉钉**不是可访问模块**，`client.js` 只是被命令行脚本引用的库 —— **没有网页界面能看/操作通讯录** |
+| **(b) 钉钉文档同步 2b** | ⏸ **前两跳已通，卡在第 3 跳的权限点**（2026-10-10 更新）。原记录「卡在 `operatorId` / `docUrl` 两个空值」已过期——两个值都填了，但填的 `operatorId` 不属于本企业。查清三处根因后已修，详见下方「钉钉文档同步 2b 排查结论」 |
+| **(c) 钉钉免登（扫码登录）** | ✅ **代码已完成**（`modules/dingtalk/routes.js` 已就位，`/api/dingtalk/login` 走 `getUserInfoByCode` → `matchUser`）。原记录「没开始」已过期 |
+| **(d) `modules/dingtalk/routes.js`** | ✅ **已补齐**。`client.js` + `routes.js` 都在，端点 `/api/dingtalk/{status,login,logout,me}` 已在 `server.js` 注册。原记录「无 routes.js / 钉钉不是可访问模块」已过期 |
 
 **模块挂载现状（`routes.js` 有无）：**
 
 ```
-已挂载 12 个：auth budget csenergy dashboard inbox iteration
+已挂载 13 个：auth budget csenergy dashboard dingtalk inbox iteration
               notify plan pradapter project settings skill tb token
-未挂载  1 个：dingtalk（只有 client.js）
 特殊    1 个：sso（走 server.js:354 站点级路由，不走 module-loader）
 ```
+
+---
+
+### 钉钉文档同步 2b 排查结论（2026-10-10）
+
+三个根因串在一起，前一个掩盖后一个。**排查中差点误判**，记录在此免得重走：
+
+**① `operatorId` 的值不属于本企业**
+旧值 `2503957756` 报 `paramError-operatorId`（400）/ `60121 The user could not be found`。
+
+> ⚠️ **最容易踩的坑**：钉钉两个接口长得像，路径参数要的东西不是一回事——
+> | 接口 | 路径参数实际要什么 | 拿 userId 去查 |
+> |---|---|---|
+> | `/v1.0/contact/users/{id}` | **unionId** | 一律 404 |
+> | `/topapi/v2/user/get` | **userId** | 正常，且响应里带 unionid |
+>
+> 第一次拿 `/v1.0/contact/users/{userId}` 做对照，连 `org.json` 里三个真实员工也全 404，
+> 差点得出「userId 反查不了 unionId」的结论（旧 handoff 里那句「钉钉没有反查接口」就是这么来的，**是错的**）。
+
+改用 `topapi/v2/user/get` 后：真实 userId 全部返回 unionId，旧值仍 60121 → 确认是**值错**，不是接口不存在。
+已替换为实测能解析目标文档的 unionId（其余候选 403 `permissionDenied`，属正常文档权限差异，反证接口正确）。
+
+**② 目标文档是 `.able` 智能表格，走了 Excel 工作簿接口**
+`/v1.0/doc/workbooks/{id}/sheets` 报 `invalidRequest.resource.notWorkbook`。
+按 `node.extension` 分流：`.able` → `notable`（读记录），其余 → `workbooks`（读区间）。
+
+> 踩过：`extension` 返回**裸串 `"able"` 不带点**，正则写成 `/^\.able$/` 判定恒 false，
+> 于是又落回 workbooks 分支，症状与没改一模一样，看起来像「改了没用」。
+
+**③ `.gitignore` 漏了 `secret.json.*`**
+原规则只匹配 `secret.json` 本身，改 operatorId 时留的 `.bak`（同样含 appSecret）
+是未忽略状态，`git status` 里直接可见。已补规则。
+
+**当前状态**：前两跳通过，第 3 跳停在——
+
+```
+❌ 缺权限点：Notable.Base.Read.All   （中文名「AI 表格应用读权限」，旧称「智能表格读权限」）
+   申请链接：https://open-dev.dingtalk.com/appscope/apply?content=ding7fftog1u6msq3x15%23Notable.Base.Read.All
+```
+
+> **关键区分**：这个 403 与本机/服务器的出网无关。
+> 出网（运维白名单）和应用权限点（钉钉后台）是**两件独立的事**：
+> 前者管「这台机器能不能连上 api.dingtalk.com」，后者管「这个应用有没有读表格的权限」。
+> 应用权限点在哪台机器上跑都一样会 403 —— 所以**不必等运维申请**即可推进。
+> 开通后需**重新发布版本**才生效（最易漏的一步；应用 appKey = `ding7fftog1u6msq3x15`）。
 
 ---
 

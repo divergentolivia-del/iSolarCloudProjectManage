@@ -32,6 +32,12 @@ const arg = (name, dft) => {
 };
 const RANGE = arg('range', 'A1:F20');
 const SHEET_IDX = parseInt(arg('sheet', '1'), 10);
+/* 智能表格（.able）没有 A1:F20 这种区间概念，改用「读前 N 条记录」。
+   默认 20，与 RANGE 的 20 行大致对齐，方便肉眼比对。 */
+const ROW_LIMIT = parseInt(arg('rows', '20'), 10);
+/* 第 2 步 queryByUrl 返回的 node.extension（如 able / xlsx），
+   决定第 3 步走智能表格还是 Excel 工作簿接口。 */
+let nodeExt = '';
 
 /* 三跳的真实结果，供结尾小结判断。
    踩过两次：
@@ -189,9 +195,10 @@ function maskDeep(obj) {
       });
       if (r.status === 200 && r.json && r.json.node) {
         nodeId = r.json.node.nodeId || r.json.node.id;
+        nodeExt = r.json.node.extension || '';
         hop.node = true;
         console.log('  ' + ok('✅ 解析成功') + dim('  nodeId=' + nodeId));
-        console.log('  ' + dim('  名称：' + (r.json.node.name || '?')));
+        console.log('  ' + dim('  名称：' + (r.json.node.name || '?') + '  类型：' + (nodeExt || '?')));
       } else {
         console.log('  ' + bad('❌ HTTP ' + r.status) + dim('  （链接解析需要「知识库」类权限点）'));
         console.log('  ' + JSON.stringify(maskDeep(r.json) || r.text.slice(0, 300), null, 2).split('\n').join('\n  '));
@@ -206,9 +213,62 @@ function maskDeep(obj) {
   }
 
   /* ---- 3. 读文档内容 ---- */
-  step('3) 读取表格内容（区间 ' + RANGE + '）');
+  step('3) 读取表格内容（前 ' + ROW_LIMIT + ' 条记录）');
+  /* 目标文档是 .able（钉钉智能表格 / 多维表），不是 Excel 工作簿。
+     踩过：原先走 /v1.0/doc/workbooks/{id}/sheets，
+     报 invalidRequest.resource.notWorkbook（"not workbook"）。
+     按扩展名分流：
+       .able / .able2 → notable（智能表格），范围用 records 查询而非 A1:F20
+       其余            → doc/workbooks（真 Excel），范围用 A1:F20
+     notable 的关键参数是 baseId = nodeId，读记录还要先拿 sheetId。 */
+  /* extension 返回的是裸串（"able"），不带点 —— 别写成 /^\.able$/。
+     踩过：第一次写成带点的正则，判定恒为 false，于是又走回 workbooks
+     分支，报的还是 notWorkbook，看起来像「改了没用」。 */
+  const isSmartSheet = /^\.?able2?$/i.test(String(nodeExt || ''));
   if (!nodeId) {
     console.log('  ' + dim('  跳过：还没拿到 nodeId。'));
+  } else if (isSmartSheet) {
+    try {
+      const r = await req('GET', API + '/v1.0/notable/bases/' + nodeId + '/sheets?operatorId=' + (cfg.operatorId || ''), { token });
+      if (r.status === 200 && r.json && r.json.value) {
+        const sheets = r.json.value;
+        console.log('  ' + ok('✅ 拿到 ' + sheets.length + ' 个数据表'));
+        sheets.forEach((s, i) => console.log('  ' + dim('  [' + (i + 1) + '] ' + (s.name || s.id) + '  id=' + (s.id || '?'))));
+        const sh = sheets[Math.min(SHEET_IDX, sheets.length) - 1];
+        if (!sh) throw new Error('SHEET_IDX 超出范围');
+        const rr = await req('POST',
+          API + '/v1.0/notable/bases/' + nodeId + '/sheets/' + encodeURIComponent(sh.id || sh.name) + '/records/query',
+          { token, body: { operatorId: cfg.operatorId || undefined, maxResults: ROW_LIMIT } });
+        if (rr.status === 200 && rr.json) {
+          hop.sheet = true;
+          const recs = (rr.json.records || []);
+          console.log('  ' + ok('✅ 读到 ' + recs.length + ' 条记录（表：' + (sh.name || sh.id) + '）'));
+          console.log(dim('  列名：' + (rr.json.fields || []).map(f => f.name).join(' | ')));
+          recs.slice(0, ROW_LIMIT).forEach((rec, i) => {
+            const cells = Object.values(rec.fields || {}).map(v =>
+              typeof v === 'object' ? JSON.stringify(v) : String(v == null ? '' : v)
+            ).map(v => v.length > 24 ? v.slice(0, 24) + '…' : v);
+            console.log('  ' + dim('  ' + String(i + 1).padStart(2) + ' | ' + cells.join(' | ')));
+          });
+        } else {
+          console.log('  ' + bad('❌ 读记录 HTTP ' + rr.status));
+          console.log('  ' + JSON.stringify(maskDeep(rr.json) || rr.text.slice(0, 300), null, 2).split('\n').join('\n  '));
+        }
+      } else if (r.status === 403 && /Notable\.Base\.Read/i.test(r.text || '')) {
+        /* 路径与鉴权都对了，只差权限点。这类 403 的响应体里钉钉会直接给出
+           要开哪个权限、以及申请链接，照抄给用户即可，不用猜。 */
+        console.log('  ' + bad('❌ 缺权限点：Notable.Base.Read.All'));
+        console.log(dim('  路径已正确（不再是 notWorkbook），应用还没开通智能表格读取权限。'));
+        const m = String(r.text || '').match(/https:\/\/open-dev\.dingtalk\.com\/appscope\/apply\?content=[^"\\]+/);
+        console.log(dim('  去这里开通（后台 → 应用 → 权限管理，开完要重新发布版本）：'));
+        console.log('  ' + (m ? m[0] : 'https://open-dev.dingtalk.com/appscope/apply?content=' + cfg.appKey + '%23Notable.Base.Read.All'));
+      } else {
+        console.log('  ' + bad('❌ 读数据表列表 HTTP ' + r.status));
+        console.log('  ' + JSON.stringify(maskDeep(r.json) || r.text.slice(0, 300), null, 2).split('\n').join('\n  '));
+      }
+    } catch (e) {
+      console.log('  ' + bad('❌ 请求失败：' + (e && e.message)));
+    }
   } else {
     try {
       const r = await req('GET', API + '/v1.0/doc/workbooks/' + nodeId + '/sheets?operatorId=' + (cfg.operatorId || ''), { token });

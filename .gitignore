@@ -41,7 +41,10 @@ tb-secret.json
 data/skill/state.json
 data/skill/history/
 # 钉钉应用凭据（本机，绝不入库）
+# 2026-10-10 补 secret.json.* —— 原规则只匹配 secret.json 本身，
+# 改 operatorId 时留的 secret.json.bak 是【未忽略】状态，同样含 appSecret。
 data/dingtalk/secret.json
+data/dingtalk/secret.json.*
 data/dingtalk/state.json
 data/dingtalk/token.json
 

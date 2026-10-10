@@ -236,18 +236,37 @@ function maskDeep(obj) {
         sheets.forEach((s, i) => console.log('  ' + dim('  [' + (i + 1) + '] ' + (s.name || s.id) + '  id=' + (s.id || '?'))));
         const sh = sheets[Math.min(SHEET_IDX, sheets.length) - 1];
         if (!sh) throw new Error('SHEET_IDX 超出范围');
-        const rr = await req('POST',
-          API + '/v1.0/notable/bases/' + nodeId + '/sheets/' + encodeURIComponent(sh.id || sh.name) + '/records/query',
-          { token, body: { operatorId: cfg.operatorId || undefined, maxResults: ROW_LIMIT } });
+        /* 读记录是 GET /records，不是 POST /records/query。
+           踩过：按「查询」的直觉写成 POST /records/query（body 带 maxResults 或 operatorId
+           都试过），一律 404 InvalidAction.NotFound —— 钉钉这一族接口只有
+           GET /sheets、GET /fields、GET /records 三个，没有 query/search 变体。
+           判据：404 + InvalidAction.NotFound 是路径错，不是权限错（权限错是 403）。 */
+        const rr = await req('GET',
+          API + '/v1.0/notable/bases/' + nodeId + '/sheets/' + encodeURIComponent(sh.id || sh.name) +
+          '/records?operatorId=' + encodeURIComponent(cfg.operatorId || '') + '&maxResults=' + ROW_LIMIT,
+          { token });
         if (rr.status === 200 && rr.json) {
           hop.sheet = true;
           const recs = (rr.json.records || []);
           console.log('  ' + ok('✅ 读到 ' + recs.length + ' 条记录（表：' + (sh.name || sh.id) + '）'));
-          console.log(dim('  列名：' + (rr.json.fields || []).map(f => f.name).join(' | ')));
+          /* 列名不在 records 响应里，要单独调 GET /fields。
+             踩过：先前直接读 rr.json.fields（期望记录里带回字段定义），
+             结果打印出空行 —— 记录接口只回值，不回定义。 */
+          const fr = await req('GET',
+            API + '/v1.0/notable/bases/' + nodeId + '/sheets/' + encodeURIComponent(sh.id || sh.name) +
+            '/fields?operatorId=' + encodeURIComponent(cfg.operatorId || ''), { token });
+          const fdefs = (fr.json && fr.json.value) || [];
+          if (fdefs.length) {
+            console.log(dim('  列（' + fdefs.length + ' 列）：' + fdefs.map(f => f.name).join(' | ')));
+          }
+          // 按列定义顺序取值，避免 Object.values 的顺序随机错位
+          const names = fdefs.map(f => f.name);
           recs.slice(0, ROW_LIMIT).forEach((rec, i) => {
-            const cells = Object.values(rec.fields || {}).map(v =>
-              typeof v === 'object' ? JSON.stringify(v) : String(v == null ? '' : v)
-            ).map(v => v.length > 24 ? v.slice(0, 24) + '…' : v);
+            const f = rec.fields || {};
+            const cells = (names.length ? names : Object.keys(f)).map(k => {
+              const v = f[k];
+              return typeof v === 'object' && v !== null ? JSON.stringify(v) : String(v == null ? '' : v);
+            }).map(v => v.length > 22 ? v.slice(0, 22) + '…' : v);
             console.log('  ' + dim('  ' + String(i + 1).padStart(2) + ' | ' + cells.join(' | ')));
           });
         } else {
@@ -319,15 +338,17 @@ function maskDeep(obj) {
 
   /* 配置层还没补齐的，单独提示 —— 这是「没开始」，不是「跑挂了」 */
   const blocker = [];
-  if (missing(cfg.operatorId)) blocker.push('operatorId 未填（读文档需要「有权访问该文档的人」的 userId）');
+  if (missing(cfg.operatorId)) blocker.push('operatorId 未填（注意：要填 unionId，不是 userId；见 secret.json 的 _operatorId说明）');
   if (missing(cfg.docUrl) && missing(cfg.nodeId)) blocker.push('docUrl / nodeId 未填（还不知道要读哪份文档）');
   if (blocker.length) {
     console.log(bad('\n  还不能跑完整的「读一份文档」验证，卡在：'));
     blocker.forEach(b => console.log('   · ' + b));
+    console.log(dim('  下一步：按 docs/plan-dingtalk-checklist.md 补齐上面两项，再重跑本脚本。'));
   } else if (failed.length === 0) {
     console.log(ok('\n  三跳都跑完了 —— 读文档这条链路是通的。'));
+    console.log(dim('  可以开始写同步逻辑了。'));
   } else {
     console.log(bad('\n  配置齐全，但上面有跳没通过，先解决它再谈同步。'));
+    console.log(dim('  下一步：按 docs/plan-dingtalk-checklist.md 补齐上面两项，再重跑本脚本。'));
   }
-  console.log(dim('  下一步：按 docs/plan-dingtalk-checklist.md 补齐上面两项，再重跑本脚本。'));
 })();

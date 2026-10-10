@@ -187,30 +187,36 @@ node dingtalk-ping.js --rows 30          # 智能表格(.able)：读前 30 条�
 
 只读、无副作用，可反复跑。三跳分别报成功/失败，失败时打印原因提示。
 
-**2026-10-10 实测结果（最新）：**
+**2026-10-10 实测结果（最新，三跳全绿）：**
 
 | 跳 | 状态 | 说明 |
 |---|---|---|
 | 0 凭据体检 | ✅ 通过 | `appKey` / `appSecret` / `operatorId` / `docUrl` **四项都已填** |
 | 1 换 token | ✅ 通过 | 出网正常，鉴权通过，token 有效期 7200 秒 |
 | 2 解析文档链接 | ✅ 通过 | `nodeId=Obva6QBXJwnzvj20UM5a6Z9vVn4qY5Pr`，名称「Agent平台智能体项目管理计划.able」，类型 `able` |
-| 3 读表格内容 | ❌ 缺权限点 | `Notable.Base.Read.All`（中文名「AI 表格应用读权限」） |
+| 3 读表格内容 | ✅ 通过 | 13 张数据表；读「项目文档及交付件」返回 6 列（文档名称 / 链接地址 / 责任人 / 归档时间 / 评审人员 / Parent Record） |
 
-**第 3 跳的处理**：钉钉在 403 响应体里直接给出了要开哪个权限和申请链接，照做即可：
+**这一跳曾经卡住的权限点已经解决了**，留个记录备查：
 
 ```
-https://open-dev.dingtalk.com/appscope/apply?content=ding7fftog1u6msq3x15%23Notable.Base.Read.All
+❌ 缺权限点：Notable.Base.Read.All（中文名「AI 表格应用读权限」）
+   申请链接：https://open-dev.dingtalk.com/appscope/apply?content=ding7fftog1u6msq3x15%23Notable.Base.Read.All
 ```
 
-开通路径：`open-dev.dingtalk.com` → 找 appKey 为 `ding7fftog1u6msq3x15` 的应用 →
-**权限管理** → 勾「AI 表格应用读权限」→ **版本管理与发布 → 发布新版本**（不发版不生效）。
-联系人：数字化运营（应用是他们建的）；若被归为「敏感权限」还需企业管理员审批。
+用户已申请并审批通过（`open-dev.dingtalk.com` → appKey `ding7fftog1u6msq3x15` 的应用 →
+**权限管理** → 勾「AI 表格应用读权限」→ **版本管理与发布 → 发布新版本**，不发版不生效）。
 
 > ⚠️ **别把这个 403 和运维申请混为一谈**。两件独立的事：
 > - **出网白名单**（运维）：这台机器能不能连上 `api.dingtalk.com` → 管第 1 跳
 > - **应用权限点**（钉钉后台）：这个应用有没有读表格的权限 → 管第 3 跳
 >
 > 权限点在哪台机器上跑都一样会 403，**不必等运维申请**即可推进。
+
+**关于 `operatorId` 填谁**：填**你自己**的 unionId，一次填好不再改动。
+unionId 跟人走，不跟文档走——一个人在本企业只有一个 unionId，换文档不会变。
+只有当你对目标文档**没有**权限时才需要借别人的，而那个前提在真实使用里不成立
+（你要同步它，自然先给自己开好可编辑权限）。
+取法见下方备注；本次定稿值对应用户本人（陈丹萍，userId `533262526`）。
 
 **2026-09-22 实测结果（历史，已过期）：**
 

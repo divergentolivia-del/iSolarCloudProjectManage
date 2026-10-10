@@ -663,12 +663,13 @@ console.log(s.includes('_nonces: _nonces'));
 4. `data/pradapter/config.json` 的 `teams: []` 仍为空 —— 要填真实仓库→团队映射，
    偏差表的「佐证」列才有内容
 
-**~~已放下（不再追）~~ —— 2026-10-10 推翻，这条线重新激活**：原文写「`operatorId` 需要真 unionId，
+**~~已放下（不再追）~~ —— 2026-10-10 推翻，这条线重新激活，同日已全线打通**：原文写「`operatorId` 需要真 unionId，
 钉钉没有反查接口，扫了 15252 条档案无匹配」。**「钉钉没有反查接口」是错的**——`POST oapi.dingtalk.com/topapi/v2/user/get`
 就是反查接口（传 userId、回 unionid），只是当时拿 `/v1.0/contact/users/{id}` 去试，
 而那个路径参数要的是 unionId，所以真实员工也全 404，才得出「换不了」的结论。
-现已换到有效 unionId，文档同步前两跳打通，只剩一个权限点待开通（见 C 节「钉钉文档同步 2b 排查结论」）。
+现已换成用户本人（陈丹萍）的 unionId，**`Notable.Base.Read.All` 权限点已审批开通，三跳全绿，读文档链路确认可跑通**。
 SSO 返回的工号直接匹配 `users.id` 这一条仍然成立、仍然够用，不受影响。
+下一步是写同步逻辑本身（钉钉为源、只读），不再有权限侧阻塞。详见 C 节「钉钉文档同步 2b 排查结论」。
 
 
 # 交接文档 v8 · 批5（分支收敛 + 团队名单落库 + 三条线进度盘点）
@@ -802,7 +803,7 @@ total     : 372
 |---|---|
 | **(a) 通讯录拉取** | ✅ **已完成**。`dingtalk-sync.js`/`dingtalk-roster.js` 跑通，产物全在（`org.json` 85 部门 + 372 人、`roster.csv`、`leavers.csv`、`report.txt`） |
 | **(a) 通讯录 → `users` 表对账（P1-3）** | ❌ **没写**。平台账号与钉钉通讯录是**两套并行数据，没连起来** |
-| **(b) 钉钉文档同步 2b** | ⏸ **前两跳已通，卡在第 3 跳的权限点**（2026-10-10 更新）。原记录「卡在 `operatorId` / `docUrl` 两个空值」已过期——两个值都填了，但填的 `operatorId` 不属于本企业。查清三处根因后已修，详见下方「钉钉文档同步 2b 排查结论」 |
+| **(b) 钉钉文档同步 2b** | ✅ **读文档链路已打通**（2026-10-10 收口）。三跳全绿：换 token → 解析文档链接 → 读智能表格 13 张数据表。权限点 `Notable.Base.Read.All` 已审批开通，`operatorId` 已换回用户本人 unionId。**剩下的活是写同步逻辑本身**（钉钉为源、只读），详见下方「钉钉文档同步 2b 排查结论」 |
 | **(c) 钉钉免登（扫码登录）** | ✅ **代码已完成**（`modules/dingtalk/routes.js` 已就位，`/api/dingtalk/login` 走 `getUserInfoByCode` → `matchUser`）。原记录「没开始」已过期 |
 | **(d) `modules/dingtalk/routes.js`** | ✅ **已补齐**。`client.js` + `routes.js` 都在，端点 `/api/dingtalk/{status,login,logout,me}` 已在 `server.js` 注册。原记录「无 routes.js / 钉钉不是可访问模块」已过期 |
 
@@ -833,7 +834,13 @@ total     : 372
 > 差点得出「userId 反查不了 unionId」的结论（旧 handoff 里那句「钉钉没有反查接口」就是这么来的，**是错的**）。
 
 改用 `topapi/v2/user/get` 后：真实 userId 全部返回 unionId，旧值仍 60121 → 确认是**值错**，不是接口不存在。
-已替换为实测能解析目标文档的 unionId（其余候选 403 `permissionDenied`，属正常文档权限差异，反证接口正确）。
+调通过程中临时借用了目标文档创建者（袁文华）的 unionId 来证明「接口本身通不通」——
+这一步只用于排除权限变量，不是最终配置。**定稿值已换回用户本人（陈丹萍，userId 533262526）的 unionId**，
+因为她要同步这份文档，必然先给自己开好可编辑权限。
+
+> **别把这个值理解成「跟着文档变」的东西**：unionId 跟**人**走，一个人在本企业只有一个 unionId，
+> 换文档不会变。变的只是「填谁」——只有当你对目标文档没权限时才需要借别人的，
+> 而这个前提在真实使用里不成立（要同步它的人当然对它有权）。所以：**一次填好，不再改动**。
 
 **② 目标文档是 `.able` 智能表格，走了 Excel 工作簿接口**
 `/v1.0/doc/workbooks/{id}/sheets` 报 `invalidRequest.resource.notWorkbook`。
@@ -846,14 +853,24 @@ total     : 372
 原规则只匹配 `secret.json` 本身，改 operatorId 时留的 `.bak`（同样含 appSecret）
 是未忽略状态，`git status` 里直接可见。已补规则。
 
-**当前状态**：前两跳通过，第 3 跳停在——
+**当前状态：三跳全绿，读文档链路已确认可跑通（2026-10-10 收口）。**
+
+第 3 跳曾经停在权限点——
 
 ```
 ❌ 缺权限点：Notable.Base.Read.All   （中文名「AI 表格应用读权限」，旧称「智能表格读权限」）
    申请链接：https://open-dev.dingtalk.com/appscope/apply?content=ding7fftog1u6msq3x15%23Notable.Base.Read.All
 ```
 
-> **关键区分**：这个 403 与本机/服务器的出网无关。
+**用户已申请并通过审批**，重跑后：
+
+```
+✅ 拿到 13 个数据表
+✅ 读到 N 条记录（表：项目文档及交付件 / 项目总览 …）
+   列（6 列）：文档名称 | 链接地址 | 责任人 | 归档时间 | 评审人员 | Parent Record
+```
+
+> **关键区分（仍然成立）**：那个 403 与本机/服务器的出网无关。
 > 出网（运维白名单）和应用权限点（钉钉后台）是**两件独立的事**：
 > 前者管「这台机器能不能连上 api.dingtalk.com」，后者管「这个应用有没有读表格的权限」。
 > 应用权限点在哪台机器上跑都一样会 403 —— 所以**不必等运维申请**即可推进。

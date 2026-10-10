@@ -130,7 +130,10 @@ const HelpModule = (() => {
     name: '使用帮助',
     icon: '📖',
     order: 9,
-    sidebar: true,
+    /* sidebar: false —— 不再往侧栏上方导航区塞第二条入口。
+       侧栏左下角（.sidebar-footer）已有一条静态的「使用帮助」链接，
+       这里再注册一次会渲染成两条重名项。保留下方那条，与「系统设置」并排。 */
+    sidebar: false,
     init(el) { container = el; injectCss(); render(); },
     enter() { render(); },
     leave() {}

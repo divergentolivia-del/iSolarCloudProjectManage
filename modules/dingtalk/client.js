@@ -23,6 +23,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
+const { URL } = require('url');
 
 const SECRET_FILE = path.join(__dirname, '..', '..', 'data', 'dingtalk', 'secret.json');
 const API = 'https://api.dingtalk.com';
@@ -69,27 +71,54 @@ function isLoginConfigured() {
 
 /* ---------- 请求 ---------- */
 
-/** 带超时的请求。json 解析失败不算错（钉钉故障时会回 HTML 网关页）。 */
-async function req(method, url, opts) {
+/** 带超时的请求。json 解析失败不算错（钉钉故障时会回 HTML 网关页）。
+ *
+ * ⚠ 用 https.request 而不是全局 fetch —— fetch 是 Node 18 才有的。
+ *   踩过：服务器上 `which node` 指向 /soft/nodejs16/bin/node（v16.20.2），
+ *   钉钉全链路报「fetch is not defined」—— 连登录、通知、通讯录一起挂，
+ *   且错误发生在发请求【之前】，看不到任何网络层线索，极难定位。
+ *   服务本身不受影响（systemd 的 ExecStart 写死 /Olivia/node22/bin/node），
+ *   但任何人手动敲 `node xxx.js` 都会踩。
+ *   同类实现见 modules/tb/client.js —— 那边一直用的 https.request，所以没这问题。
+ */
+function req(method, url, opts) {
   const o = opts || {};
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), o.timeout || TIMEOUT_MS);
+  const payload = o.body ? JSON.stringify(o.body) : null;
   const headers = { 'Content-Type': 'application/json' };
   if (o.token) headers['x-acs-dingtalk-access-token'] = o.token;
-  try {
-    const res = await fetch(url, {
-      method,
-      headers,
-      body: o.body ? JSON.stringify(o.body) : undefined,
-      signal: ctl.signal
+  if (payload) headers['Content-Length'] = Buffer.byteLength(payload);
+
+  return new Promise((resolve, reject) => {
+    let full;
+    try {
+      full = new URL(url);
+    } catch (e) {
+      return reject(new Error('URL 构造失败: ' + e.message));
+    }
+    const r = https.request({
+      method: method,
+      hostname: full.hostname,
+      path: full.pathname + full.search,
+      headers: headers
+    }, (res) => {
+      let text = '';
+      res.setEncoding('utf8');
+      res.on('data', c => { text += c; });
+      res.on('end', () => {
+        let json = null;
+        try { json = JSON.parse(text); } catch (e) { /* 非 JSON（钉钉故障时会回 HTML 网关页） */ }
+        resolve({ status: res.statusCode, json: json, text: text });
+      });
     });
-    const text = await res.text();
-    let json = null;
-    try { json = JSON.parse(text); } catch (e) { /* 非 JSON */ }
-    return { status: res.status, json, text };
-  } finally {
-    clearTimeout(timer);
-  }
+    r.on('error', e => reject(e));
+    /* 超时用 destroy 而不是 abort —— 语义与原先的 AbortController 一致：
+       到点掐断并让 Promise 落到 reject。 */
+    r.setTimeout(o.timeout || TIMEOUT_MS, () => {
+      r.destroy(new Error('请求超时(' + (o.timeout || TIMEOUT_MS) + 'ms): ' + method + ' ' + full.pathname));
+    });
+    if (payload) r.write(payload);
+    r.end();
+  });
 }
 
 /* ---------- 遮蔽（日志里绝不出现明文密钥 / token）----------

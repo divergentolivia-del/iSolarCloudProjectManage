@@ -20,6 +20,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
+const { URL } = require('url');
 
 const SECRET_FILE = path.join(__dirname, 'data', 'dingtalk', 'secret.json');
 const API = 'https://api.dingtalk.com';
@@ -84,26 +86,52 @@ function readConfig() {
   };
 }
 
-/** 带超时的请求。钉钉接口的 token 走请求头，不放 query —— 这点与 TB 不同。 */
-async function req(method, url, { token, body } = {}) {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+/** 带超时的请求。钉钉接口的 token 走请求头，不放 query —— 这点与 TB 不同。
+ *
+ * ⚠ 用 https.request 而不是全局 fetch —— fetch 是 Node 18 才有的。
+ *   踩过：服务器上 `which node` 指向 /soft/nodejs16/bin/node（v16.20.2），
+ *   跑本脚本报「fetch is not defined」—— 请求根本没发出去，所以看不到
+ *   任何网络/权限层的线索，极易误判成「网络不通」或「没权限」。
+ *   本脚本常被拿来当排障第一步，报错信息又指向错误方向，危害更大。
+ *   同一个坑在 modules/dingtalk/client.js 里也有（登录/通知/通讯录共用），
+ *   两边已一并改成 https.request，写法对齐 modules/tb/client.js。
+ */
+function req(method, url, opts) {
+  const o = opts || {};
+  const payload = o.body ? JSON.stringify(o.body) : null;
   const headers = { 'Content-Type': 'application/json' };
-  if (token) headers['x-acs-dingtalk-access-token'] = token;
-  try {
-    const res = await fetch(url, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-      signal: ctl.signal
+  if (o.token) headers['x-acs-dingtalk-access-token'] = o.token;
+  if (payload) headers['Content-Length'] = Buffer.byteLength(payload);
+
+  return new Promise((resolve, reject) => {
+    let full;
+    try {
+      full = new URL(url);
+    } catch (e) {
+      return reject(new Error('URL 构造失败: ' + e.message));
+    }
+    const r = https.request({
+      method: method,
+      hostname: full.hostname,
+      path: full.pathname + full.search,
+      headers: headers
+    }, (res) => {
+      let text = '';
+      res.setEncoding('utf8');
+      res.on('data', c => { text += c; });
+      res.on('end', () => {
+        let json = null;
+        try { json = JSON.parse(text); } catch (e) { /* 非 JSON（比如网关 HTML 报错页） */ }
+        resolve({ status: res.statusCode, json: json, text: text });
+      });
     });
-    const text = await res.text();
-    let json = null;
-    try { json = JSON.parse(text); } catch (e) { /* 非 JSON（比如网关 HTML 报错页） */ }
-    return { status: res.status, json, text };
-  } finally {
-    clearTimeout(timer);
-  }
+    r.on('error', e => reject(e));
+    r.setTimeout(TIMEOUT_MS, () => {
+      r.destroy(new Error('请求超时(' + TIMEOUT_MS + 'ms): ' + method + ' ' + full.pathname));
+    });
+    if (payload) r.write(payload);
+    r.end();
+  });
 }
 
 /** 遮蔽敏感值：token 只留头尾，避免密钥进聊天/截图。
@@ -348,7 +376,14 @@ function maskDeep(obj) {
     console.log(ok('\n  三跳都跑完了 —— 读文档这条链路是通的。'));
     console.log(dim('  可以开始写同步逻辑了。'));
   } else {
+    /* ⚠ 这里【不能】再提「补齐上面两项」—— 配置已经齐了，缺的是别的。
+       踩过：旧版这个分支照抄了 blocker 分支的文案，在「四项都已填、某一跳报错」
+       时打印「补齐上面两项」，和同一屏的 ❌ 自相矛盾，会把人带偏去反复检查
+       配置（上次服务器那次 notWorkbook 就这么被误导过）。
+       配置齐了就该指向真实故障，指向上面那几行报错。 */
     console.log(bad('\n  配置齐全，但上面有跳没通过，先解决它再谈同步。'));
-    console.log(dim('  下一步：按 docs/plan-dingtalk-checklist.md 补齐上面两项，再重跑本脚本。'));
+    console.log(dim('  排查顺序：先看上面失败那一跳打印的原始响应体，再对照 secret.json 的 _operatorId说明。'));
+    console.log(dim('  若报错里出现 fetch is not defined → 不是网络也不是权限，是 node 版本太低（要 ≥18）。'));
+    console.log(dim('  自测：node -v 应为 v22.x；服务器上写全路径 /Olivia/node22/bin/node dingtalk-ping.js'));
   }
 })();

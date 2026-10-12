@@ -187,7 +187,7 @@ node dingtalk-ping.js --rows 30          # 智能表格(.able)：读前 30 条�
 
 只读、无副作用，可反复跑。三跳分别报成功/失败，失败时打印原因提示。
 
-**2026-10-10 实测结果（最新，三跳全绿）：**
+**2026-10-10 实测结果（本机，三跳全绿）：**
 
 | 跳 | 状态 | 说明 |
 |---|---|---|
@@ -195,6 +195,51 @@ node dingtalk-ping.js --rows 30          # 智能表格(.able)：读前 30 条�
 | 1 换 token | ✅ 通过 | 出网正常，鉴权通过，token 有效期 7200 秒 |
 | 2 解析文档链接 | ✅ 通过 | `nodeId=Obva6QBXJwnzvj20UM5a6Z9vVn4qY5Pr`，名称「Agent平台智能体项目管理计划.able」，类型 `able` |
 | 3 读表格内容 | ✅ 通过 | 13 张数据表；读「项目文档及交付件」返回 6 列（文档名称 / 链接地址 / 责任人 / 归档时间 / 评审人员 / Parent Record） |
+
+**2026-10-12 服务器实跑结果（踩到两个新坑，都已在 `5afea55` 修掉）：**
+
+| 跳 | 状态 | 说明 |
+|---|---|---|
+| 0 凭据体检 | ✅ 通过 | 服务器那份 `secret.json` 原为 `{appKey, appSecret, operatorId:"2503957756"}`，缺 `corpId` 与 `docUrl`，`operatorId` 还填成了 userId —— 已就地补齐（只补缺的键，不动它自己的 appSecret） |
+| 1 换 token | ❌ → ✅ | **`fetch is not defined`**。不是网络也不是权限 —— 请求根本没发出去。详见下方「Node 版本坑」 |
+| 2 解析文档链接 | ⏸ → ✅ | 第 1 跳挂了就被跳过 |
+| 3 读表格内容 | ❌ → ✅ | 服务器上的 `dingtalk-ping.js` 是旧版，没有 `.able` 分流，拿 Excel 工作簿接口去读智能表格，报 `notWorkbook` —— 看着像权限问题，其实是**代码没拉最新** |
+
+### ⚠️ Node 版本坑（2026-10-12，最费时间的一个）
+
+**症状：** `fetch is not defined`。极易误判成「内网不通」或「没开权限」。
+
+**判据：** 如果是网络问题，会先超时（`AbortError` / ETIMEDOUT）或 DNS 报错；
+如果是权限问题，服务端会回 403 并带权限点名。
+**`fetch is not defined` 是 JS 层的 `ReferenceError`，请求一个字节都没出去。**
+
+**根因链条：**
+
+```
+systemd 的 ExecStart 写死 /Olivia/node22/bin/node
+  → 平台服务本身跑在 v22，一切正常          ← 所以「服务能用」不能证明 shell 也能用
+shell 里 which node → /soft/nodejs16/bin/node（v16.20.2）
+  → 部署文档把 PATH 导出写进了 /etc/profile
+  → /etc/profile 只被【登录 shell】读取，非登录 shell 读不到
+  → 手动敲 `node xxx.js` 用的是 Node 16
+  → 全局 fetch 是 Node 18+ 才有的 → undefined
+  → 请求死在发出去之前
+```
+
+**影响范围比脚本大：** `modules/dingtalk/client.js` 也用全局 fetch，
+所以**钉钉登录 / 消息通知 / 通讯录同步在服务器 shell 下是同一个死法**。
+`modules/tb/client.js` 一直用的 `https.request`，所以从没踩过。
+
+**已做的修复（代码层，不动服务器全局配置）：**
+`modules/dingtalk/client.js` 与 `dingtalk-ping.js` 的 `req()` 都改成 `https.request`，
+写法对齐 `modules/tb/client.js`。外部签名与返回结构不变，三个调用方无需改动。
+
+**规矩：服务器上手动跑任何脚本，一律写全路径**
+```bash
+/Olivia/node22/bin/node dingtalk-ping.js
+```
+凡是看到 `node -v` 不是 v22.x，先别查业务，先换成绝对路径。
+（不去改 `/etc/profile` 或 `~/.bashrc` —— 不因为一个进程的版本问题去动别人的环境。）
 
 **这一跳曾经卡住的权限点已经解决了**，留个记录备查：
 

@@ -50,14 +50,6 @@
     color:var(--danger); background:#fef2f2; border-radius:7px;
   }
   .err:empty { display:none; }
-  .qr {
-    margin:14px auto 0; width:196px; padding:10px; background:#fff;
-    border:1px solid var(--line); border-radius:10px;
-  }
-  .qr svg { display:block; width:100%; height:auto; }
-  .hint { margin:10px 0 0; font-size:12px; color:var(--sub); text-align:center; line-height:1.7; }
-  .hint:empty { display:none; }
-  .hint .u { display:block; margin-top:4px; font-size:11px; color:#9ca3af; word-break:break-all; }
 </style>
 </head>
 <body>
@@ -80,31 +72,30 @@
     <button type="button" class="sso" id="ssoBtn">公司统一认证登录</button>
   </div>
 
-  <!-- 钉钉入口。同样「配好才显示」。与 SSO 的区别：
-       SSO 是浏览器跳转，钉钉免登必须在钉钉客户端内才能拿到 authCode。
-       所以这个块里的内容按 UA 二选一（见脚本里的分支）：
-         在钉钉里  → 按钮，且进页面就自动免登
-         普通浏览器 → 二维码，用手机钉钉扫 -->
-  <div id="ddBox" style="display:none">
-    <div class="divider">或用</div>
-    <div id="ddScan" style="display:none">
-      <div class="qr" id="qrBox"></div>
-    </div>
-    <div id="ddInApp" style="display:none">
-      <button type="button" class="sso" id="ddBtn" style="color:#1677ff;border-color:#1677ff">
-        钉钉一键登录
-      </button>
-    </div>
-    <div class="hint" id="ddTip"></div>
-  </div>
   <div class="err" id="err"></div>
 </form>
 
-<!-- 二维码生成器：本地一份，不走公网 CDN。
-     服务器在内网，引外部脚本 = 给登录页加一个会失败的外部依赖。
-     带 ?v= 便于将来改算法后让浏览器缓存失效（与 xlsx.full.min.js 同做法）。 -->
-<script src="vendor/qrcode.min.js?v=1.0.0"></script>
+<!--
+  钉钉登录入口已于 2026-10-13 移除。原委记在这里，避免以后有人再走一遍错路：
 
+  做过的两个版本：
+    ① 「钉钉一键登录」按钮 —— 点了必失败。浏览器（非钉钉容器）拿不到 authCode，
+       钉钉没有提供「网页里读本机钉钉客户端登录态」的接口。这是平台能力边界。
+    ② 换成二维码，把本页地址编成码 —— 也失败。码里是本平台的内网地址
+       （http://10.63.139.103:9680），而手机钉钉走的是蜂窝流量、连不到公司内网。
+       公司网络也不允许手机接入，所以「连上 WiFi 再扫」这条路也不成立。
+
+  ⚠ 判断上的教训（比技术细节更值得记）：
+     手机钉钉 = 移动网络，这是常识。做之前就该问一句「扫这个码的手机，
+     能访问到这个内网地址吗」。等做完、部署完再发现前提不成立，整轮返工。
+     凡是要跨设备/跨网络才成立的方案，先确认网络拓扑，再写代码。
+
+  真正能做到你截图那个效果（钉钉官方登录页、扫码或点头像授权）的是
+  钉钉 OAuth2 网页登录：二维码里编的是 login.dingtalk.com，手机只跟钉钉
+  服务器通信，最后由【电脑浏览器】带着 authCode 跳回来 —— 手机全程碰不到内网。
+  卡点不在代码，在开发者后台要给应用登记一个回调地址，而那需要后台权限。
+  等那条路谈通再实现，不要先写代码。
+-->
 <script>
 (function () {
   var f = document.getElementById('f');
@@ -165,198 +156,6 @@
           var next = new URLSearchParams(location.search).get('next') || '';
           location.href = '/sso/login' + (next ? '?next=' + encodeURIComponent(next) : '');
         });
-      })
-      .catch(function () { /* 忽略：不影响账号密码登录 */ });
-  })();
-
-  /* ---- 钉钉免登 ----
-     与 SSO 最大的区别：authCode 由【前端在钉钉客户端里】取得后 POST 给后端，
-     钉钉服务器从不访问平台 —— 所以纯内网 IP 也能用，不需要回调域名。
-
-     两种情况，按 UA 走两条不同的路（这是 2026-10-12 改的）：
-       ① 在钉钉客户端里打开 → 按钮 + 进页面即自动免登，用户不用点任何东西
-       ② 普通浏览器打开     → 二维码。手机钉钉扫一下，就在钉钉容器里重开本页，
-                             ① 随即触发。这样「扫一下就登进去了」，不用先手动
-                             去工作台找卡片。
-
-     ⚠ 为什么普通浏览器里【换成二维码而不是保留按钮】：
-       浏览器（非钉钉容器）拿不到 authCode —— 钉钉没有提供「网页里读本机钉钉登录态」
-       的接口，这是平台能力边界，不是没做。
-       于是那个按钮点了【必然失败】，只能弹一句「请在钉钉中打开」。
-       点了没反应/点了必报错的按钮比不给按钮更糟 —— 换成能真正走通的那条路。
-
-     这个入口整体是【增强】：任何一步失败都不能影响账号密码登录这条主路，
-     所以全程 catch，且失败只在用户主动点击时才报错（自动那次失败保持安静，
-     否则用户一进页面就看到红字，会以为平台坏了）。 */
-  (function () {
-    var box = document.getElementById('ddBox');
-    var btn = document.getElementById('ddBtn');
-    var inAppBox = document.getElementById('ddInApp');
-    var scanBox = document.getElementById('ddScan');
-    var qrBox = document.getElementById('qrBox');
-    var tip = document.getElementById('ddTip');
-    var errEl = document.getElementById('err');
-    var cfg = null;
-
-    /* 钉钉客户端的 webview UA 里带 DingTalk。
-       注意这也包含 PC 客户端与 Mac 客户端，都是我们想要的。 */
-    var inDingTalk = /DingTalk/i.test(navigator.userAgent);
-
-    var BTN_TEXT = '钉钉一键登录';
-    /* 浏览器分支的常驻说明。点按钮失败后要能恢复成它，所以存一份。 */
-    var SCAN_TIP = '用手机钉钉扫上面的码即可登录';
-    var hintText = SCAN_TIP;
-
-    function showErr(msg) { if (errEl) errEl.textContent = msg; }
-    function setTip(msg) { if (tip) tip.textContent = msg || ''; }
-
-    function nextPath() {
-      var n = new URLSearchParams(location.search).get('next') || '';
-      /* 只接受站内相对路径，与服务端 safeNext 同规则（双保险） */
-      return (n.charAt(0) === '/' && n.charAt(1) !== '/') ? n : '/';
-    }
-
-    /** 把 authCode 交给后端换会话 */
-    function submit(code) {
-      return fetch('/api/dingtalk/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin',
-        body: JSON.stringify({ authCode: code, next: nextPath() })
-      }).then(function (r) {
-        return r.json().then(function (d) { return { ok: r.ok, d: d }; });
-      }).then(function (r) {
-        if (!r.ok) throw new Error(r.d.error || '钉钉登录失败');
-        /* 免登成功：整页跳转（不是 fetch），让服务端种的 Cookie 生效后重新加载 */
-        location.href = (r.d && r.d.next) ? r.d.next : '/';
-      });
-    }
-
-    /** 载入钉钉 JSAPI。内网环境可能拿不到 CDN，所以必须有超时兜底。 */
-    function loadJsapi() {
-      return new Promise(function (resolve, reject) {
-        if (window.dd && window.dd.runtime) return resolve(window.dd);
-        var s = document.createElement('script');
-        s.src = 'https://g.alicdn.com/dingding/dingtalk-jsapi/3.0.25/dingtalk.open.js';
-        var done = false;
-        var timer = setTimeout(function () {
-          if (!done) { done = true; reject(new Error('钉钉 JSAPI 加载超时（内网可能无法访问 CDN）')); }
-        }, 8000);
-        s.onload = function () {
-          if (done) return;
-          done = true; clearTimeout(timer);
-          window.dd ? resolve(window.dd) : reject(new Error('钉钉 JSAPI 加载后未就绪'));
-        };
-        s.onerror = function () {
-          if (done) return;
-          done = true; clearTimeout(timer);
-          reject(new Error('钉钉 JSAPI 加载失败'));
-        };
-        document.head.appendChild(s);
-      });
-    }
-
-    /** 取 authCode → 交给后端。silent=true 时失败不显示错误（用于自动尝试）
-     *
-     * ⚠ 按钮的「登录中…」必须在这里【同步】就位，不能等 Promise 回来再设。
-     *   踩过：JSAPI 走公网 CDN，内网里加载要卡满 8 秒才 reject。
-     *   旧版是先设按钮后 loadJsapi，看起来没问题，但按钮是在 inDingTalk 判定
-     *   之后才设的 —— 普通浏览器点下去直接 return，按钮一个像素都不动，
-     *   用户的感受就是「点了没反应」。反馈必须无条件先给。 */
-    function login(silent) {
-      btn.disabled = true;
-      btn.textContent = '登录中…';
-      if (!silent) showErr('');
-      /* 慢的时候给一句解释，否则 8 秒空白用户会以为卡死 */
-      var slow = setTimeout(function () {
-        setTip('正在加载钉钉组件…（内网首次可能较慢）');
-      }, 4000);
-      var restore = function () {
-        clearTimeout(slow);
-        btn.disabled = false;
-        btn.textContent = BTN_TEXT;
-        setTip(hintText);
-      };
-
-      loadJsapi().then(function (dd) {
-        return new Promise(function (resolve, reject) {
-          dd.ready(function () {
-            dd.runtime.permission.requestAuthCode({
-              corpId: cfg.corpId,
-              onSuccess: function (res) { resolve(res.code); },
-              onFail: function (e) { reject(new Error('取授权码失败：' + (e && e.errorMessage || '未知原因'))); }
-            });
-          });
-          dd.error(function (e) {
-            reject(new Error('钉钉环境初始化失败：' + (e && e.errorMessage || '未知原因')));
-          });
-        });
-      }).then(submit).catch(function (e) {
-        restore();
-        /* 自动那次失败保持安静：只在用户主动点了按钮才提示。
-           但也不能【什么都不留】—— 那样用户看到的是一个静止的按钮，
-           不知道自动登录到底试没试过、该不该点。所以给一句中性引导，
-           不是红字报错（一进页面就飘红会让人以为平台坏了）。
-           用户真去点了，才把具体原因用红字摆出来。 */
-        if (!silent) showErr(e.message || '钉钉登录失败');
-        else setTip('未能自动登录，请点上方按钮重试');
-      });
-    }
-
-    /** 普通浏览器分支：把本页地址画成二维码，手机钉钉扫一下即在钉钉容器内重开。
-     *
-     * 地址取 location 而非写死 —— 部署地址/端口将来变了不用改代码。
-     * 带 location.search 是为了保住 next：从子页面被踢到登录页的，
-     * 扫码登录后还能回到原来要去的页面。 */
-    function renderQr() {
-      var url = location.origin + location.pathname + location.search;
-      try {
-        if (!window.QR || typeof window.QR.svg !== 'function') {
-          throw new Error('vendor/qrcode.min.js 未加载');
-        }
-        /* level L：内网短网址信息量很小，L 足够，且码点更少更好扫。
-           scale/margin 只影响 SVG 的清晰度，显示尺寸由 CSS 决定（矢量不糊）。 */
-        qrBox.innerHTML = window.QR.svg(url, { level: 'L', scale: 4, margin: 2 });
-      } catch (e) {
-        /* 生成器没加载出来时【不能】只留一句「扫上面的码」——上面根本没有码。
-           退化成把网址写出来，用户还能手动输。
-           ⚠ 这里用 innerHTML 不用 textContent：textContent 里的 \n 不换行，
-           而把两个独立元素写在两行上才能保证样式各归各的。 */
-        qrBox.style.display = 'none';
-        hintText = '二维码生成失败，请在手机钉钉里打开这个地址';
-        tip.innerHTML = '';
-        tip.appendChild(document.createTextNode(hintText));
-        var u = document.createElement('span');
-        u.className = 'u';
-        u.textContent = url;
-        tip.appendChild(u);
-        return;
-      }
-      qrBox.title = url;
-      setTip(hintText);
-    }
-
-    fetch('/api/dingtalk/status', { cache: 'no-store' })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        if (!d || !d.configured) return;    // 没配好就不摆按钮
-        cfg = d;
-        box.style.display = 'block';
-
-        if (inDingTalk) {
-          /* ---- 在钉钉客户端里 ---- */
-          inAppBox.style.display = 'block';
-          hintText = '';
-          setTip('');
-          btn.addEventListener('click', function () { login(false); });
-          /* 已经在钉钉里 → 直接自动登录，省掉一次点击。
-             这正是「打通」的体验收益：从工作台点进来就已经是登录态。 */
-          login(true);
-        } else {
-          /* ---- 普通浏览器里 ---- */
-          scanBox.style.display = 'block';
-          renderQr();
-        }
       })
       .catch(function () { /* 忽略：不影响账号密码登录 */ });
   })();

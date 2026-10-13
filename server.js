@@ -243,6 +243,17 @@ const AUTH_OPEN = [
   '/favicon.ico'
 ];
 
+/* 按【前缀】放行的路径。与上面的精确匹配分开维护 —— 精确匹配的清单短且
+   每一条都有具体理由，混进前缀规则会让「这条到底管到哪」变得难读。
+
+   为什么 /vendor/ 必须放行：登录页要画二维码，用的是 vendor/qrcode.min.js。
+   登录页本身在 AUTH_OPEN 里，它引的脚本却要登录后才能取 —— 门禁把脚本请求
+   302 到登录页，浏览器拿到一坨 HTML 当 JS 执行，二维码那块直接空白。
+   踩过：本地起服务验的时候 /vendor/qrcode.min.js?v=1.0.0 返回 302 才发现。
+
+   /vendor/ 下只有第三方静态库（xlsx / qrcode），不含任何业务数据，放行不扩大暴露面。 */
+const AUTH_OPEN_PREFIX = ['/vendor/'];
+
 /** 该路径属于哪个模块资源；单段路径（/api/plan）取第一段。
     先查内置路由，再查 module-loader 注册表（模块自声明）。 */
 function resourceOf(pathname) {
@@ -268,6 +279,11 @@ function gate(req, res, url) {
 
   const p = url.pathname;
   if (AUTH_OPEN.indexOf(p) >= 0) return false;
+  /* 前缀放行（/vendor/ 等）。只认目录边界，不用 startsWith 裸判 ——
+     否则将来多一个名字以 /vendor 开头的接口会被顺带放行。 */
+  for (const pre of AUTH_OPEN_PREFIX) {
+    if (p === pre.slice(0, -1) || p.startsWith(pre)) return false;
+  }
 
   const me = authMod.currentUser(req);
 

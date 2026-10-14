@@ -27,14 +27,40 @@ let initialAdmin = null;   // 首次建库时生成的默认管理员（含一�
 
 /* ---------- 建表 ---------- */
 
-/* 角色取值：admin（全权）/ pm（可改计划迭代资源）/ dev（只能动自己的任务）/ viewer（只读） */
+/* 角色取值（2026-10-14 收敛，用户拍板）：
+     admin  —— 全权，hasPermission() 直接放行，不进权限表
+     editor —— 可读写。能改哪些模块由【二级权限矩阵】逐模块授权
+     reader —— 仅可读。全模块只读，不可配置
+
+   ★ 为什么不保留旧的 admin/pm/dev/viewer：
+     pm / dev 是【职能】，viewer 是【访问级别】—— 两个维度揉在一列里，
+     界面上用户根本看不出「开发」和「只读」谁大谁小。
+     而且旧集合本身是错的：dev 零写权限，viewer 反而多一个 budget:read，
+     等于「开发」比「只读」看得还少。现在只留访问级别这一个维度，
+     职能信息归 department 字段（钉钉通讯录带入），不要去占用 role。 */
+const ROLES = {
+  ADMIN: 'admin',
+  EDITOR: 'editor',
+  READER: 'reader'
+};
+
+/** 可用角色清单。所有校验（建号、改角色、批量导入）都从这里取，不再各处硬编码数组。 */
+const ROLE_LIST = [ROLES.ADMIN, ROLES.EDITOR, ROLES.READER];
+
+/** 角色中文名。界面文案只有这一处来源，改名不用满仓库找。 */
+const ROLE_LABELS = {
+  [ROLES.ADMIN]: '管理员',
+  [ROLES.EDITOR]: '可读写',
+  [ROLES.READER]: '仅可读'
+};
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
   id            TEXT PRIMARY KEY,
   name          TEXT NOT NULL,
   dingtalk_id   TEXT,                      -- 钉钉 userId，将来扫码登录用
   password_hash TEXT,                      -- scrypt 加盐哈希；纯钉钉登录的用户可为空
-  role          TEXT NOT NULL DEFAULT 'viewer',
+  role          TEXT NOT NULL DEFAULT 'reader',
   department    TEXT,                      -- 部门（钉钉通讯录叶子部门名）。用于部门 admin 只读本部门、按部门筛选
   enabled       INTEGER NOT NULL DEFAULT 1,
   pwd_is_initial INTEGER NOT NULL DEFAULT 0, -- 1 = 还在用批量建号发的初始密码（前端提示可改，不强制）
@@ -84,9 +110,17 @@ CREATE TABLE IF NOT EXISTS meta (
 );
 `;
 
-/* 默认权限矩阵。admin 不在表里判定——见 hasPermission()，admin 一律放行。 */
+/* 默认权限矩阵。admin 不在表里判定——见 hasPermission()，admin 一律放行。
+
+   editor / reader 两档：
+     editor 是【基准集】，逐模块的写权限由管理员在「权限矩阵」里按需调整。
+     这里给的是「刚建号时的合理默认」，不是天花板。
+     reader 只给只读。
+
+   ★ 权限点用【逐条 INSERT OR IGNORE】播种，见下方 seedPermissions() ——
+     不要把这里改成按角色整体判断。 */
 const DEFAULT_PERMISSIONS = {
-  pm: [
+  editor: [
     'plan:read', 'plan:write', 'iteration:read', 'iteration:write',
     'project:read', 'project:write', 'csenergy:read', 'csenergy:write',
     'budget:read', 'token:read', 'dashboard:read', 'archive:read', 'archive:write',
@@ -96,20 +130,23 @@ const DEFAULT_PERMISSIONS = {
     'notify:read', 'notify:write',           // 钉钉主动推送：看配置/待发队列 + 改配置/手动发/补发
     'dingtalk:read', 'dingtalk:write',        // 钉钉身份打通：看绑定状态 + 触发绑定/解绑
     'ai:doc', 'ai:risk', 'ai:report'          // 可调用文档/风险/周报 Agent
-    // 刻意不含 'budget:write' 与 'ai:finance'：PM 不能改预算基准、不能调财务 Agent
+    // 刻意不含 'budget:write' 与 'ai:finance'：改预算基准、调财务 Agent 属管理员动作
   ],
-  dev: [
-    'plan:read', 'iteration:read', 'project:read', 'csenergy:read',
-    'dashboard:read', 'token:read', 'pradapter:read', 'skill:read', 'inbox:read',
-    'dingtalk:read'
-    // 无 write：研发改自己的任务状态走单独的 'task:write' 通道（后续用行级权限补齐）
-    // 也不含 notify:*：推送配置里是 groupChatId / agentId，能改就等于能让平台以公司名义往群里发消息
-  ],
-  viewer: [
+  reader: [
     'plan:read', 'iteration:read', 'project:read', 'csenergy:read',
     'budget:read', 'token:read', 'dashboard:read', 'pradapter:read', 'skill:read', 'inbox:read',
     'dingtalk:read'
   ]
+};
+
+/* 旧角色名 → 新角色名（2026-10-14 一次性迁移用）。
+   dev 落到 reader 而不是 editor：dev 在旧矩阵里【零写权限】，
+   直接给 editor 等于顺手放宽了写权限，那是提权不是改名。
+   需要写权限的人，改完角色后在权限矩阵里单独开。 */
+const ROLE_MIGRATION = {
+  pm: 'editor',
+  dev: 'reader',
+  viewer: 'reader'
 };
 
 /* ---------- 打开与初始化 ---------- */
@@ -127,6 +164,51 @@ function migrate() {
     get().exec('ALTER TABLE users ADD COLUMN department TEXT');
     console.log('[db] 已为 users 表补列 department（部门，用于部门 admin 与按部门筛选）');
   }
+  migrateRoles();
+}
+
+/* 角色模型 v2 迁移：admin/pm/dev/viewer → admin/editor/reader（2026-10-14 用户拍板）
+   「一把改透，不留映射层」——底层存的就是新名，界面上不再有「显示名 ↔ 存储名」的对应表。
+
+   为什么必须有版本标记：本函数每次启动都跑，没有标记的话
+   ① 每次都全表 UPDATE（373 行，白扫一遍）；
+   ② 更糟的是——管理员后来手动把某人从 editor 调回 reader，
+      下次重启又被「迁移」覆盖一遍，且不报错。用 meta 打标记，跑一次就封存。
+
+   顺带清掉旧的权限行：不清的话 permissions 表里会长期留着 pm/dev/viewer 三条僵尸角色，
+   下次有人翻表会以为还有三个角色。新角色的行由 seedPermissions() 补齐。 */
+function migrateRoles() {
+  if (getMeta('role_model')) return;
+
+  const counts = {};
+  Object.keys(ROLE_MIGRATION).forEach(oldRole => {
+    const n = get().prepare('SELECT COUNT(*) AS n FROM users WHERE role = ?').get(oldRole).n;
+    if (n) {
+      counts[oldRole + '→' + ROLE_MIGRATION[oldRole]] = n;
+      get().prepare('UPDATE users SET role = ? WHERE role = ?').run(ROLE_MIGRATION[oldRole], oldRole);
+    }
+  });
+
+  /* 清权限表的旧角色行。注意要在 UPDATE users 之后跑，
+     否则「先删权限、后改用户」中间若失败，会出现有角色无权限的空窗。 */
+  ['pm', 'dev', 'viewer'].forEach(r => {
+    get().prepare('DELETE FROM permissions WHERE role = ?').run(r);
+  });
+
+  /* 没被规则覆盖的角色值原样留着并告警：宁可见到一条刺眼的日志，
+     也不猜。「不认识的角色就当只读吧」这种兜底会让权限悄悄降级而无人察觉。 */
+  const unknown = get().prepare(
+    "SELECT role, COUNT(*) AS n FROM users WHERE role NOT IN (?,?,?) GROUP BY role"
+  ).all(ROLES.ADMIN, ROLES.EDITOR, ROLES.READER);
+  unknown.forEach(u => {
+    console.warn('[db] ⚠ 未识别的角色值「' + u.role + '」共 ' + u.n +
+      ' 个账号，已原样保留。请用 user-cli.js role <账号> <角色> 逐个确认。');
+  });
+
+  setMeta('role_model', 'v2');
+  const moved = Object.keys(counts).map(k => k + ' ' + counts[k] + ' 个').join('，');
+  console.log('[db] 角色模型已迁移到 v2：' + (moved || '无需迁移') +
+    '。新角色：' + ROLE_LIST.join(' / '));
 }
 
 function open() {
@@ -235,11 +317,15 @@ function findUserByDingtalkId(dingtalkId) {
 function createUser({ id, name, password, role, dingtalkId, initialPassword, department }) {
   if (!id || !name) throw new Error('账号和姓名不能为空');
   if (findUser(id)) throw new Error('账号已存在：' + id);
+  /* 角色兜底走 reader（最小权限）。不再兜到 admin/pm 之类的宽角色——
+     调用方漏传角色时，宁可给只读，也不要静默给写权限。 */
+  const r = role ? String(role) : ROLES.READER;
+  if (ROLE_LIST.indexOf(r) < 0) throw new Error('角色非法：' + r + '（可选 ' + ROLE_LIST.join(' / ') + '）');
   const now = new Date().toISOString();
   get().prepare(
     'INSERT INTO users(id, name, password_hash, role, department, dingtalk_id, enabled, pwd_is_initial, created_at, updated_at) VALUES(?,?,?,?,?,?,1,?,?,?)'
   ).run(String(id), String(name), password ? hashPassword(password) : null,
-        String(role || 'viewer'), department ? String(department) : null,
+        r, department ? String(department) : null,
         dingtalkId || null, initialPassword ? 1 : 0, now, now);
   return findUser(id);
 }
@@ -328,6 +414,17 @@ function listPermissions(role) {
     .map(r => r.resource);
 }
 
+/**
+ * 取某角色的完整权限表（含 allowed 状态）。
+ * listPermissions() 只回资源名、丢掉了 allowed，渲染权限矩阵时读不出「这一项到底开没开」，
+ * 所以矩阵要的是这个而不是它。两者用途不同，都留着。
+ * @returns {Array<{resource:string, allowed:number}>}
+ */
+function getPermissions(role) {
+  return get().prepare('SELECT resource, allowed FROM permissions WHERE role = ?')
+    .all(String(role));
+}
+
 function setPermission(role, resource, allowed) {
   get().prepare(
     'INSERT INTO permissions(role, resource, allowed) VALUES(?,?,?) ON CONFLICT(role, resource) DO UPDATE SET allowed = excluded.allowed'
@@ -400,11 +497,13 @@ function useMemory() {
 
 module.exports = {
   open, get, useMemory, DB_FILE,
+  ROLES, ROLE_LIST, ROLE_LABELS,
   hashPassword, verifyPassword,
   findUser, listUsers, findUserByDingtalkId, createUser, setPassword, setRole, setDingtalkId, takeInitialAdmin,
   createSession, sessionUser, destroySession, purgeExpiredSessions,
-  hasPermission, listPermissions, setPermission,
+  hasPermission, listPermissions, getPermissions, setPermission,
   logAudit, getAudit, auditCount,
   setMeta, getMeta,
+  migrateRoles,
   DEFAULT_PERMISSIONS
 };

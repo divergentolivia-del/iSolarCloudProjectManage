@@ -29,23 +29,30 @@ function fresh() {
 
 test('建表与默认权限种子', () => {
   fresh();
-  const pm = db.listPermissions('pm');
-  assert.ok(pm.includes('plan:write'), 'pm 应能写计划');
-  assert.ok(!pm.includes('budget:write'), 'pm 不应能改预算基准');
-  assert.ok(pm.includes('ai:doc'), 'pm 应能调文档 Agent');
+  const editor = db.listPermissions('editor');
+  assert.ok(editor.includes('plan:write'), 'editor 应能写计划');
+  assert.ok(!editor.includes('budget:write'), 'editor 不应能改预算基准');
+  assert.ok(editor.includes('ai:doc'), 'editor 应能调文档 Agent');
+  assert.ok(!editor.includes('ai:finance'), 'editor 不应能调财务 Agent');
 
-  const dev = db.listPermissions('dev');
-  assert.ok(dev.includes('plan:read'), 'dev 应能读计划');
-  assert.ok(!dev.includes('plan:write'), 'dev 不应能直接写计划');
+  const reader = db.listPermissions('reader');
+  assert.ok(reader.includes('plan:read'), 'reader 应能读计划');
+  assert.ok(!reader.includes('plan:write'), 'reader 不应能写计划');
+  assert.ok(!reader.includes('iteration:write'), 'reader 不应能写迭代');
 
   /* admin 不在权限表里，靠 hasPermission 特判 */
   assert.strictEqual(db.listPermissions('admin').length, 0);
+
+  /* 旧角色名不该再有默认权限行 —— 留着会让权限矩阵凭空多出两列 */
+  ['pm', 'dev', 'viewer'].forEach(r => {
+    assert.strictEqual(db.listPermissions(r).length, 0, '旧角色 ' + r + ' 不应再有权限行');
+  });
 });
 
 test('用户 CRUD 与密码哈希', () => {
   fresh();
-  const u = db.createUser({ id: 'zhang', name: '张三', password: 'pw123456', role: 'pm' });
-  assert.strictEqual(u.role, 'pm');
+  const u = db.createUser({ id: 'zhang', name: '张三', password: 'pw123456', role: 'editor' });
+  assert.strictEqual(u.role, 'editor');
   assert.ok(u.password_hash.startsWith('scrypt$'), '应为加盐 scrypt 格式');
   assert.ok(!u.password_hash.includes('pw123456'), '明文绝不能出现在库里');
 
@@ -60,9 +67,14 @@ test('用户 CRUD 与密码哈希', () => {
   assert.strictEqual(db.verifyPassword('newpw888', db.findUser('zhang').password_hash), true);
   assert.strictEqual(db.verifyPassword('pw123456', db.findUser('zhang').password_hash), false);
 
-  db.setRole('zhang', 'dev');
-  assert.strictEqual(db.findUser('zhang').role, 'dev');
+  db.setRole('zhang', 'reader');
+  assert.strictEqual(db.findUser('zhang').role, 'reader');
   assert.strictEqual(db.listUsers().length, 2, 'admin + zhang');
+
+  /* 角色兜底为 reader，且非法角色直接拒绝 —— 静默写个拼错的值会让那人处处 403 */
+  assert.strictEqual(db.createUser({ id: 'nobody', name: '无角色' }).role, 'reader');
+  assert.throws(() => db.createUser({ id: 'typo', name: '拼错', role: 'editro' }), /角色非法/);
+  assert.throws(() => db.createUser({ id: 'old', name: '旧值', role: 'viewer' }), /角色非法/);
 });
 
 test('会话签发 / 校验 / 注销 / 过期', () => {
@@ -101,18 +113,71 @@ test('权限判定：admin 放行，其余默认拒绝', () => {
   assert.strictEqual(db.hasPermission('admin', 'plan:write'), true);
   assert.strictEqual(db.hasPermission('admin', '随便什么资源'), true);
 
-  assert.strictEqual(db.hasPermission('pm', 'plan:write'), true);
-  assert.strictEqual(db.hasPermission('pm', 'budget:write'), false);
-  assert.strictEqual(db.hasPermission('dev', 'plan:write'), false);
-  assert.strictEqual(db.hasPermission('viewer', 'plan:write'), false);
+  assert.strictEqual(db.hasPermission('editor', 'plan:write'), true);
+  assert.strictEqual(db.hasPermission('editor', 'budget:write'), false);
+  assert.strictEqual(db.hasPermission('reader', 'plan:write'), false);
   assert.strictEqual(db.hasPermission('不存在的角色', 'plan:read'), false);
   assert.strictEqual(db.hasPermission(null, 'plan:read'), false);
 
   /* 改一条权限后立即生效 */
-  db.setPermission('dev', 'plan:write', true);
-  assert.strictEqual(db.hasPermission('dev', 'plan:write'), true);
-  db.setPermission('dev', 'plan:write', false);
-  assert.strictEqual(db.hasPermission('dev', 'plan:write'), false);
+  db.setPermission('reader', 'plan:write', true);
+  assert.strictEqual(db.hasPermission('reader', 'plan:write'), true);
+  db.setPermission('reader', 'plan:write', false);
+  assert.strictEqual(db.hasPermission('reader', 'plan:write'), false);
+});
+
+test('权限矩阵读得出 allowed 状态', () => {
+  fresh();
+  /* listPermissions 只回资源名；矩阵要的是 resource + allowed */
+  const rows = db.getPermissions('editor');
+  assert.ok(rows.length > 0);
+  assert.ok(rows.every(r => typeof r.resource === 'string' && (r.allowed === 0 || r.allowed === 1)));
+  assert.strictEqual(rows.find(r => r.resource === 'plan:read').allowed, 1);
+  assert.strictEqual(rows.find(r => r.resource === 'plan:write').allowed, 1);
+
+  /* 关掉一条后，getPermissions 应读出 0，而 listPermissions 仍会把它列出来
+     （它不筛 allowed，是「这个角色定义过哪些权限点」的口径，不是「现在开着哪些」） */
+  db.setPermission('editor', 'plan:write', false);
+  assert.strictEqual(db.getPermissions('editor').find(r => r.resource === 'plan:write').allowed, 0);
+  assert.strictEqual(db.hasPermission('editor', 'plan:write'), false);
+  assert.ok(db.listPermissions('editor').includes('plan:write'));
+});
+
+test('角色模型迁移 v2：旧角色值改写 + 权限行清理 + 幂等', () => {
+  fresh();
+  /* 造出四种旧角色，外加一个不认识的，看迁移认不认它 */
+  db.get().prepare('DELETE FROM users').run();
+  const now = new Date().toISOString();
+  const ins = db.get().prepare(
+    'INSERT INTO users(id, name, role, enabled, created_at, updated_at) VALUES(?,?,?,1,?,?)');
+  ins.run('a1', '甲', 'admin', now, now);
+  ins.run('p1', '乙', 'pm', now, now);
+  ins.run('d1', '丙', 'dev', now, now);
+  ins.run('v1', '丁', 'viewer', now, now);
+  ins.run('x1', '戊', 'weird-role', now, now);
+
+  /* 清掉版本标记并重跑迁移，模拟「升级到新版后第一次启动」 */
+  db.setMeta('role_model', '');
+  db.open();
+  db.migrateRoles();
+
+  assert.strictEqual(db.findUser('a1').role, 'admin', 'admin 不动');
+  assert.strictEqual(db.findUser('p1').role, 'editor', 'pm → editor');
+  assert.strictEqual(db.findUser('d1').role, 'reader', 'dev → reader（旧矩阵里 dev 零写权限，不能提权给 editor）');
+  assert.strictEqual(db.findUser('v1').role, 'reader', 'viewer → reader');
+  assert.strictEqual(db.findUser('x1').role, 'weird-role', '不认识的角值原样保留，不猜');
+
+  /* 旧角色的权限行应被清干净 */
+  ['pm', 'dev', 'viewer'].forEach(r => {
+    assert.strictEqual(
+      db.get().prepare('SELECT COUNT(*) AS n FROM permissions WHERE role = ?').get(r).n, 0,
+      '旧角色 ' + r + ' 的权限行应被清掉');
+  });
+
+  /* 幂等：再跑一次，人工改过的角色不能被冲掉 */
+  db.setRole('v1', 'editor');
+  db.migrateRoles();
+  assert.strictEqual(db.findUser('v1').role, 'editor', '迁移必须只跑一次，否则会覆盖管理员的手工调整');
 });
 
 test('审计：追加写不截断，可按人/模块过滤', () => {

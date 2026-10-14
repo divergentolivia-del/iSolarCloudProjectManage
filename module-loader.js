@@ -18,6 +18,16 @@ const path = require('path');
 
 const MODULES_DIR = path.join(__dirname, 'modules');
 
+/* 非模块内置路由的权限资源名（由 server.js 直接处理，不走 module-loader）。
+   ★ 放在这里而不是 server.js：权限矩阵要枚举「全部可授权资源」，
+     它只能从模块注册表 + 这张表汇总。如果表留在 server.js，
+     auth 模块要么 require server.js（循环依赖），要么自己抄一份 ——
+     抄一份就是第二处真值，迟早和门禁对不上。 */
+const BUILTIN_RESOURCE = {
+  '/api/platform': 'platform',
+  '/api/archive': 'archive'
+};
+
 // 已注册模块列表（按 prefix 长度降序排列）
 let registered = [];
 
@@ -151,4 +161,30 @@ function resourceOf(pathname) {
   return '';
 }
 
-module.exports = { loadAll, dispatch, list, resourceOf };
+/**
+ * listResources() — 全部可授权资源名（去重后的清单）。
+ *
+ * 用途：权限矩阵要枚举「有哪些模块可以被授权」。这里不维护第二份模块表 ——
+ * 资源名从【模块自声明的 resource】+【BUILTIN_RESOURCE】汇总，与门禁
+ * resourceOf() 用的是同一批数据，界面能配出来的项，门禁必然认得。
+ *
+ * 返回 [{ resource, id, prefix, builtin }]，按 id 排序（展示顺序稳定，
+ * 免得每次刷新矩阵各行的位置都在跳）。auth / settings / sso 这类
+ * 不走资源门禁的模块也会出现在清单里 —— 它们的权限由模块内部判定，
+ * 配了不生效。保留是刻意的：宁可多列出来看着明确，也不要留一个
+ * 「界面上找不到、其实有这行权限」的暗角。
+ */
+function listResources() {
+  const out = registered.map(m => ({
+    resource: m.resource, id: m.id, prefix: m.prefix, builtin: false
+  }));
+  Object.keys(BUILTIN_RESOURCE).forEach(prefix => {
+    const resource = BUILTIN_RESOURCE[prefix];
+    /* 模块 prefix 与内置路由前缀理论上不会重名，真重了以模块为准（去重） */
+    if (out.some(o => o.resource === resource)) return;
+    out.push({ resource, id: resource, prefix, builtin: true });
+  });
+  return out.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+}
+
+module.exports = { loadAll, dispatch, list, listResources, resourceOf, BUILTIN_RESOURCE };

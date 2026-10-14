@@ -82,7 +82,10 @@ docs/samples/部门归属核对表.csv
 data/platform.db
 data/platform.db-wal
 data/platform.db-shm
-data/platform.db.bak
+# 备份。★ 必须带 * —— 手工备份是按「platform.db.bak-YYYYMMDD-HHMMSS」命名的，
+# 旧写法 data/platform.db.bak 是精确匹配，只能挡住不带时间戳的那一个，
+# 带时间戳的会大摇大摆出现在 git status 里（里面有全部密码哈希和审计）。
+data/platform.db.bak*
 
 # 备份目录（含密码哈希与审计，不入 git）
 backups/

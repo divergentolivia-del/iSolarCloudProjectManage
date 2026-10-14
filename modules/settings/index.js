@@ -143,7 +143,76 @@ const SettingsModule = (() => {
             <p style="color:#6b7280">加载中...</p>
           </div>
         </div>
-        ` : ''}
+
+        <!-- 新建用户：默认收起，点标题展开。接口本来就存在
+             （POST /api/auth/users），373 个号当初是批量导入建的，
+             一直没有界面 —— 于是「外包同事（无工号）怎么建号」没地方落。
+             密码由服务端按 data/auth-config.json 的规则算出来，只回显这一次。 -->
+        <h2 class="page-title" style="margin-top:32px">新建用户</h2>
+        <div class="settings-section">
+          <div class="form-group">
+            <label class="form-label">类型</label>
+            <div class="form-control">
+              <label style="margin-right:16px;font-weight:400">
+                <input type="radio" name="nuKind" value="internal" checked> 内部同事
+              </label>
+              <label style="font-weight:400">
+                <input type="radio" name="nuKind" value="outsourced"> 外包同事
+              </label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">账号</label>
+            <div class="form-control">
+              <input type="text" id="nuId" class="settings-input" placeholder="内部填工号，外包填姓名拼音" style="text-align:left">
+              <span id="nuIdHint" style="font-size:12px;color:#6b7280;margin-left:8px"></span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">姓名</label>
+            <div class="form-control">
+              <input type="text" id="nuName" class="settings-input" placeholder="真实姓名" style="text-align:left">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">姓名缩写</label>
+            <div class="form-control">
+              <input type="text" id="nuPrefix" class="settings-input" placeholder="如 陈丹萍 填 cdp" style="text-align:left;max-width:160px">
+              <span style="font-size:12px;color:#6b7280;margin-left:8px">
+                密码的第一段。程序不做拼音转换，这一格必须手填。
+              </span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">角色</label>
+            <div class="form-control">
+              <select id="nuRole" class="settings-input" style="text-align:left"></select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label"></label>
+            <div class="form-control">
+              <button class="btn primary" id="nuSubmit">建号</button>
+              <span style="font-size:12px;color:#6b7280;margin-left:10px">
+                外包同事可用姓名拼音做账号
+              </span>
+            </div>
+          </div>
+          <div id="nuResult" style="font-size:13px"></div>
+        </div>
+
+        <!-- 权限矩阵：只管「可读写」这一档。
+             「仅可读」固定全模块只读、不可配 —— 少一半勾选框，
+             也不会出现「把只读角色的读权限收没了、某人连首页都打不开」这种误配。
+             真正的门禁在 server.js 的 gate()，早就按 模块:read / 模块:write 判了，
+             这里只是把那个矩阵接到界面上。 -->
+        <h2 class="page-title" style="margin-top:32px">权限矩阵</h2>
+        <div class="settings-section">
+          <p style="color:#6b7280;font-size:13px;margin-top:0">
+            「可读写」角色在各模块上的权限。改动即时生效。
+          </p>
+          <div id="pmMatrix"><p style="color:#6b7280">加载中...</p></div>
+        </div>
 
         <h2 class="page-title" style="margin-top:32px">白名单管理</h2>
         <div class="settings-section" id="whitelistSection">
@@ -154,23 +223,25 @@ const SettingsModule = (() => {
         <div class="settings-section" id="auditSection">
           <p style="color:#6b7280">加载中...</p>
         </div>
+        ` : ''}
       </div>
     `;
 
     // 绑定事件
     bindEvents(container);
 
-    // 加载账号区（当前账号名）
+    // 加载账号区（当前账号名）—— 改密码/退出登录对所有人开放，
+    // 顶部提示条的「去修改密码」就指向这里，页面不能锁死
     loadAccountSection();
 
-    // 加载白名单配置
-    loadWhitelistSection();
-
-    // 加载审计日志
-    loadAuditSection();
-
-    // 加载用户管理（仅管理员有这段 DOM，非管理员直接跳过）
-    if (isAdmin) loadUserSection();
+    /* 以下全部仅管理员有 DOM。非管理员的 HTML 里根本没有这些区块，
+       所以「加载中...」不会永远挂着 —— 那正是预期的：压根不请求。 */
+    if (isAdmin) {
+      loadUserSection();        // 用户列表 + 新建用户
+      loadPermissionMatrix();   // 权限矩阵
+      loadWhitelistSection();   // 白名单
+      loadAuditSection();       // 操作记录
+    }
   }
 
   /* ---------- 事件绑定 ---------- */
@@ -481,6 +552,7 @@ const SettingsModule = (() => {
     if (!sel) return;
 
     bindUserEvents();
+    bindNewUserForm();
 
     fetch('/api/auth/teams', { credentials: 'same-origin' })
       .then(r => r.json())
@@ -553,10 +625,14 @@ const SettingsModule = (() => {
       });
   }
 
+  /* 角色三档。2026-10-14 由 admin/pm/dev/viewer 收敛而来 ——
+     旧的 pm/dev 是【职能】、viewer 是【访问级别】，两个维度揉在一列里，
+     界面上根本看不出「开发」和「只读」谁大谁小（而且旧矩阵里 dev 是零写权限、
+     viewer 反而多一个 budget:read，等于「开发」比「只读」看得还少）。
+     现在 role 只表达访问级别，职能信息归 department。 */
   const ROLE_OPTIONS = [
-    { v: 'viewer', t: '只读' },
-    { v: 'dev', t: '开发' },
-    { v: 'pm', t: '项目经理' },
+    { v: 'reader', t: '仅可读' },
+    { v: 'editor', t: '可读写' },
     { v: 'admin', t: '管理员' }
   ];
 
@@ -621,6 +697,281 @@ const SettingsModule = (() => {
           '<th style="padding:8px 10px;text-align:left;font-size:13px;border-bottom:1px solid var(--line)">操作</th>' +
         '</tr></thead><tbody>' + rows + '</tbody>' +
       '</table>';
+  }
+
+  /* ---------- 新建用户 ----------
+
+     373 个号当初是 CSV 批量导入建的，`POST /api/auth/users` 早就存在却从没被前端调过，
+     于是「外包同事没有工号、SSO 也进不去，怎么开号」这件事一直没有落点。
+
+     密码不由前端拼：服务端按 data/auth-config.json 的规则算，一次性回显。
+     前端算的话规则就散到了浏览器里，改一次要动两处 —— 而两处一旦不一致，
+     建出来的号密码格式不同，且两边都不会报错。 */
+
+  function bindNewUserForm() {
+    const btn = document.getElementById('nuSubmit');
+    if (!btn || btn.dataset.nuBound === '1') return;
+    btn.dataset.nuBound = '1';
+
+    const roleSel = document.getElementById('nuRole');
+    if (roleSel) {
+      /* 默认「仅可读」：给权限时从最小开始，要写权限得有人主动去选。
+         反过来（默认可读写）意味着每次建号都在无声地放宽权限。 */
+      roleSel.innerHTML = ROLE_OPTIONS.slice().reverse()
+        .map(o => '<option value="' + o.v + '"' + (o.v === 'reader' ? ' selected' : '') + '>' + o.t + '</option>')
+        .join('');
+    }
+
+    /* 类型切换时改账号格的提示语。内部是工号（密码要用后 4 位），
+       外包是姓名拼音 —— 两者混填会让密码公式拼出个位数不对的密码。 */
+    const kindInputs = document.querySelectorAll('input[name="nuKind"]');
+    Array.prototype.forEach.call(kindInputs, function (r) {
+      r.addEventListener('change', syncNewUserKind);
+    });
+    syncNewUserKind();
+
+    btn.addEventListener('click', submitNewUser);
+  }
+
+  function syncNewUserKind() {
+    const kind = (document.querySelector('input[name="nuKind"]:checked') || {}).value || 'internal';
+    const idBox = document.getElementById('nuId');
+    if (!idBox) return;
+    idBox.placeholder = kind === 'outsourced' ? '姓名全拼，如 zhangsan' : '工号，如 10017968';
+    const tag = document.getElementById('nuIdHint');
+    if (tag) {
+      tag.textContent = kind === 'outsourced'
+        ? '外包没有工号，密码用固定后缀，账号请填姓名全拼（不要用缩写，缩写会撞）'
+        : '密码 = 姓名缩写首字母大写 + 年份 + 工号后 4 位';
+    }
+  }
+
+  function submitNewUser() {
+    const kind = (document.querySelector('input[name="nuKind"]:checked') || {}).value || 'internal';
+    const id = ((document.getElementById('nuId') || {}).value || '').trim();
+    const name = ((document.getElementById('nuName') || {}).value || '').trim();
+    const prefix = ((document.getElementById('nuPrefix') || {}).value || '').trim();
+    const role = ((document.getElementById('nuRole') || {}).value || 'reader');
+    const box = document.getElementById('nuResult');
+
+    function show(msg, color) {
+      if (box) box.innerHTML = '<p style="color:' + (color || 'var(--warn)') + ';margin:8px 0 0">' +
+        SharedUI.esc(msg) + '</p>';
+    }
+
+    /* 前端这几条只防手滑（少填一格就点建号），真正的校验在服务端 ——
+       表单是浏览器里的东西，绕过它直接 POST 一样能建号。 */
+    if (!id) return show('账号不能为空');
+    if (!name) return show('姓名不能为空');
+    if (!prefix) return show('姓名缩写不能为空 —— 它是密码的第一段，程序不做拼音转换');
+
+    const btn = document.getElementById('nuSubmit');
+    if (btn) btn.disabled = true;
+
+    fetch('/api/auth/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ id: id, name: name, prefix: prefix, role: role, kind: kind })
+    })
+      .then(r => r.json().then(d => ({ ok: r.ok, d: d })))
+      .then(function (r) {
+        if (!r.ok) return show((r.d && r.d.error) || '建号失败');
+        /* ★ 明文密码只此一次：服务端不落库、不再回显。
+           所以这里不做 toast（几秒就没），而是留在页面上等管理员抄走。 */
+        if (box) {
+          box.innerHTML =
+            '<div style="margin-top:10px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--bg)">' +
+              '<div style="font-size:13px;color:var(--ok);margin-bottom:6px">已建号：' +
+                SharedUI.esc(r.d.user.name) + '（' + SharedUI.esc(r.d.user.id) + '，' + SharedUI.esc(role) + '）</div>' +
+              '<div style="font-size:13px">初始密码：<b id="nuPwd">' + SharedUI.esc(r.d.password) + '</b>' +
+                ' <button class="link" id="nuCopy" style="margin-left:8px">复制</button></div>' +
+              '<div style="font-size:12px;color:#6b7280;margin-top:6px">' +
+                '这个密码只显示这一次，请现在抄给本人。刷新后不再可见，只能重置。</div>' +
+            '</div>';
+          const copy = document.getElementById('nuCopy');
+          if (copy) {
+            copy.addEventListener('click', function () {
+              const t = (document.getElementById('nuPwd') || {}).textContent || '';
+              /* 内网 http 下 navigator.clipboard 通常不可用（非安全上下文），
+                 所以退化到临时 textarea + execCommand，别让「复制」点了没反应。 */
+              if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(t).then(
+                  function () { SharedUI.toast('密码已复制', 'success'); },
+                  function () { SharedUI.toast('复制失败，请手动选中', 'error'); });
+              } else {
+                const ta = document.createElement('textarea');
+                ta.value = t; document.body.appendChild(ta); ta.select();
+                try { document.execCommand('copy'); SharedUI.toast('密码已复制', 'success'); }
+                catch (e) { SharedUI.toast('复制失败，请手动选中', 'error'); }
+                document.body.removeChild(ta);
+              }
+            });
+          }
+        }
+        /* 清掉输入，避免手快连点两次建出两个号（第二次会因账号已存在而失败） */
+        ['nuId', 'nuName', 'nuPrefix'].forEach(function (k) {
+          const el = document.getElementById(k);
+          if (el) el.value = '';
+        });
+        loadUserList();
+      })
+      .catch(function () { show('网络异常，未建号'); })
+      .then(function () { if (btn) btn.disabled = false; });
+  }
+
+  /* ---------- 权限矩阵（仅 admin 渲染） ----------
+
+     ⚠ 门禁本身【不需要改】：server.js 的 gate() 早就是
+       `need = isRead(req) ? 模块:read : 模块:write`，模块级授权在鉴权层一直有效，
+       缺的只是写 permissions 表的界面（db.setPermission 实现且导出，全仓库零调用）。
+
+     只配「可读写」这一档：「仅可读」是全平台只读的基线，允许在界面上改它，
+     就会出现「把某人所在档的读权限收没了、登录后首页都打不开」这种自伤配置。
+     服务端也拦了（POST /api/auth/permissions 只收 editor），不只是这里不给点。 */
+
+  let _pmData = null;
+
+  function loadPermissionMatrix() {
+    const box = document.getElementById('pmMatrix');
+    if (!box) return;
+
+    fetch('/api/auth/permissions/matrix', { credentials: 'same-origin' })
+      .then(r => r.json().then(d => ({ ok: r.ok, d: d })))
+      .then(function (r) {
+        if (!r.ok) {
+          box.innerHTML = '<p style="color:var(--warn)">' +
+            SharedUI.esc((r.d && r.d.error) || '获取权限矩阵失败') + '</p>';
+          return;
+        }
+        _pmData = r.d;
+        renderPermissionMatrix();
+      })
+      .catch(function () {
+        box.innerHTML = '<p style="color:var(--warn)">获取权限矩阵失败</p>';
+      });
+  }
+
+  /** 三态取值：'rw' 读写 / 'read' 只读 / 'none' 无 */
+  function triState(resource) {
+    const ed = (_pmData && _pmData.allowed && _pmData.allowed.editor) || {};
+    const rd = ed[resource + ':read'] ? 1 : 0;
+    const wr = ed[resource + ':write'] ? 1 : 0;
+    return wr ? 'rw' : (rd ? 'read' : 'none');
+  }
+
+  function renderPermissionMatrix() {
+    const box = document.getElementById('pmMatrix');
+    if (!box || !_pmData) return;
+
+    const rows = _pmData.resources || [];
+    const reader = (_pmData.allowed && _pmData.allowed.reader) || {};
+    const editable = _pmData.editableRole;
+
+    /* 按分组切段。分组顺序由服务端排好（业务模块 / 平台管理 / AI 能力 / 其它），
+       前端只按相邻聚合，不再排一次 —— 两处都排就会出现顺序不一致的诡异情况。 */
+    const groups = [];
+    rows.forEach(function (r) {
+      const g = groups[groups.length - 1];
+      if (g && g.name === r.group) g.items.push(r);
+      else groups.push({ name: r.group, items: [r] });
+    });
+
+    const head =
+      '<table style="width:100%;border-collapse:collapse">' +
+        '<thead><tr style="background:var(--bg)">' +
+          '<th style="padding:8px 10px;text-align:left;font-size:13px">模块</th>' +
+          '<th style="padding:8px 10px;text-align:left;font-size:13px;width:180px">仅可读（固定）</th>' +
+          '<th style="padding:8px 10px;text-align:left;font-size:13px;width:180px">可读写</th>' +
+        '</tr></thead><tbody>';
+
+    const body = groups.map(function (g) {
+      const title =
+        '<tr><td colspan="3" style="padding:10px 10px 4px;font-size:12px;color:#6b7280;' +
+          'border-bottom:1px solid var(--line)">' + SharedUI.esc(g.name) + '</td></tr>';
+      const lines = g.items.map(function (r) {
+        /* 仅可读那一列只作展示。rw 行显示「读 ✔ / 写 ✘」两个事实，
+           让管理员一眼看懂「这一档就是不给写」；AI 能力是单点开关。 */
+        const readerCell = r.kind === 'rw'
+          ? (reader[r.resource + ':read'] ? '<span style="color:var(--ok)">读 ✔</span>' : '') +
+            ' <span style="color:#9ca3af">写 ✘</span>'
+          : (reader[r.resource] ? '<span style="color:var(--ok)">开</span>' : '<span style="color:#9ca3af">关</span>');
+
+        const editorCell = r.kind === 'rw'
+          ? '<select class="settings-input" data-pm-rw="' + SharedUI.esc(r.resource) + '" style="font-size:13px;padding:2px 6px">' +
+              ['none', 'read', 'rw'].map(function (v) {
+                const t = { none: '无', read: '只读', rw: '读写' }[v];
+                return '<option value="' + v + '"' + (v === triState(r.resource) ? ' selected' : '') + '>' + t + '</option>';
+              }).join('') +
+            '</select>'
+          : '<label style="font-size:13px;font-weight:400;cursor:pointer">' +
+              '<input type="checkbox" data-pm-point="' + SharedUI.esc(r.resource) + '"' +
+                ((_pmData.allowed.editor || {})[r.resource] ? ' checked' : '') + '> 可调用</label>';
+
+        return '<tr>' +
+          '<td style="padding:6px 10px;border-bottom:1px solid var(--line);font-size:13px">' +
+            SharedUI.esc(r.name) +
+            ' <span style="color:#9ca3af;font-size:11px">' + SharedUI.esc(r.resource) + '</span></td>' +
+          '<td style="padding:6px 10px;border-bottom:1px solid var(--line);font-size:13px">' + readerCell + '</td>' +
+          '<td style="padding:6px 10px;border-bottom:1px solid var(--line)">' + editorCell + '</td>' +
+        '</tr>';
+      }).join('');
+      return title + lines;
+    }).join('');
+
+    box.innerHTML = head + body + '</tbody></table>';
+
+    if (!box.dataset.pmBound) {
+      box.dataset.pmBound = '1';
+      box.addEventListener('change', onMatrixChange);
+    }
+    box.dataset.editable = editable || '';
+  }
+
+  function onMatrixChange(e) {
+    const rw = e.target.closest('[data-pm-rw]');
+    const pt = e.target.closest('[data-pm-point]');
+    if (!rw && !pt) return;
+
+    const editable = (_pmData && _pmData.editableRole) || 'editor';
+    const resource = rw ? rw.dataset.pmRw : pt.dataset.pmPoint;
+    const body = rw
+      ? { role: editable, resource: resource, read: rw.value !== 'none', write: rw.value === 'rw' }
+      : { role: editable, resource: resource, allowed: !!pt.checked };
+
+    /* 先把控件锁住，避免改一格的过程中又动另一格 —— 两次 POST 交错回来，
+       后到的响应会把先到的那格的选择冲掉，界面和库里就对不上了。 */
+    e.target.disabled = true;
+
+    fetch('/api/auth/permissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(body)
+    })
+      .then(r => r.json().then(d => ({ ok: r.ok, d: d })))
+      .then(function (r) {
+        if (!r.ok) {
+          SharedUI.toast((r.d && r.d.error) || '保存失败', 'error');
+          /* 失败回滚：重拉一次矩阵，让控件回到服务端的真实值。
+             不自己改控件的值 —— 前端猜的服务端状态没有意义。 */
+          return loadPermissionMatrix();
+        }
+        if (_pmData && _pmData.allowed && _pmData.allowed[editable]) {
+          if (rw) {
+            _pmData.allowed[editable][resource + ':read'] = body.read ? 1 : 0;
+            _pmData.allowed[editable][resource + ':write'] = body.write ? 1 : 0;
+          } else {
+            _pmData.allowed[editable][resource] = body.allowed ? 1 : 0;
+          }
+        }
+        SharedUI.toast('已保存', 'success');
+      })
+      .catch(function () {
+        SharedUI.toast('网络异常，未保存', 'error');
+        loadPermissionMatrix();
+      })
+      .then(function () { e.target.disabled = false; });
   }
 
   function onUserTableChange(e) {

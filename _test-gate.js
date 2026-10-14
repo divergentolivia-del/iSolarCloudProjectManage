@@ -110,22 +110,22 @@ async function testGate() {
   ck('错误密码 → 401', r.code === 401, r.code);
   r = await req('POST', '/api/auth/login', { id: 'dev', password: 'dev-pass-123' });
   const devCookie = r.cookie;
-  ck('dev 登录成功并种 HttpOnly Cookie', r.code === 200 && !!devCookie && /HttpOnly/i.test(r.setCookieRaw || ''), r.body);
+  ck('reader 账号登录成功并种 HttpOnly Cookie', r.code === 200 && !!devCookie && /HttpOnly/i.test(r.setCookieRaw || ''), r.body);
   r = await req('POST', '/api/auth/login', { id: 'pm', password: 'pm-pass-123' });
   const pmCookie = r.cookie;
-  ck('pm 登录成功', r.code === 200 && !!pmCookie);
+  ck('editor 账号登录成功', r.code === 200 && !!pmCookie);
 
   /* 角色差异：读放行，写分权 */
   r = await req('GET', '/api/plan/state', null, devCookie);
-  ck('dev 读 plan → 放行（200）', r.code === 200, r.code);
+  ck('reader 读 plan → 放行（200）', r.code === 200, r.code);
   r = await req('POST', '/api/plan/definitely-not-exist', { x: 1 }, devCookie);
-  ck('dev 写 plan → 403（无 plan:write）', r.code === 403, r.code);
+  ck('reader 写 plan → 403（无 plan:write）', r.code === 403, r.code);
   r = await req('POST', '/api/plan/definitely-not-exist', { x: 1 }, pmCookie);
-  ck('pm 写 plan → 门禁放行（落到路由层，非 403）', r.code !== 403 && r.code !== 401, r.code);
+  ck('editor 写 plan → 门禁放行（落到路由层，非 403）', r.code !== 403 && r.code !== 401, r.code);
   r = await req('POST', '/api/tb/definitely-not-exist', { x: 1 }, pmCookie);
-  ck('pm 写 tb → 403（默认矩阵无 tb:write）', r.code === 403, r.code);
+  ck('editor 写 tb → 403（默认矩阵无 tb:write）', r.code === 403, r.code);
   r = await req('GET', '/api/platform/config', null, pmCookie);
-  ck('pm 读 platform → 403（默认矩阵无 platform:read，维持 step 2 行为）', r.code === 403, r.code);
+  ck('editor 读 platform → 403（默认矩阵无 platform:read，维持 step 2 行为）', r.code === 403, r.code);
 
   /* Cookie 校验 */
   r = await req('GET', '/api/plan/state', null, 'wb_session=forged-token-123');
@@ -163,14 +163,114 @@ async function testThrottle() {
   ck('锁定期内别的账号照常登录（不是全局封锁）', other.code === 200, other.code);
 }
 
+/* ---------- 子进程：权限矩阵 + 新建用户（2026-10-14 新增） ---------- */
+
+async function testMatrix(adminCookie, editorCookie) {
+  console.log('\n[3] 权限矩阵');
+
+  let r = await req('GET', '/api/auth/permissions/matrix', null, editorCookie);
+  ck('非 admin 读矩阵 → 403', r.code === 403, r.code);
+  r = await req('POST', '/api/auth/permissions', { role: 'editor', resource: 'plan', read: true, write: true }, editorCookie);
+  ck('非 admin 改矩阵 → 403', r.code === 403, r.code);
+
+  r = await req('GET', '/api/auth/permissions/matrix', null, adminCookie);
+  const m = r.body || {};
+  ck('admin 读矩阵 → 200', r.code === 200 && Array.isArray(m.resources), r.code);
+  ck('矩阵列出模块（含 plan）', (m.resources || []).some(x => x.resource === 'plan' && x.kind === 'rw'));
+  ck('矩阵含 AI 能力组', (m.resources || []).some(x => x.resource === 'ai:finance' && x.kind === 'point'));
+  ck('可编辑角色只有 editor', m.editableRole === 'editor', m.editableRole);
+  ck('reader 在角色列表里且不可编辑',
+    (m.roles || []).some(x => x.role === 'reader' && x.editable === false));
+  ck('矩阵带两档 allowed 状态',
+    !!(m.allowed && m.allowed.reader && m.allowed.editor));
+
+  /* 把 plan 对 editor 改成「只读」：读放行、写必须立刻 403 */
+  r = await req('POST', '/api/auth/permissions',
+    { role: 'editor', resource: 'plan', read: true, write: false }, adminCookie);
+  ck('admin 把 plan 设为只读 → 200', r.code === 200, r.body);
+  r = await req('POST', '/api/plan/definitely-not-exist', { x: 1 }, editorCookie);
+  ck('设只读后 editor 写 plan → 403', r.code === 403, r.code);
+  r = await req('GET', '/api/plan/state', null, editorCookie);
+  ck('设只读后 editor 读 plan 仍 200', r.code === 200, r.code);
+
+  /* 改回去，别污染后面的用例 */
+  r = await req('POST', '/api/auth/permissions',
+    { role: 'editor', resource: 'plan', read: true, write: true }, adminCookie);
+  ck('恢复 plan 读写 → 200', r.code === 200);
+  r = await req('POST', '/api/plan/definitely-not-exist', { x: 1 }, editorCookie);
+  ck('恢复后 editor 写 plan → 非 403', r.code !== 403 && r.code !== 401, r.code);
+
+  /* 服务端硬边界：只配「可读写」一档 */
+  r = await req('POST', '/api/auth/permissions',
+    { role: 'reader', resource: 'plan', read: true, write: true }, adminCookie);
+  ck('改「仅可读」档 → 400（固定只读基线，不可配）', r.code === 400, r.body && r.body.error);
+  r = await req('POST', '/api/auth/permissions',
+    { role: 'editor', resource: 'no-such-module', read: true, write: true }, adminCookie);
+  ck('未知资源 → 400', r.code === 400, r.body && r.body.error);
+}
+
+async function testNewUser(adminCookie) {
+  console.log('\n[4] 新建用户（含外包密码公式）');
+
+  /* 外包：账号 = 姓名拼音，密码 = 缩写首字母大写 + outsourcedPasswordSuffix */
+  let r = await req('POST', '/api/auth/users',
+    { id: 'zhangsan', name: '张三', prefix: 'zs', role: 'reader', kind: 'outsourced' }, adminCookie);
+  ck('建外包号 → 200 且一次性返回密码', r.code === 200 && r.body && !!r.body.password, r.body);
+  ck('外包密码 = Zs20261024', r.body && r.body.password === 'Zs20261024', r.body && r.body.password);
+
+  /* 拿这个密码真登一遍 —— 公式对不对，登录接口说了算 */
+  r = await req('POST', '/api/auth/login', { id: 'zhangsan', password: 'Zs20261024' });
+  ck('外包号能用生成的密码登录', r.code === 200, r.code);
+
+  /* 内部：密码 = 缩写首字母大写 + 年份 + 工号后 4 位 */
+  r = await req('POST', '/api/auth/users',
+    { id: '10017968', name: '陈丹萍', prefix: 'cdp', role: 'editor', kind: 'internal' }, adminCookie);
+  ck('建内部号 → 密码 = Cdp20267968', r.body && r.body.password === 'Cdp20267968', r.body && r.body.password);
+  ck('内部号角色落到 editor', r.body && r.body.user && r.body.user.role === 'editor');
+
+  /* 缩写大小写不敏感：LS / ls / Ls 都规范成 Ls。
+     工号取【后 4 位】—— 10017001 的末四位是 7001，不是 0001。 */
+  r = await req('POST', '/api/auth/users',
+    { id: '10017001', name: '李四', prefix: 'LS', role: 'reader', kind: 'internal' }, adminCookie);
+  ck('缩写大小写归一（LS → Ls）', r.body && r.body.password === 'Ls20267001', r.body && r.body.password);
+
+  /* 服务端校验：前端是浏览器里的东西，绕过它直接 POST 一样能建号 */
+  r = await req('POST', '/api/auth/users',
+    { id: 'noprefix', name: '无缩写', role: 'reader', kind: 'outsourced' }, adminCookie);
+  ck('缺姓名缩写 → 400', r.code === 400, r.body && r.body.error);
+  r = await req('POST', '/api/auth/users',
+    { id: 'badrole', name: '拼错角色', prefix: 'br', role: 'viewer', kind: 'outsourced' }, adminCookie);
+  ck('旧角色值 viewer → 400', r.code === 400, r.body && r.body.error);
+  r = await req('POST', '/api/auth/users',
+    { id: 'abc', name: '内部短工号', prefix: 'ab', role: 'reader', kind: 'internal' }, adminCookie);
+  ck('内部号工号不足 4 位 → 400（拼不出后 4 位）', r.code === 400, r.body && r.body.error);
+  r = await req('POST', '/api/auth/users',
+    { id: 'zhangsan', name: '张三', prefix: 'zs', role: 'reader', kind: 'outsourced' }, adminCookie);
+  ck('账号重复 → 400', r.code === 400, r.body && r.body.error);
+
+  /* ★ 审计里绝不能出现密码：操作记录区块是全平台可见的 */
+  const db2 = require('./db');
+  const newUserLogs = db2.getAudit(50).filter(x => x.action === '新建用户');
+  ck('建号写了审计', newUserLogs.length >= 3, newUserLogs.length);
+  ck('审计不含密码明文',
+    newUserLogs.every(x => !/Zs20261024|Cdp20267968|Ls20267001/.test(
+      String(x.details || '') + String(x.user_name || ''))),
+    newUserLogs.map(x => x.details));
+}
+
 (async () => {
   testResourceOf();
 
-  /* 先在测试进程建用户（与子进程服务共享同一个 DATA 下的 platform.db，WAL 多进程可共读） */
+  /* 先在测试进程建用户（与子进程服务共享同一个 DATA 下的 platform.db，WAL 多进程可共读）
+     账号名仍是 pm/dev（历史沿用），但角色已按 2026-10-14 的模型收敛为 editor/reader ——
+     这一对承担的正是「有 plan:write / 无 plan:write」的差异，改名后语义完全对应。 */
   const db = require('./db');
-  db.createUser({ id: 'pm', name: '测试项目经理', role: 'pm', password: 'pm-pass-123' });
-  db.createUser({ id: 'dev', name: '测试研发', role: 'dev', password: 'dev-pass-123' });
-  db.createUser({ id: 'lockme', name: '节流测试号', role: 'viewer', password: 'lock-pass-123' });
+  db.createUser({ id: 'pm', name: '测试可读写', role: 'editor', password: 'pm-pass-123' });
+  db.createUser({ id: 'dev', name: '测试仅可读', role: 'reader', password: 'dev-pass-123' });
+  db.createUser({ id: 'lockme', name: '节流测试号', role: 'reader', password: 'lock-pass-123' });
+  /* admin 是首次建库时随机密码造的，这里改成一个已知值才能登进去测矩阵。
+     注意：改的是临时 DATA 下的副本库，不碰仓库的 data/platform.db。 */
+  db.setPassword('admin', 'admin-pass-123');
 
   const srv = startServer();
   let srvOut = '';
@@ -180,6 +280,16 @@ async function testThrottle() {
     await waitReady(15000);
     await testGate();
     await testThrottle();
+
+    /* 矩阵与建号要 admin 会话。放在节流测试【之后】：
+       节流那组会把 lockme 锁住，顺序换了不影响结论，但先跑完干净的更易读。 */
+    const admin = await req('POST', '/api/auth/login', { id: 'admin', password: 'admin-pass-123' });
+    ck('admin 登录成功（临时库里已把随机密码改成已知值）', admin.code === 200, admin.code);
+    const editor = await req('POST', '/api/auth/login', { id: 'pm', password: 'pm-pass-123' });
+    if (admin.cookie) {
+      await testMatrix(admin.cookie, editor.cookie);
+      await testNewUser(admin.cookie);
+    }
   } finally {
     try { srv.kill(); } catch (e) { /* ignore */ }
     await sleep(300);

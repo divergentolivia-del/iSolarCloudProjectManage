@@ -25,7 +25,9 @@ const DB_DESC = process.env.DATA_DIR
   ? process.env.DATA_DIR + '/' + (process.env.DB_FILE || 'platform.db')
   : './data/' + (process.env.DB_FILE || 'platform.db');
 
-const ROLES = ['admin', 'pm', 'dev', 'viewer'];
+/* 角色清单从 db.js 取，不在本文件再写一份。
+   2026-10-14 角色收敛为 admin/editor/reader 三档。 */
+const ROLES = db.ROLE_LIST;
 
 function usage(code) {
   console.log(require('fs').readFileSync(__filename, 'utf8').split('*/')[0].replace(/^#![^\n]*\n/, ''));

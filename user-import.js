@@ -18,8 +18,9 @@
    名单格式（CSV，首行表头，UTF-8）:
      工号,姓名,密码前缀[,角色]
      10017xxx,张三,zs
-     10018xxx,李四,,pm          ← 前缀可留空
+     10018xxx,李四,,editor      ← 前缀不能留空（它是密码第一段）
      多出来的列会被忽略（如 dingtalk-roster.js 产出的「部门」列）。
+     角色取值 admin / editor / reader（2026-10-14 收敛，见 db.js 头部）。
 
    注意：本脚本直接写平台数据库，请先停掉服务再执行，避免写入竞争。
 */
@@ -29,22 +30,19 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('./db');
+const passwordRule = require('./password-rule');
 
-const ROLES = ['admin', 'pm', 'dev', 'viewer'];
+/* 角色清单从 db.js 取，不在这里硬编码 —— 2026-10-14 角色收敛为
+   admin/editor/reader 三档，当初这里和 user-cli.js、auth/routes.js 各写了一份数组，
+   改一次要满仓库找。统一到 db.ROLE_LIST。 */
+const ROLES = db.ROLE_LIST;
 
 /* 已实现的密码公式。加公式时这里和 buildPassword 一起改。 */
-const SUPPORTED_MODES = ['initials+suffix', 'initials+suffix+last4'];
+const SUPPORTED_MODES = passwordRule.SUPPORTED_MODES;
 
 /* 密码规则配置：与 db.js 同源，落在 data 目录下（已 gitignore） */
-const CONFIG_FILE = path.join(
-  process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(__dirname, 'data'),
-  'auth-config.json'
-);
-const DEFAULT_CONFIG = {
-  defaultPasswordSuffix: '2026',
-  defaultPasswordMode: 'initials+suffix+last4',
-  forceChangeOnFirstLogin: false
-};
+const CONFIG_FILE = passwordRule.CONFIG_FILE;
+const DEFAULT_CONFIG = passwordRule.DEFAULT_CONFIG;
 
 const DB_DESC = process.env.DATA_DIR
   ? process.env.DATA_DIR + '/' + (process.env.DB_FILE || 'platform.db')
@@ -62,24 +60,11 @@ function usage(code) {
 
 /* ---------- 配置 ---------- */
 
-/** 读密码规则。读不到（或坏了）用内置默认值并提示，绝不因此中断导入。 */
+/* 读密码规则。【已抽到 password-rule.js】—— 「新建用户」表单也要用同一条公式，
+   两边各留一份会建出两种格式的初始密码，且都不报错。
+   这里保留非 strict 行为：批量导到一半因为配置少个字段整体失败，代价太大。 */
 function loadConfig() {
-  let cfg = DEFAULT_CONFIG;
-  try {
-    const raw = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-    cfg = Object.assign({}, DEFAULT_CONFIG, raw);
-  } catch (e) {
-    if (e.code === 'ENOENT') {
-      console.log('提示：未找到 ' + CONFIG_FILE + '，本次用内置默认规则（后缀 ' + DEFAULT_CONFIG.defaultPasswordSuffix + '）。');
-    } else {
-      console.log('提示：' + CONFIG_FILE + ' 读取失败（' + e.message + '），本次用内置默认规则。');
-    }
-  }
-  if (SUPPORTED_MODES.indexOf(cfg.defaultPasswordMode) < 0) {
-    fail('不支持的 defaultPasswordMode：' + cfg.defaultPasswordMode
-      + '，可选 ' + SUPPORTED_MODES.join(' / '));
-  }
-  return cfg;
+  return passwordRule.loadConfig();
 }
 
 /**
@@ -106,16 +91,10 @@ function loadConfig() {
  * 大小写在这里统一：不管名单里填的是 `cdp` / `CDP` / `Cdp`，
  * 一律规范成首字母大写 —— 免得同一批人因为录入习惯不同拿到两种格式的密码。
  */
+/* buildPassword / normalizeInitials 的实现在 password-rule.js，
+   本文件只做转发 —— 批量建号和界面建号必须是同一条公式。 */
 function buildPassword(prefix, id, cfg) {
-  const suffix = String(cfg.defaultPasswordSuffix || '');
-  const mode = cfg.defaultPasswordMode || DEFAULT_CONFIG.defaultPasswordMode;
-  if (mode === 'initials+suffix') {
-    return String(prefix || '') + suffix;           // 老规则，兼容老名单
-  }
-  /* initials+suffix+last4（当前） */
-  const p = String(prefix || '');
-  const norm = p ? p.charAt(0).toUpperCase() + p.slice(1).toLowerCase() : '';
-  return norm + suffix + String(id || '').slice(-4);
+  return passwordRule.buildPassword(prefix, id, cfg, 'internal');
 }
 
 /* ---------- CSV ---------- */
@@ -204,7 +183,10 @@ function readRoster(file) {
       rows.push({ lineNo: lineNo, id: id, name: name, bad: '角色非法：' + role + '，可选 ' + ROLES.join('/') });
       continue;
     }
-    rows.push({ lineNo: lineNo, id: id, name: name, prefix: prefix, role: role || 'viewer', dept: dept });
+    /* 角色列留空时兜到 reader（最小权限）。CSV 里 372 行角色列全是空的，
+       所以这一条决定了绝大多数账号的初始角色 —— 宁可给只读，
+       需要写权限的人在界面上逐个开，也不要批量给出去。 */
+    rows.push({ lineNo: lineNo, id: id, name: name, prefix: prefix, role: role || ROLES[2], dept: dept });
   }
   return rows;
 }

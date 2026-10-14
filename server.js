@@ -211,13 +211,10 @@ if (process.platform === 'win32' && process.stdin.isTTY) {
 /* ---------- 身份与权限门禁 ---------- */
 
 /* 非模块内置路由的权限资源名（由 server.js 直接处理，不走 module-loader）。
-   模块前缀 → 资源名的映射不再在这里维护：模块在 modules/<id>/routes.js
-   导出里声明 resource（缺省取 id），由 module-loader 注册表统一管理。
-   新增模块无需改这里；新增内置路由才需要在这里补一行。 */
-const BUILTIN_RESOURCE = {
-  '/api/platform': 'platform',
-  '/api/archive': 'archive'
-};
+   ★ 表本身已移到 module-loader.js —— 权限矩阵要枚举全部可授权资源，
+     auth 模块不能为了这张表去 require server.js（循环依赖），
+     抄一份又会变成第二处真值。所以真值放 module-loader，这里只引用。 */
+const BUILTIN_RESOURCE = moduleLoader.BUILTIN_RESOURCE;
 
 /* 不需要登录的路径：登录接口本身、当前用户查询、登录页与静态样式脚本、
    事件流（EventSource 不能带自定义头，靠 Cookie，未登录时由门禁挡掉） */
@@ -259,6 +256,71 @@ function isRead(req) {
   return req.method === 'GET' || req.method === 'HEAD';
 }
 
+/* ---------- 平台配置缓存（只读模式用） ----------
+
+   gate() 每次写请求都要判「现在是不是白名单只读模式」，而 platform.json
+   是「整体读、整体写」的 JSON —— 每个写请求都 readFileSync 一遍没必要。
+   缓存住，POST /api/platform/config 写盘后主动失效。
+
+   ★ 这是进程内缓存，多实例部署时会不一致（A 实例改了配置，B 实例还在用旧缓存）。
+     本项目是单实例 systemd 服务，不构成问题；真要横向扩就得换成读文件或加失效通知。 */
+let _platformCfg = null;
+let _platformCfgAt = 0;
+const PLATFORM_CFG_TTL = 5000;   // 兜底 5 秒过期，防「有别的途径改了文件」而缓存不刷新
+
+function platformConfig() {
+  const now = Date.now();
+  if (_platformCfg && now - _platformCfgAt < PLATFORM_CFG_TTL) return _platformCfg;
+  try {
+    _platformCfg = JSON.parse(fs.readFileSync(PLATFORM_FILE, 'utf8'));
+  } catch (e) {
+    /* 文件缺失/损坏 → 当作「开放编辑」。不当作只读：配置坏了就把全平台锁成只读，
+       等于一次误操作让所有人不能干活，而管理员自己也改不回来（他也在只读里）。 */
+    _platformCfg = { editMode: 'open', whitelist: [] };
+  }
+  _platformCfgAt = now;
+  return _platformCfg;
+}
+
+/**
+ * 白名单只读校验。返回 true 表示请求已被挡下。
+ *
+ * ── 为什么必须有这一段 ──────────────────────────────────────
+ * 白名单原本【只在客户端拦】：platform.js 的 checkWhitelist() 给 body 挂
+ * .readonly-mode，靠 CSS 的 pointer-events:none 让按钮点不动。
+ * 那是防手滑，不是防绕过 —— 打开控制台直接 POST /api/plan/state 就写进去了。
+ *
+ * ── 拦在哪一层 ─────────────────────────────────────────────
+ * 拦【所有模块的写请求】，不是只拦 /api/platform/config：
+ * 只读模式要挡的是「改业务数据」，而配置本身恰恰得留给没进白名单的人去关掉它
+ * （见下面的豁免），否则一开就再也关不回来。
+ */
+function readonlyBlocked(req, url, me) {
+  if (isRead(req)) return false;
+
+  const p = url.pathname;
+  /* 豁免一：平台配置自身。唯一能解开只读模式的入口，挡了就锁死。
+     保护它的是门禁里原有的 platform:write 权限（默认矩阵里只有 admin 有）。 */
+  if (p === '/api/platform/config') return false;
+  /* 豁免二：退出登录 / 改自己密码 / 登录本身 —— 人得能走、能改密码。
+     /api/auth/* 在上面已经 return false 了，这里再兜一层是防顺序调整时被漏掉。 */
+  if (p === '/api/auth' || p.startsWith('/api/auth/')) return false;
+
+  const cfg = platformConfig();
+  if (cfg.editMode !== 'whitelist') return false;
+  const wl = Array.isArray(cfg.whitelist) ? cfg.whitelist : [];
+  if (!wl.length) return false;   // 白名单为空 = 没限制（与前端 checkWhitelist 同口径）
+
+  /* 白名单里存的是【姓名】（platform.js 的 whoami() 返回 user.name）——
+     不是账号、也不是工号。这里必须用 me.name 对齐，用 me.id 比就永远不匹配，
+     表现为「白名单明明是空的却守不住」或者反过来「谁都进不去」。 */
+  if (wl.indexOf(me.name) >= 0) return false;
+  if (me.role === 'admin') return false;   // 管理员不受白名单约束，否则无人能解锁
+
+  sendJson(res, 403, { error: '当前为只读模式（' + me.name + ' 不在编辑白名单中）' });
+  return true;
+}
+
 /**
  * 登录与权限门禁。返回 true 表示请求已被挡下（调用方直接 return）。
  * AUTH_REQUIRED 关闭时恒返回 false，不改变任何现有行为。
@@ -298,6 +360,12 @@ function gate(req, res, url) {
     sendJson(res, 403, { error: '没有权限：' + need });
     return true;
   }
+
+  /* 白名单只读。放在权限判定【之后】是有意的：
+     先分出「这人本身就没权限」和「白名单临时只读」两种 403，
+     文案不同，排查时不用猜是权限配错了还是被只读模式锁了。 */
+  if (readonlyBlocked(req, url, me)) return true;
+
   return false;
 }
 
@@ -573,6 +641,12 @@ const server = http.createServer((req, res) => {
       } catch (e) {
         return sendJson(res, 500, { error: '写入失败: ' + e.message });
       }
+
+      /* ★ 让只读模式的缓存立即失效。
+         不等 TTL 自然过期（最多 5 秒）—— 管理员刚把 editMode 从 whitelist
+         改回 open，自己接下来那几秒的保存却仍被 403，会以为是改坏了。 */
+      _platformCfg = null;
+      _platformCfgAt = 0;
 
       audit.log({
         user: incoming._updatedBy || '未署名',

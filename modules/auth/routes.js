@@ -8,10 +8,12 @@
      GET  /api/auth/me                              → 当前用户（未登录返回 {user:null}）
      POST /api/auth/password {旧密码, 新密码}       → 改自己的密码
      GET  /api/auth/users                           → 用户列表（仅 admin）
-     POST /api/auth/users    {id,name,role,password}→ 建用户（仅 admin）
+     POST /api/auth/users    {id,name,role,kind,prefix} → 建用户 + 一次性返回初始密码（仅 admin）
      POST /api/auth/users/role    {id, role}        → 改角色（仅 admin）
      POST /api/auth/users/enable  {id, enabled}     → 启用/停用（仅 admin）
-     GET  /api/auth/permissions?role=pm             → 角色权限（admin 可查任意角色）
+     GET  /api/auth/permissions?role=editor         → 角色权限（admin 可查任意角色）
+     GET  /api/auth/permissions/matrix              → 权限矩阵全量（仅 admin）
+     POST /api/auth/permissions  {role,resource,allowed} → 改一格权限（仅 admin）
 
    ★ 与 ACCESS_TOKEN 的关系：两者并存，不冲突。
      ACCESS_TOKEN 是「整个平台进不来」的粗门禁，先于本模块执行；
@@ -21,6 +23,87 @@
 
 const db = require('../../db');
 const teams = require('../../teams');
+const passwordRule = require('../../password-rule');
+/* ⚠ module-loader 不在这里顶层 require —— 会和它形成循环依赖：
+     module-loader.loadAll() → require(modules/auth/routes.js) → require(module-loader)
+   此时 module-loader 的 module.exports 还没赋值，拿到的是空对象，
+   而它最后用的是 `module.exports = {...}`（换对象），不是往旧对象上挂属性，
+   所以这个空对象永远不会被填充。表现是 matrixResources 里 moduleLoader.listResources
+   不是函数 —— 且只在「先加载 auth 模块」的入口上复现，很难查。
+   放到函数里惰性 require，此时缓存已是完整导出的，入口顺序怎么变都不会踩。 */
+/* 资源名 → 界面上的中文名 / 分组。权限矩阵靠它把 plan 显示成「项目计划」。
+   ⚠ 这张表【只影响显示】，不参与判定：没登记的模块照样能配、照样门禁生效，
+   只是那一行显示的是原始 resource 名。判定口径永远只有 resourceOf() 一处，
+   界面文案多一份、漏一份都不会影响谁能干什么。 */
+const RESOURCE_LABELS = {
+  plan: { name: '项目计划', group: '业务模块' },
+  iteration: { name: '迭代管理', group: '业务模块' },
+  project: { name: '项目管理', group: '业务模块' },
+  csenergy: { name: '中盛能源', group: '业务模块' },
+  budget: { name: '预算与工时', group: '业务模块' },
+  token: { name: 'Token 用量', group: '业务模块' },
+  dashboard: { name: '数据看板', group: '业务模块' },
+  archive: { name: '归档', group: '业务模块' },
+  pradapter: { name: 'PR 适配器', group: '业务模块' },
+  skill: { name: 'AI 技能', group: '业务模块' },
+  inbox: { name: '今日待确认', group: '业务模块' },
+  notify: { name: '钉钉推送', group: '业务模块' },
+  dingtalk: { name: '钉钉身份', group: '业务模块' },
+  tb: { name: 'TB 数据源', group: '业务模块' },
+  platform: { name: '平台配置', group: '平台管理' },
+  settings: { name: '系统设置', group: '平台管理' },
+  help: { name: '使用说明', group: '平台管理' },
+  auth: { name: '账号与会话', group: '平台管理' },
+  sso: { name: '单点登录', group: '平台管理' }
+};
+
+/* AI 能力不是「模块」，门禁不看路径而是看调用点（skill 模块内部判定），
+   所以在 module-loader 注册表里找不到。矩阵要单独列出来 —— 否则
+   「可读写」这档的 ai:finance（调财务 Agent）在界面上无处可配。 */
+const AI_CAPABILITIES = [
+  { resource: 'ai:doc', name: '文档 Agent' },
+  { resource: 'ai:risk', name: '风险 Agent' },
+  { resource: 'ai:report', name: '周报 Agent' },
+  { resource: 'ai:finance', name: '财务 Agent' }
+];
+
+/* 资源清单 → 矩阵要显示的行。
+   行的两种形态：
+     kind='rw'    —— 模块。一对权限点（x:read / x:write），界面给三态选择。
+     kind='point' —— AI 能力。单个权限点，界面给开/关。
+   清单【不硬编码模块表】：来自 module-loader 注册表（模块自声明 resource）
+   + 内置路由表，与门禁 resourceOf() 同一批数据 —— 界面配得出的项，门禁必然认得。 */
+function matrixResources() {
+  const moduleLoader = require('../../module-loader');   // 惰性，见文件头循环依赖说明
+  const rows = moduleLoader.listResources().map(m => {
+    const label = RESOURCE_LABELS[m.resource] || {};
+    return {
+      kind: 'rw',
+      resource: m.resource,
+      name: label.name || m.resource,
+      group: label.group || '其它模块',
+      prefix: m.prefix
+    };
+  });
+  AI_CAPABILITIES.forEach(a => {
+    rows.push({ kind: 'point', resource: a.resource, name: a.name, group: 'AI 能力', prefix: '' });
+  });
+  /* 分组内按名字排，组间按固定顺序 —— 免得每次刷新矩阵行都在跳 */
+  const order = ['业务模块', '平台管理', 'AI 能力', '其它模块'];
+  rows.sort((a, b) => {
+    const ga = order.indexOf(a.group), gb = order.indexOf(b.group);
+    return (ga < 0 ? 99 : ga) - (gb < 0 ? 99 : gb)
+      || String(a.resource).localeCompare(String(b.resource));
+  });
+  return rows;
+}
+
+/** 权限点 → allowed 的查表函数（1 / 0） */
+function allowedMap(role) {
+  const m = {};
+  db.getPermissions(role).forEach(r => { m[r.resource] = r.allowed ? 1 : 0; });
+  return m;
+}
 
 const COOKIE = 'wb_session';
 /* 登录来源标记，与 modules/sso/routes.js 里同名同属性。取值 sso | local。
@@ -269,7 +352,9 @@ async function handle(req, res, url) {
 
   /* ---- 以下仅管理员 ---- */
   const needAdmin = p === '/api/auth/users' || p.startsWith('/api/auth/users/')
-                    || p === '/api/auth/teams';
+                    || p === '/api/auth/teams'
+                    || p === '/api/auth/permissions/matrix'
+                    || (p === '/api/auth/permissions' && method === 'POST');
   if (needAdmin) {
     const me = currentUser(req);
     if (!me) return sendJson(res, 401, { error: '请先登录' });
@@ -335,17 +420,48 @@ async function handle(req, res, url) {
     if (p === '/api/auth/users' && method === 'POST') {
       const b = await readBody(req);
       try {
+        const id = String(b.id || '').trim();
+        const name = String(b.name || '').trim();
+        const role = String(b.role || db.ROLES.READER);
+
+        /* 服务端生成初始密码（或收下人工指定的一条），不再接受前端传任意密码。
+           为什么要改成「服务端算」：
+             ① 密码公式是同一份规则，前端算会让规则散到浏览器里，改一次要动两处；
+             ② 一次性返回后不落库明文、不回显第二次，比让管理员手抄 CSV 安全。 */
+        const chk = passwordRule.validateNewUser({ id, name, prefix: b.prefix, kind: b.kind });
+        if (!chk.ok) return sendJson(res, 400, { error: chk.error });
+        if (db.ROLE_LIST.indexOf(role) < 0) {
+          return sendJson(res, 400, { error: '角色非法，可选：' + db.ROLE_LIST.join(' / ') });
+        }
+
+        const cfg = passwordRule.loadConfig({ strict: true });
+        /* 显式传了 password 就用它（兼容脚本/联调），否则按公式算。
+           外包没有工号，工号段留空 —— buildPassword 走独立分支不加后4位。 */
+        const password = b.password
+          ? String(b.password)
+          : passwordRule.buildPassword(b.prefix, id, cfg, chk.kind);
+        if (password.length < 6) {
+          return sendJson(res, 400, { error: '按当前规则拼出的密码不足 6 位（' + password + '），请检查姓名缩写与工号' });
+        }
+
         const u = db.createUser({
-          id: String(b.id || '').trim(),
-          name: String(b.name || '').trim(),
-          password: String(b.password || ''),
-          role: String(b.role || 'viewer')
+          id, name, password, role,
+          department: b.department ? String(b.department).trim() : null,
+          /* 标成初始密码：用户列表要能一眼看出「谁还没改过」，否则这个数只能靠数库 */
+          initialPassword: true
         });
+        /* ★ 审计【不记密码】。审计日志在界面上给所有人看（操作记录区块），
+           把初始密码写进去等于把密码贴到公告栏。只记账号、角色、类型。 */
         db.logAudit({
           user_id: me.id, user: me.name, module: 'auth', action: '新建用户',
-          details: u.id + '（' + u.role + '）'
+          details: u.id + '（' + u.name + '，' + u.role + '，' + chk.kind + '）'
         });
-        return sendJson(res, 200, { ok: true, user: { id: u.id, name: u.name, role: u.role } });
+        return sendJson(res, 200, {
+          ok: true,
+          user: { id: u.id, name: u.name, role: u.role, pwdIsInitial: 1 },
+          /* 明文密码只在这里出现一次，前端弹窗给管理员抄；刷新即不可再取。 */
+          password
+        });
       } catch (e) {
         return sendJson(res, 400, { error: e.message });
       }
@@ -356,10 +472,17 @@ async function handle(req, res, url) {
       const target = String(b.id || '');
       if (target === me.id) return sendJson(res, 400, { error: '不能改自己的角色' });
       if (!db.findUser(target)) return sendJson(res, 404, { error: '用户不存在' });
-      db.setRole(target, String(b.role || 'viewer'));
+      /* 角色必须落在白名单内。旧代码是 String(b.role || 'viewer')，
+         传个拼错的值会静默写库，那人此后 hasPermission 全部查不到记录 = 处处 403，
+         而库里的 role 看着又「有个值」，极难查。宁可 400。 */
+      const role = String(b.role || '');
+      if (db.ROLE_LIST.indexOf(role) < 0) {
+        return sendJson(res, 400, { error: '角色非法，可选：' + db.ROLE_LIST.join(' / ') });
+      }
+      db.setRole(target, role);
       db.logAudit({
         user_id: me.id, user: me.name, module: 'auth', action: '改角色',
-        details: target + ' → ' + b.role
+        details: target + ' → ' + role
       });
       return sendJson(res, 200, { ok: true });
     }
@@ -390,6 +513,89 @@ async function handle(req, res, url) {
         user_id: me.id, user: me.name, module: 'auth', action: '重置密码', details: target
       });
       return sendJson(res, 200, { ok: true });
+    }
+
+    /* ---- 权限矩阵（全量读）----
+       与下面 role-scoped 的 GET /api/auth/permissions 不是一回事：
+       那个是「我这个角色有哪些权限点」，这个给管理员看【所有模块 × 两档角色】。
+       两档里只有「可读写」可编辑，所以 editableRole 直接给前端，
+       免得前端再硬编码一次「只配 editor」这条规则。 */
+    if (p === '/api/auth/permissions/matrix' && method === 'GET') {
+      return sendJson(res, 200, {
+        resources: matrixResources(),
+        editableRole: db.ROLES.EDITOR,
+        roles: [
+          { role: db.ROLES.READER, label: db.ROLE_LABELS[db.ROLES.READER], editable: false },
+          { role: db.ROLES.EDITOR, label: db.ROLE_LABELS[db.ROLES.EDITOR], editable: true }
+        ],
+        allowed: {
+          [db.ROLES.READER]: allowedMap(db.ROLES.READER),
+          [db.ROLES.EDITOR]: allowedMap(db.ROLES.EDITOR)
+        }
+      });
+    }
+
+    /* ---- 权限矩阵（改一格）----
+       请求体两种形态：
+         kind='rw'    → { role, resource, read, write }   读写/只读/无 三态
+         kind='point' → { role, resource, allowed }        AI 能力开关
+       服务端的硬边界：role 只接受「可读写」。仅可读那一档是全平台只读的基线，
+       允许在界面上改它，就会出现「把 reader 的 plan:read 关掉、某人登录后
+       首页都打不开」这种自伤配置。这里拦在服务端，不只是前端不给点。 */
+    if (p === '/api/auth/permissions' && method === 'POST') {
+      const b = await readBody(req);
+      const role = String(b.role || '');
+      const resource = String(b.resource || '').trim();
+      if (role !== db.ROLES.EDITOR) {
+        return sendJson(res, 400, {
+          error: '「' + (db.ROLE_LABELS[db.ROLES.READER] || db.ROLES.READER)
+            + '」是固定只读基线，不可配置；权限矩阵只配「'
+            + (db.ROLE_LABELS[db.ROLES.EDITOR] || db.ROLES.EDITOR) + '」'
+        });
+      }
+      if (!resource) return sendJson(res, 400, { error: '缺少 resource' });
+
+      /* 只允许配【清单里存在】的资源。放任意字符串进来会让 permissions 表
+         长出垃圾行 —— 门禁查不到它们，但下次有人翻表会以为规则生效了。 */
+      const known = matrixResources().some(r => r.resource === resource
+        || r.resource + ':read' === resource || r.resource + ':write' === resource);
+      if (!known) return sendJson(res, 400, { error: '未知资源：' + resource });
+
+      const hasWrite = Object.prototype.hasOwnProperty.call(b, 'write');
+      const read = b.read ? 1 : 0, write = b.write ? 1 : 0;
+      try {
+        /* read / write 是一对，必须一起落地。分两条 UPDATE 中间失败会留下
+           「read=1、write=0」的半截状态 —— 看着像「只读」，实际是配坏了。
+           node:sqlite 没有事务辅助函数，手工 BEGIN/COMMIT 兜住。 */
+        const conn = db.get();
+        conn.exec('BEGIN');
+        try {
+          if (hasWrite) {
+            db.setPermission(role, resource + ':read', read);
+            db.setPermission(role, resource + ':write', write);
+          } else {
+            db.setPermission(role, resource, b.allowed ? 1 : 0);
+          }
+          conn.exec('COMMIT');
+        } catch (e) {
+          try { conn.exec('ROLLBACK'); } catch (e2) { /* 回滚失败就让异常冒出去 */ }
+          throw e;
+        }
+      } catch (e) {
+        return sendJson(res, 400, { error: '写入失败：' + e.message });
+      }
+
+      const detail = hasWrite
+        ? resource + ' → ' + (read && write ? '读写' : (read ? '只读' : '无'))
+        : resource + ' → ' + (b.allowed ? '开' : '关');
+      db.logAudit({
+        user_id: me.id, user: me.name, module: 'auth', action: '改权限',
+        details: role + ' · ' + detail
+      });
+      return sendJson(res, 200, {
+        ok: true,
+        allowed: allowedMap(role)[hasWrite ? resource + ':read' : resource] || 0
+      });
     }
   }
 

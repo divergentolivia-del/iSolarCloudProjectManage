@@ -65,7 +65,11 @@ const ORG_SRC = process.env.DATA_DIR ? path.join(OUT_DIR, 'org.json') : ORG_FILE
 const DISABLE_RATIO_LIMIT = 0.2;
 const DISABLE_ABS_LIMIT = 5;      // 人数少时按比例算不可靠，给个绝对下限
 
-const ROLE_NEW = 'viewer';        // D8：自动建号一律 viewer，不看不猜
+/* D8：自动建号一律拿最小权限，不看不猜。
+   2026-10-14 角色收敛后是 reader（原 viewer）。含义一字未变：只读。
+   「非 reader 的账号 = 人工提权过的」，下方 privileged 判定就靠这个常量的值，
+   所以这里改名后，对账报告的分组口径自动跟着走，不需要再改判定逻辑。 */
+const ROLE_NEW = db.ROLES.READER;
 
 const argv = process.argv.slice(2);
 const has = (name) => argv.includes('--' + name);

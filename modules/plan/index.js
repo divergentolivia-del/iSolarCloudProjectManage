@@ -671,6 +671,7 @@ const PlanModule = (() => {
           <td class="pl-progress-cell">${progressBadge(pct)}</td>
           <td class="txt">${esc(fmtDate(node.startDate))}</td>
           <td class="txt">${esc(fmtDate(node.endDate))}</td>
+          <td class="txt">${esc(fmtDate(node.expectedOnlineDate))}</td>
           <td class="txt pl-deps">${esc((node.dependencies || []).map(d => typeof d === 'object' ? (d.name || d.id) : d).join(', ') || '—')}</td>
         </tr>`);
         if (hasChildren && isExpanded) walk(node.children, depth + 1);
@@ -686,7 +687,7 @@ const PlanModule = (() => {
             <tr>
               <th class="txt">WBS</th><th class="txt" style="min-width:230px">任务名称</th><th>类型</th><th>状态</th><th>优先级</th>
               <th class="txt">负责人</th><th class="txt">主责部门</th><th>人天</th><th style="min-width:110px">进度</th>
-              <th class="txt">开始</th><th class="txt">结束</th><th class="txt" style="min-width:120px">依赖</th>
+              <th class="txt">开始</th><th class="txt">结束</th><th class="txt">预计上线</th><th class="txt" style="min-width:120px">依赖</th>
             </tr>
           </thead>
           <tbody>${rows.join('')}</tbody>
@@ -1038,7 +1039,16 @@ const PlanModule = (() => {
   const EXPORT_SCHEMA = 1;   // 表结构版本，导入时校验，日后加列可据此兼容
 
   /* 每张表的列定义：h=表头，f=字段名，dict=值→中文标签字典，num=按数字写入 */
-  function planSheetSpecs() {
+  function planSheetSpecs(plan) {
+    /* WBS 的 extras 列：钉钉表里平台模型没接的业务列（关联业务 / 技术组件 / 操作模式 …）
+       导入时原样收在 task.extras 里。这里把用到的列名并起来当动态列写在固定列之后，
+       导出 → 再导入时它们又会被识别成「未映射列」收回 extras，往返一列不丢。
+       列序取首次出现顺序（不是字母序），这样同一份数据每次导出的列序是稳定的。 */
+    const extraKeys = [];
+    ((plan && plan.tasks) || []).forEach(t => {
+      Object.keys((t && t.extras) || {}).forEach(k => { if (extraKeys.indexOf(k) < 0) extraKeys.push(k); });
+    });
+    const extraCols = extraKeys.map(k => ({ h: k, get: t => ((t && t.extras) || {})[k] || '' }));
     return [
       {
         key: 'overview', sheet: '项目总览', tree: true, nameField: 'name',
@@ -1064,13 +1074,13 @@ const PlanModule = (() => {
           { h: '优先级', f: 'priority', dict: PRIORITY_LABELS },
           { h: '负责人', f: 'owner' }, { h: '主责部门', f: 'dept' },
           { h: '人天', f: 'plannedHours', num: true }, { h: '进度%', f: 'progress', num: true },
-          { h: '开始', f: 'startDate' }, { h: '结束', f: 'endDate' },
+          { h: '开始', f: 'startDate' }, { h: '结束', f: 'endDate' }, { h: '预计上线', f: 'expectedOnlineDate' },
           { h: 'WBS编码', f: 'wbsCode' },
           { h: '依赖', get: t => (t.dependencies || []).join(', ') },
           { h: '工作域', f: 'phase' }, { h: '工作模块', f: 'module' },
           { h: '参与部门', f: 'dept2' }, { h: 'SE负责人', f: 'se' },
           { h: '描述', f: 'desc' }, { h: '备注', f: 'note' }
-        ]
+        ].concat(extraCols)
       },
       {
         key: 'marketPlan', sheet: '上市计划', tree: true, nameField: 'name',
@@ -1203,7 +1213,7 @@ const PlanModule = (() => {
     };
 
     add('基本信息', basicSheetAoa(plan));
-    planSheetSpecs().forEach(spec => {
+    planSheetSpecs(plan).forEach(spec => {
       const list = plan[spec.key] || [];
       add(spec.sheet, spec.tree ? treeSheetAoa(list, spec) : flatSheetAoa(list, spec));
     });
@@ -1748,7 +1758,7 @@ const PlanModule = (() => {
      新建 / 编辑 —— 第二页表单
      ========================================================== */
   function blankTask() {
-    return { id: 't-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), parentId: '', wbsCode: '', name: '', type: 'dev', status: 'not-started', priority: 'medium', progress: 0, plannedHours: '', owner: '', dept: '', startDate: '', endDate: '', dependencies: [], note: '' };
+    return { id: 't-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), parentId: '', wbsCode: '', name: '', type: 'dev', status: 'not-started', priority: 'medium', progress: 0, plannedHours: '', owner: '', dept: '', startDate: '', endDate: '', expectedOnlineDate: '', dependencies: [], note: '' };
   }
   function blankMilestone() {
     return { id: 'm-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: '', date: '', status: 'pending', owner: '', desc: '' };
@@ -1923,6 +1933,7 @@ const PlanModule = (() => {
         <td><input type="number" data-f="progress" value="${esc(t.progress)}" placeholder="0-100" min="0" max="100"></td>
         <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="startDate" value="${esc(t.startDate)}"></td>
         <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="endDate" value="${esc(t.endDate)}"></td>
+        <td><input type="text" class="pl-date" readonly placeholder="选择日期" data-f="expectedOnlineDate" value="${esc(t.expectedOnlineDate)}"></td>
         <td><select data-f="parentId" class="pl-f-parent">${parentOptions(draft.tasks, t.id, t.parentId, '— 顶层 —')}</select></td>
         <td><input data-f="deps" value="${esc((t.dependencies || []).join(', '))}" placeholder="依赖任务WBS"></td>
         <td><button type="button" class="pl-row-del pl-del-task" data-del-task="${i}" title="删除（连带子任务）"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M6.5 1.5h3a.5.5 0 0 1 .5.5v1H6V2a.5.5 0 0 1 .5-.5Zm-1.5 2V2A1.5 1.5 0 0 1 6.5.5h3A1.5 1.5 0 0 1 11 2v1.5h2.5a.5.5 0 0 1 0 1h-.53l-.6 8.4A2 2 0 0 1 10.38 15H5.62a2 2 0 0 1-1.99-1.85l-.6-8.4H2.5a.5.5 0 0 1 0-1H5Zm-.96 1 .59 8.33a1 1 0 0 0 1 .92h4.74a1 1 0 0 0 1-.92l.59-8.33H4.04ZM6.75 6a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v5a.5.5 0 0 1-1 0v-5a.5.5 0 0 1 .5-.5Z"/></svg></button></td>
@@ -1931,7 +1942,7 @@ const PlanModule = (() => {
     return `<div class="table-wrapper pl-form-table-wrap"><table class="data-table pl-form-table"><thead><tr>
         <th style="min-width:58px">#</th><th class="txt" style="min-width:260px">任务名称</th><th>类型</th><th>状态</th><th>优先级</th>
         <th class="txt">负责人</th><th class="txt">主责部门</th><th style="min-width:70px">人天</th><th style="min-width:60px">进度%</th>
-        <th class="txt">开始</th><th class="txt">结束</th><th class="txt" style="min-width:170px">父任务</th><th class="txt">依赖</th><th></th>
+        <th class="txt">开始</th><th class="txt">结束</th><th class="txt">预计上线</th><th class="txt" style="min-width:170px">父任务</th><th class="txt">依赖</th><th></th>
       </tr></thead><tbody>${rows}</tbody></table></div>`;
   }
 
@@ -2627,6 +2638,7 @@ const PlanModule = (() => {
       parentId: t.parentId || '',
       startDate: t.startDate || '',
       endDate: t.endDate || '',
+      expectedOnlineDate: t.expectedOnlineDate || '',
       dependencies: Array.isArray(t.dependencies) ? t.dependencies : []
     }));
     const milestones = dirtyForm.milestones.filter(m => m.name && String(m.name).trim()).map(m => ({

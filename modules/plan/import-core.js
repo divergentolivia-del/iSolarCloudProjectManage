@@ -96,6 +96,10 @@ const SYNONYMS = {
     plannedHours: ['计划工时（人天）', '计划工时', '人天', '工时', '工作量', '预计工时'],
     startDate: ['计划开始时间', '开始时间', '计划开始', '开始日期', '起始日期'],
     endDate: ['计划完成时间', '计划结束时间', '结束时间', '完成时间', '截止日期'],
+    /* 预计上线时间：钉钉 WBS 表里 913 行有 558 行有值，且是 PM 真会看的一个日期，
+       所以提为正式字段（而不是像其余长尾列那样进 extras）。
+       '预计上线' 是平台导出用的短表头，留着它才能保证「导出→再导入」一列不丢。 */
+    expectedOnlineDate: ['预计上线', '预计上线时间', '预计上线日期', '上线时间', '计划上线时间'],
     type: ['能力类型', '任务类型', '类型', '工作类型'],
     priority: ['优先级', '需求优先级', '重要程度'],
     dept2: ['参与部门', '协同部门'],
@@ -767,7 +771,33 @@ function convertOverview(rows, mapping, genId) {
 
 /* WBS 任务。钉钉「团队分工与执行计划」是能力拆解表，利用率最高的一张。
    平台没有的列（参与部门/SE负责人/工作域/目标用户…）按约定直接丢弃，不硬塞。 */
-function convertTasks(rows, mapping, genId) {
+/* 未映射列兜底：钉钉那张 WBS 表有 9 个业务列（关联业务 / 技术组件 / 操作模式 /
+   支持渠道 / 能力层级 / 目标用户 / 依赖服务 / 区域限制 …）平台任务模型里没有对应字段。
+   它们的填充率从 456/913 到 6/913 不等，全提为正式列会把任务从 17 列撑到 26 列，
+   而为 6 行数据付出的代价是每个视图、每次导出都得带着这几列。
+
+   所以统一收进 task.extras（列名 → 文本），落库保存、导出原样写回，一列不丢。
+   日后某一列用得多了，再从 extras 提为正式字段即可（数据已经在了，不用重导）。 */
+function collectExtras(raw, mapping, headers, unmatched) {
+  if (!unmatched || !unmatched.length) return null;
+  const mapped = {};
+  Object.keys(mapping).forEach(f => { mapped[mapping[f]] = true; });
+  let out = null;
+  unmatched.forEach(function (h) {
+    /* 父列（Parent Record）不光是「没接上的业务列」——它已经变成了 parentId / 层级，
+       再塞进 extras 就是重复存一份，导出时还会多出一列没用的父名。排除掉。 */
+    if (PARENT_COLS.indexOf(normKey(h)) >= 0) return;
+    const i = headers.indexOf(h);
+    if (i < 0 || mapped[i]) return;              // 未映射列里也要防重复表头
+    const v = cellText(raw[i]);
+    if (!v) return;                              // 空值不占位，否则每行都挂一堆空 key
+    if (!out) out = {};
+    out[h] = v;
+  });
+  return out;
+}
+
+function convertTasks(rows, mapping, genId, headers, unmatched) {
   return rows.map(r => {
     const progress = parseProgress(rowVal(r.raw, mapping, 'progress'));
     let status = FROM_LABEL.taskStatus[normLabel(rowVal(r.raw, mapping, 'status'))] || null;
@@ -792,8 +822,12 @@ function convertTasks(rows, mapping, genId) {
       dept: rowVal(r.raw, mapping, 'dept'),
       startDate: parseDate(rowVal(r.raw, mapping, 'startDate')),
       endDate: parseDate(rowVal(r.raw, mapping, 'endDate')),
+      expectedOnlineDate: parseDate(rowVal(r.raw, mapping, 'expectedOnlineDate')),
       dependencies: [],
-      note: rowVal(r.raw, mapping, 'note')
+      note: rowVal(r.raw, mapping, 'note'),
+      /* 没接上的业务列原样留着（见 collectExtras 注释）。没有就整个不写这个 key，
+         免得每条任务挂个空对象把 state.json 撑大。 */
+      extras: collectExtras(r.raw, mapping, headers, unmatched)
     };
   });
 }
@@ -1099,7 +1133,7 @@ function parseDingTalkSheets(sheetNames, aoaOf, opts) {
         plan.overview = linkParents(convertOverview(rows, mapping, genId));
         break;
       case 'tasks':
-        plan.tasks = linkParents(convertTasks(rows, mapping, genId));
+        plan.tasks = linkParents(convertTasks(rows, mapping, genId, headers, c.unmatched));
         break;
       case 'marketPlan':
         plan.marketPlan = linkParents(convertTreeForm(rows, mapping, genId, 'mk', 'name'));
@@ -1302,6 +1336,25 @@ function parsePlatformExport(wb, XLSX, meta, opts) {
 }
 
 /* 平台导出行 → 平台记录（把中文标签反查成枚举值） */
+/* 平台导出 WBS 表的固定列（顺序与 index.js planSheetSpecs 的 tasks.cols 一致）。
+   extras 的动态列一定是追加在这些之后的，所以「不在此名单里」就等于「是动态列」。 */
+const TASK_FIXED_COLS = ['层级', '名称', '类型', '状态', '优先级', '负责人', '主责部门', '人天', '进度%',
+  '开始', '结束', '预计上线', 'WBS编码', '依赖', '工作域', '工作模块', '参与部门', 'SE负责人', '描述', '备注'];
+
+/* 从导出行里回收动态列。按列名反查而不是按下标，列序变了也不受影响。 */
+function pickTaskExtras(r) {
+  let out = null;
+  Object.keys(r).forEach(function (k) {
+    if (k.charAt(0) === '_') return;                    // _rowNo / _id / _parentId 是内部列
+    if (TASK_FIXED_COLS.indexOf(k) >= 0) return;        // 固定列已由 toPlatformItem 逐个读取
+    const v = cellText(r[k]);
+    if (!v) return;
+    if (!out) out = {};
+    out[k] = v;
+  });
+  return out;
+}
+
 function toPlatformItem(r, form, genId) {
   const g = k => cellText(r[k]);
   const st = FROM_LABEL.taskStatus[normKey(g('状态'))];
@@ -1328,8 +1381,15 @@ function toPlatformItem(r, form, genId) {
         plannedHours: parseNumber(g('人天')) == null ? '' : parseNumber(g('人天')),
         owner: g('负责人'), dept: g('主责部门'),
         startDate: parseDate(g('开始')), endDate: parseDate(g('结束')),
+        expectedOnlineDate: parseDate(g('预计上线')),
         dependencies: g('依赖') ? g('依赖').split(/[,，、]\s*/).map(x => x.trim()).filter(Boolean) : [],
-        note: g('备注')
+        /* 下面这几个字段平台导出会写（见 index.js planSheetSpecs），以前回导时不读，
+           属于「导出去就回不来」的静默丢数据，一并补上。 */
+        phase: g('工作域'), module: g('工作模块'), dept2: g('参与部门'), se: g('SE负责人'),
+        desc: g('描述'), note: g('备注'),
+        /* 动态列（钉钉同步时接不上的业务列）导出时按原列名追加在固定列之后，
+           这里按「不在固定列名单里」反查收回来，保证往返一列不丢。没有就不写这个 key。 */
+        extras: pickTaskExtras(r)
       };
     }
     case 'milestones': return {

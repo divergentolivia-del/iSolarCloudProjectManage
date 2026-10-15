@@ -171,6 +171,7 @@ function validateState(next) {
           if (t.plannedHours != null && (typeof t.plannedHours !== 'number' || t.plannedHours < 0)) return `任务 "${t.id}" 计划工时必须为非负数`;
           if (t.startDate && !isValidDate(t.startDate)) return `任务 "${t.id}" startDate 必须为 YYYY-MM-DD`;
           if (t.endDate && !isValidDate(t.endDate)) return `任务 "${t.id}" endDate 必须为 YYYY-MM-DD`;
+          if (t.expectedOnlineDate && !isValidDate(t.expectedOnlineDate)) return `任务 "${t.id}" expectedOnlineDate 必须为 YYYY-MM-DD`;
           if (t.startDate && t.endDate && t.startDate > t.endDate) return `任务 "${t.id}" 开始日期不能晚于结束日期`;
         }
       }

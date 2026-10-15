@@ -35,9 +35,9 @@ function platformWorkbook() {
     ['TR3 评审', '2026-06-20', '进行中', '李四', '', 'm2']
   ]);
   put('WBS任务', [
-    ['层级', '名称', '类型', '状态', '优先级', '负责人', '主责部门', '人天', '进度%', '开始', '结束', 'WBS编码', '依赖', '备注', '_id', '_parentId'],
-    ['1', '需求开发', '开发', '进行中', '高', '张三', '研发', 10, 50, '2026-03-01', '2026-04-30', '1', '', '', 't1', ''],
-    ['1.1', '　接口联调', '开发', '未开始', '中', '李四', '研发', 5, 0, '2026-05-01', '2026-05-20', '1.1', '', '', 't2', 't1']
+    ['层级', '名称', '类型', '状态', '优先级', '负责人', '主责部门', '人天', '进度%', '开始', '结束', '预计上线', 'WBS编码', '依赖', '备注', '_id', '_parentId'],
+    ['1', '需求开发', '开发', '进行中', '高', '张三', '研发', 10, 50, '2026-03-01', '2026-04-30', '2026-06-30', '1', '', '', 't1', ''],
+    ['1.1', '　接口联调', '开发', '未开始', '中', '李四', '研发', 5, 0, '2026-05-01', '2026-05-20', '', '1.1', '', '', 't2', 't1']
   ]);
   put('遗留问题', [
     ['问题编号', '遗留问题描述', '应对方案', '责任人', '预计闭环时间', '当前进展', '结论', '当前状态', '_id'],
@@ -145,6 +145,34 @@ test('往返不丢数值：人天 / 进度解析成数字', () => {
   const t1 = r.plan.tasks.find(t => t.name === '需求开发');
   assert.equal(t1.plannedHours, 10);
   assert.equal(t1.progress, 50);
+});
+
+test('往返不丢「预计上线」：平台导出的短表头能读回正式字段', () => {
+  const r = parse(platformWorkbook());
+  const t1 = r.plan.tasks.find(t => t.name === '需求开发');
+  const t2 = r.plan.tasks.find(t => t.name === '接口联调');
+  assert.equal(t1.expectedOnlineDate, '2026-06-30');
+  assert.equal(t2.expectedOnlineDate, '', '空值不能被写成 undefined 或字符串');
+});
+
+test('钉钉未接上的业务列收进 extras，父列不重复收', () => {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+    ['能力名称', 'Parent Record', '关联业务', '技术组件', '预计上线时间'],
+    ['能力A', '', '营销', '前端能力', '2026-07-01'],
+    ['能力B', '能力A', '', '后端能力', '']
+  ]), '团队分工与执行计划');
+  const r = parse(wb);
+  const a = r.plan.tasks.find(t => t.name === '能力A');
+  const b = r.plan.tasks.find(t => t.name === '能力B');
+  assert.equal(a.expectedOnlineDate, '2026-07-01');
+  assert.deepEqual(a.extras, { '关联业务': '营销', '技术组件': '前端能力' });
+  // 空值不占位：能力B 的「关联业务」是空的，extras 里只该剩有值的那一列
+  assert.deepEqual(b.extras, { '技术组件': '后端能力' });
+  // Parent Record 已经变成层级（parentId），不该再在 extras 里存一份
+  assert.equal(Object.prototype.hasOwnProperty.call(a.extras, 'Parent Record'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(b.extras, 'Parent Record'), false);
+  assert.equal(b.parentId, a.id, 'Parent Record 仍须正常还原成层级');
 });
 
 /* ─────────────────────── 2. 钉钉导出映射 ─────────────────────── */

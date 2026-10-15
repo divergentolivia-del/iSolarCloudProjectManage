@@ -1063,7 +1063,9 @@ const PlanModule = (() => {
           { h: '开始', f: 'startDate' }, { h: '结束', f: 'endDate' },
           { h: 'WBS编码', f: 'wbsCode' },
           { h: '依赖', get: t => (t.dependencies || []).join(', ') },
-          { h: '备注', f: 'note' }
+          { h: '工作域', f: 'phase' }, { h: '工作模块', f: 'module' },
+          { h: '参与部门', f: 'dept2' }, { h: 'SE负责人', f: 'se' },
+          { h: '描述', f: 'desc' }, { h: '备注', f: 'note' }
         ]
       },
       {
@@ -1098,7 +1100,8 @@ const PlanModule = (() => {
         key: 'resources', sheet: '资源', tree: false,
         cols: [
           { h: '资源', f: 'name' }, { h: '类型', f: 'kind', dict: RES_KIND_LABELS },
-          { h: '部门', f: 'dept' }, { h: '总容量(人天)', f: 'total', num: true }
+          { h: '部门', f: 'dept' }, { h: '总容量(人天)', f: 'total', num: true },
+          { h: '缺口', f: 'gap', num: true }, { h: '应对方案', f: 'solution' }
         ]
       },
       {

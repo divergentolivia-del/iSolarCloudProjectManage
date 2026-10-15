@@ -597,6 +597,87 @@ function userTokenStats() {
   return { cached: _userTokens.size, alive: alive };
 }
 
+/* ---------- 智能表格（Notable）只读读取 -------------------------
+ *
+ * 用途：「从钉钉文档同步」入口要读在线文档里的表。与 dingtalk-dump-doc.js
+ * 是同一套调用，但那个是 CLI 脚本、自己实现了 req/loadCred，服务端没法用，
+ * 所以在这里按同一套写法固化一份。
+ *
+ * ── 三个必踩的坑（都是实测出来的）────────────────────────────
+ *  ① /sheets 和 /fields 的结果挂在 .value，/records 的记录挂在顶层 .records。
+ *     两处写成同一个形状，就会各静默拿到空数组 —— 表现是「表清单读到了、
+ *     记录全是空」，看着像没权限，其实是读错字段。
+ *  ② /records 的 maxResults 上限是 100，超了直接 HTTP 400
+ *     invalidRequest.inputArgs.invalid。必须用 nextToken / hasMore 分页。
+ *  ③ operatorId 必须带，否则钉钉按调用人不明处理。
+ */
+
+/**
+ * 读一个智能表格文档的全部表（字段定义 + 全量记录）。
+ * @param {string} nodeId 文档 nodeId（链接 /i/nodes/<nodeId> 里那段）
+ * @param {object} [opts] { onProgress(name, {tables, records}) }
+ * @returns {Promise<Array<{id,name,fields,records}>>}
+ */
+async function readNotableTables(nodeId, opts) {
+  const o = opts || {};
+  const cfg = loadConfig();
+  if (missing(nodeId)) {
+    const err = new Error('缺少 nodeId（文档链接 /i/nodes/ 后面那段）');
+    err.step = 'param';
+    throw err;
+  }
+  if (missing(cfg.operatorId)) {
+    const err = new Error('缺少 operatorId，请填 data/dingtalk/secret.json');
+    err.step = 'config';
+    throw err;
+  }
+
+  const token = await getToken();
+  const op = '?operatorId=' + encodeURIComponent(cfg.operatorId);
+  const base = API + '/v1.0/notable/bases/' + encodeURIComponent(nodeId) + '/sheets';
+
+  const lr = await req('GET', base + op, { token: token });
+  if (lr.status !== 200 || !lr.json || !Array.isArray(lr.json.value)) {
+    const err = new Error('读表清单失败：HTTP ' + lr.status + ' ' + String(lr.text || '').slice(0, 200));
+    err.step = 'sheets';
+    throw err;
+  }
+  const tables = lr.json.value;
+
+  const out = [];
+  for (const t of tables) {
+    const sid = encodeURIComponent(t.id || t.name);
+
+    /* 字段定义（.value 包装，与 /sheets 同形）*/
+    const fr = await req('GET', base + '/' + sid + '/fields' + op, { token: token });
+    const fields = (fr.status === 200 && fr.json && Array.isArray(fr.json.value)) ? fr.json.value : [];
+
+    /* 记录分页（顶层 .records，单页上限 100）*/
+    const records = [];
+    let nextToken = null;
+    let err = null;
+    for (let page = 0; page < 500; page++) {
+      const rq = op + '&maxResults=100' + (nextToken ? '&nextToken=' + encodeURIComponent(nextToken) : '');
+      const dr = await req('GET', base + '/' + sid + '/records' + rq, { token: token });
+      if (dr.status !== 200 || !dr.json) {
+        /* 单张表失败不掐断整次同步：记下原因继续读下一张，
+           让预览页能明确告诉用户「哪张表没读到、为什么」，
+           而不是整个同步失败、看不出是哪张表的问题。 */
+        err = 'HTTP ' + dr.status + ' ' + String(dr.text || '').slice(0, 150);
+        break;
+      }
+      records.push(...(dr.json.records || []));
+      if (!dr.json.hasMore) break;
+      nextToken = dr.json.nextToken || null;
+      if (!nextToken) break;
+    }
+
+    out.push({ id: t.id, name: t.name, fields: fields, records: records, _err: err });
+    if (o.onProgress) o.onProgress(t.name, { tables: tables.length, records: records.length });
+  }
+  return out;
+}
+
 module.exports = {
   API, OAPI, SECRET_FILE,
   missing, loadConfig, isConfigured, isLoginConfigured,
@@ -604,6 +685,7 @@ module.exports = {
   getToken, clearToken,
   listSubDepartments, listDepartmentUsers,
   fetchOrg,
+  readNotableTables,
   /* 用户身份 / 权限透传 */
   getUserInfoByCode, getUserDetail, exchangeUserToken, refreshUserToken,
   putUserToken, getUserToken, userTokenOf, clearUserToken, userTokenStats

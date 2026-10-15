@@ -433,7 +433,9 @@ function buildAssignments(candidates) {
         matched: m.matchedCount, mapping: m.mapping, unmatched: m.unmatchedHeaders,
         disc: conf.disc, score: conf.score, exHits: conf.exHits, exactEx: conf.exactEx,
         ratio: conf.ratio, nameHint: conf.nameHint,
-        tier: conf.tier, nonEmpty: c.best.nonEmpty
+        tier: conf.tier, nonEmpty: c.best.nonEmpty,
+        /* 文档同步路径的内部列，必须一路带到转换阶段，否则层级又退回按名字猜 */
+        hasDt: c.hasDt, dtIdOf: c.dtIdOf, dtPidOf: c.dtPidOf
       });
     });
   });
@@ -557,7 +559,8 @@ function applySheetOverrides(taken, usedSheets, candidates, overrides) {
       matched: m.matchedCount, mapping: m.mapping, unmatched: m.unmatchedHeaders,
       disc: conf.disc, weight: conf.score, score: conf.score, exHits: conf.exHits,
       ratio: conf.ratio, nameHint: conf.nameHint, tier: conf.tier,
-      nonEmpty: c.best.nonEmpty, manual: true
+      nonEmpty: c.best.nonEmpty, manual: true,
+      hasDt: c.hasDt, dtIdOf: c.dtIdOf, dtPidOf: c.dtPidOf
     };
     taken[form] = p;
     usedSheets[sheetName] = p;
@@ -650,26 +653,55 @@ function buildHierarchy(rows, mapping, nameField) {
     if (r.name) (byName[r.name] = byName[r.name] || []).push(i);
   });
 
-  const claimed = {};     // 名字 → 已被当作父名认领过的行下标集合
+  /* ★ 两条建树路径，按「手上有没有权威 id」分流：
+   *
+   *   有（钉钉文档同步）→ 按 dtParentId 直连。钉钉 API 是按 recordId 排序返回的，
+   *     父行完全可能排在子行【下方】（实测 913 行的 WBS 表里 332 行如此），
+   *     所以绝不能沿用「只认上方父行」那条规则，否则层级大面积丢失且不报错。
+   *   没有（Excel 导入）→ 保持原来的名字 + 在上方 就近匹配，一行行为都不变。
+   *
+   * 名字匹配对文档路径还有个隐藏问题：同名行很多（本表 913 行只有 695 个不同名字），
+   * 即便父行在上方也会认错人。所以分流不是优化，是正确性要求。 */
+  const byDtId = {};
+  let hasDt = false;
   rows.forEach((r, i) => {
-    const pn = r.parentName;
-    if (!pn) return;
-    if (pn === r.name) { diag.selfRef.push({ row: r.rowNo, name: pn, parentName: pn }); return; }
-    const cands = byName[pn] || [];
-    if (!cands.length) { diag.dangling.push({ row: r.rowNo, name: r.name, parentName: pn }); return; }
-    claimed[pn] = claimed[pn] || {};
-    // 取「在上方、最近、且未被占用」的那个；都被占用则退而取最近的上方那个
-    let pick = -1;
-    for (let k = cands.length - 1; k >= 0; k--) {
-      if (cands[k] < i) { if (pick < 0) pick = cands[k]; if (!claimed[pn][cands[k]]) { pick = cands[k]; break; } }
-    }
-    if (pick < 0) { diag.dangling.push({ row: r.rowNo, name: r.name, parentName: pn }); return; }
-    claimed[pn][pick] = true;
-    r.parentRow = pick;
-    if (cands.length > 1 && !diag.ambiguous.some(x => x.parentName === pn)) {
-      diag.ambiguous.push({ row: r.rowNo, name: r.name, parentName: pn, candidates: cands.length });
-    }
+    if (r.dtId) { byDtId[r.dtId] = i; hasDt = true; }
   });
+
+  if (hasDt) {
+    rows.forEach((r, i) => {
+      const pid = r.dtParentId;
+      if (!pid) return;                                  // 没有父 = 顶层
+      if (byDtId[pid] === undefined) {
+        diag.dangling.push({ row: r.rowNo, name: r.name, parentName: r.parentName || pid });
+        return;
+      }
+      const pi = byDtId[pid];
+      if (pi === i) { diag.selfRef.push({ row: r.rowNo, name: r.name, parentName: r.name }); return; }
+      r.parentRow = pi;
+    });
+  } else {
+    const claimed = {};     // 名字 → 已被当作父名认领过的行下标集合
+    rows.forEach((r, i) => {
+      const pn = r.parentName;
+      if (!pn) return;
+      if (pn === r.name) { diag.selfRef.push({ row: r.rowNo, name: pn, parentName: pn }); return; }
+      const cands = byName[pn] || [];
+      if (!cands.length) { diag.dangling.push({ row: r.rowNo, name: r.name, parentName: pn }); return; }
+      claimed[pn] = claimed[pn] || {};
+      // 取「在上方、最近、且未被占用」的那个；都被占用则退而取最近的上方那个
+      let pick = -1;
+      for (let k = cands.length - 1; k >= 0; k--) {
+        if (cands[k] < i) { if (pick < 0) pick = cands[k]; if (!claimed[pn][cands[k]]) { pick = cands[k]; break; } }
+      }
+      if (pick < 0) { diag.dangling.push({ row: r.rowNo, name: r.name, parentName: pn }); return; }
+      claimed[pn][pick] = true;
+      r.parentRow = pick;
+      if (cands.length > 1 && !diag.ambiguous.some(x => x.parentName === pn)) {
+        diag.ambiguous.push({ row: r.rowNo, name: r.name, parentName: pn, candidates: cands.length });
+      }
+    });
+  }
 
   // 成环检测：沿 parentRow 往上走，超过行数必成环
   rows.forEach(r => {
@@ -746,6 +778,9 @@ function convertTasks(rows, mapping, genId) {
       parentId: '',
       _parentRow: r.parentRow,
       _rowNo: r.rowNo,
+      /* 钉钉文档记录 id（Excel 导入为空串）。存它是为了让「再次从文档同步」能按
+         id 认出「还是这条任务」—— 改了名字、换了位置都不会错认成新增。 */
+      dtRecordId: r.dtId || '',
       wbsCode: '',
       name: rowVal(r.raw, mapping, 'name'),
       type: FROM_LABEL.taskType[normLabel(rowVal(r.raw, mapping, 'type'))] || 'dev',
@@ -932,19 +967,50 @@ function parseWorkbook(buf, XLSX, opts) {
   return parseDingTalkExport(wb, XLSX, opts);
 }
 
-/* ---------- 来源 B：钉钉导出 ---------- */
-function parseDingTalkExport(wb, XLSX, opts) {
+/* ---------- 来源 B：钉钉数据（两个入口共用同一套映射）----------
+ *
+ * ★ 为什么中间要抽一层 parseDingTalkSheets
+ *   钉钉的数据有两个入口：① 导出的 .xlsx 文件；② 在线文档 API 直读。
+ *   两者的差别**只在「怎么把一张表读成 aoa」**——后面的表头探测、表单分配、
+ *   列映射、层级还原、转换落库必须逐字一致。任何一边单独改一点，就会出现
+ *   「导入 Excel 对、从文档同步错」这种最难查的分叉。
+ *   所以：parseDingTalkExport 只负责「工作簿 → sheetNames + aoaOf」，
+ *   真正的解析逻辑全在下面这个共用函数里。
+ *
+ * @param {string[]} sheetNames  表名列表（保持原始顺序）
+ * @param {function} aoaOf       name → aoa（二维数组，首行是表头）
+ * @param {object}   opts        { planName, monthToDay, sheetOverrides }
+ */
+function parseDingTalkSheets(sheetNames, aoaOf, opts) {
   const genId = idGen('im');
   const sheets = [];
   const skipped = [];
 
   /* 1) 先把每张 sheet 读成 aoa，并对每个平台表单试算表头行 */
   const candidates = [];
-  wb.SheetNames.forEach(name => {
+  sheetNames.forEach(name => {
     if (name.charAt(0) === '_') return;                        // _元信息 之类
     if (isExcludedSheet(name)) return;                         // 废弃 / 草稿 / 备份表不参与
-    const aoa = sheetToAoa(wb.Sheets[name], XLSX);
+    const aoa = aoaOf(name) || [];
     if (!aoa.length) return;
+    /* 内部列 _dtId / _dtParentId（文档同步路径才有，Excel 路径没有）：
+       先按列名取出来存到候选上，再从 aoa 里【摘掉】—— 后面的表头探测、列映射
+       必须与 Excel 路径看到完全一样的表头，否则「导入 Excel 对、文档同步错」又回来了。 */
+    const h0 = (aoa[0] || []).map(cellText);
+    const dtIdIdx = h0.indexOf('_dtId');
+    const dtPidIdx = h0.indexOf('_dtParentId');
+    const hasDt = dtIdIdx >= 0 || dtPidIdx >= 0;
+    const dtIdOf = [], dtPidOf = [];
+    if (hasDt) {
+      const cut = Math.min(dtIdIdx < 0 ? 1e9 : dtIdIdx, dtPidIdx < 0 ? 1e9 : dtPidIdx);
+      for (let r = 1; r < aoa.length; r++) {
+        dtIdOf.push(dtIdIdx >= 0 ? cellText((aoa[r] || [])[dtIdIdx]) : '');
+        dtPidOf.push(dtPidIdx >= 0 ? cellText((aoa[r] || [])[dtPidIdx]) : '');
+      }
+      /* 内部列一定是追加在最后的连续两列，所以从头切到第一列内部列即可 */
+      aoa.forEach((row, i) => { if (row.length > cut) row.length = cut; });
+      aoa[0] = h0.slice(0, cut);
+    }
     let best = { form: null, matched: 0, headerRow: 0, mapping: {}, unmatched: [], score: -1, nonEmpty: 0 };
     Object.keys(FORM_TITLE).forEach(form => {
       if (form === 'basic') return;                            // 基本信息不在 sheet 级匹配
@@ -955,7 +1021,7 @@ function parseDingTalkExport(wb, XLSX, opts) {
         best = { form: form, matched: h.matched, headerRow: h.row, mapping: m.mapping, unmatched: m.unmatchedHeaders, score: score, nonEmpty: h.nonEmpty };
       }
     });
-    candidates.push({ name: name, aoa: aoa, best: best, headerRow: best.headerRow });
+    candidates.push({ name: name, aoa: aoa, best: best, headerRow: best.headerRow, hasDt: hasDt, dtIdOf: dtIdOf, dtPidOf: dtPidOf });
   });
 
   /* 2) 一张 sheet 只喂一个表单，一个表单只吃一张 sheet（贪心一对一分配） */
@@ -993,9 +1059,14 @@ function parseDingTalkExport(wb, XLSX, opts) {
     for (let r = c.headerRow + 1; r < c.aoa.length; r++) {
       const row = c.aoa[r] || [];
       if (isEmptyRow(row, mapping)) continue;
-      if (!nameField) { rows.push({ rowNo: r + 1, raw: row, parentName: '' }); continue; }
+      /* 文档同步路径：把这一行的钉钉记录 id / 父记录 id 带上（Excel 路径两边都是空）。
+         下标 = r - headerRow - 1，因为 dtIdOf 是从 aoa 第 1 行开始铺的。 */
+      const di = r - 1;
+      const dtId = c.hasDt ? (c.dtIdOf[di] || '') : '';
+      const dtPid = c.hasDt ? (c.dtPidOf[di] || '') : '';
+      if (!nameField) { rows.push({ rowNo: r + 1, raw: row, parentName: '', dtId: dtId, dtParentId: dtPid }); continue; }
       if (!cellText(row[mapping[nameField]])) continue;
-      rows.push({ rowNo: r + 1, raw: row, parentName: parentCol >= 0 ? cellText(row[parentCol]) : '' });
+      rows.push({ rowNo: r + 1, raw: row, parentName: parentCol >= 0 ? cellText(row[parentCol]) : '', dtId: dtId, dtParentId: dtPid });
     }
 
     const hd = buildHierarchy(rows, mapping, nameField);
@@ -1059,7 +1130,7 @@ function parseDingTalkExport(wb, XLSX, opts) {
   });
 
   /* 4) 未匹配的 sheet 列出原因，让用户知道什么被跳过了（用户明确要求：平台没有的一律跳过） */
-  wb.SheetNames.forEach(name => {
+  sheetNames.forEach(name => {
     if (name.charAt(0) === '_') return;
     if (sheets.some(s => s.sheetName === name)) return;
     const c = candidates.find(x => x.name === name);
@@ -1112,6 +1183,15 @@ function parseDingTalkExport(wb, XLSX, opts) {
     diagnostics: dedupeDiag(diag),
     summary: countPlan(plan)
   };
+}
+
+/* 入口：钉钉导出的 .xlsx 文件。只做「工作簿 → sheetNames + aoaOf」，其余交给共用函数。 */
+function parseDingTalkExport(wb, XLSX, opts) {
+  return parseDingTalkSheets(
+    wb.SheetNames,
+    function (name) { return sheetToAoa(wb.Sheets[name], XLSX); },
+    opts
+  );
 }
 
 /* 从某张表里补基本信息（负责人 / 起止时间），钉钉没有独立的基本信息 sheet */
@@ -1303,6 +1383,7 @@ function toPlatformItem(r, form, genId) {
 module.exports = {
   parseWorkbook: parseWorkbook,
   parseDingTalkExport: parseDingTalkExport,
+  parseDingTalkSheets: parseDingTalkSheets,
   parsePlatformExport: parsePlatformExport,
   LABELS: LABELS,
   SYNONYMS: SYNONYMS,

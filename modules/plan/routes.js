@@ -15,6 +15,8 @@ const fs = require('fs');
 const path = require('path');
 const XLSX = require('xlsx');
 const importCore = require('./import-core.js');
+const dingtalk = require('../dingtalk/client.js');
+const docTables = require('../dingtalk/doc-tables.js');
 
 const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
@@ -63,6 +65,19 @@ function sendJson(res, code, obj) {
     'Cache-Control': 'no-store'
   });
   res.end(body);
+}
+
+/* 从钉钉文档链接里抠出 nodeId。用户手上是一整条链接
+   （https://alidocs.dingtalk.com/i/nodes/<nodeId>?...），不该要求他自己剪。
+   也接受直接传 nodeId 本身。 */
+function parseDocNodeId(s) {
+  const v = String(s || '').trim();
+  if (!v) return '';
+  const m = /\/nodes\/([A-Za-z0-9]+)/.exec(v);
+  if (m) return m[1];
+  /* 没有 /nodes/ 段时，整串看起来就是个 nodeId 才认（避免把随便一串东西当 id） */
+  if (/^[A-Za-z0-9]{8,64}$/.test(v)) return v;
+  return '';
 }
 
 function isValidDate(value) {
@@ -484,6 +499,64 @@ module.exports = {
           // 不是合法工作簿时给出可读提示，而不是 500
           return sendJson(res, 400, { error: '表格解析失败：' + e.message + '（请确认是 .xlsx / .xls 文件）' });
         }
+        sendJson(res, 200, result);
+      });
+      return;
+    }
+
+    /* 从钉钉文档同步（只读，不落库）。与 /import-parse 返回同一个结构，
+       前端复用同一套预览组件；区别只在数据来源：那边是上传的 xlsx，
+       这边是钉钉智能表格 API 直读。列映射走的是同一个 parseDingTalkSheets。 */
+    if (sub === '/doc-parse' && req.method === 'POST') {
+      let body = '';
+      req.on('data', c => {
+        body += c;
+        if (body.length > 4 * 1024 * 1024) req.destroy();
+      });
+      req.on('end', async () => {
+        let incoming;
+        try { incoming = JSON.parse(body); }
+        catch (e) { return sendJson(res, 400, { error: 'JSON 解析失败' }); }
+
+        const nodeId = parseDocNodeId(incoming.nodeId || incoming.docUrl || '');
+        if (!nodeId) return sendJson(res, 400, { error: '缺少文档 nodeId（粘贴钉钉文档链接即可）' });
+
+        let tables;
+        try {
+          tables = await dingtalk.readNotableTables(nodeId);
+        } catch (e) {
+          /* 读不到就把钉钉的原话带出来 —— 「换 token 失败」「无权限」这类
+             处置方式完全不同，吞成「同步失败」等于让人没法查。 */
+          return sendJson(res, 502, { error: '读取钉钉文档失败：' + e.message, step: e.step || '' });
+        }
+
+        /* 单表读取失败的表也要在预览里露出来，不能静默少一张 */
+        const failed = tables.filter(t => t._err).map(t => ({ name: t.name, reason: t._err }));
+        const sheets = docTables.tablesToSheets(tables.filter(t => !t._err));
+
+        let result;
+        try {
+          result = importCore.parseDingTalkSheets(
+            sheets.map(s => s.name),
+            function (n) {
+              const hit = sheets.find(s => s.name === n);
+              return hit ? hit.aoa : null;
+            },
+            {
+              planName: incoming.planName ? String(incoming.planName).slice(0, 120) : '',
+              sheetOverrides: incoming.sheetOverrides || null
+            }
+          );
+        } catch (e) {
+          return sendJson(res, 500, { error: '解析文档内容失败：' + e.message });
+        }
+
+        /* 绑定信息：落盘时前端会把这个对象挂到 plan.dingtalk 上，
+           之后「再同步」直接复用，不再问用户要链接。 */
+        result.source = 'dingtalk-doc';
+        result.dingtalk = { docUrl: String(incoming.docUrl || '').slice(0, 500), nodeId: nodeId };
+        result.tableCount = tables.length;
+        result.failedTables = failed;
         sendJson(res, 200, result);
       });
       return;

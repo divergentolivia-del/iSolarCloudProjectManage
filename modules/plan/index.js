@@ -502,6 +502,7 @@ const PlanModule = (() => {
         <p class="pl-head-desc">部门项目执行指挥台：先看要出事的，再看最近要交的</p>
       </div>
       <div class="cs-head-actions">
+        <button class="btn" id="plSyncDoc" title="从钉钉智能表格文档只读拉取，落成一份新的平台计划">🔗 从钉钉文档同步</button>
         <button class="btn" id="plImportPlan" title="从 Excel 导入：平台导出文件 / 钉钉多维表导出 / 任意表格">⬆ 导入 Excel</button>
         <button class="btn primary" id="plNewPlan">＋ 新建计划</button>
       </div>
@@ -568,6 +569,9 @@ const PlanModule = (() => {
         <span class="pl-tag">🏷️ ${esc(plan.year || '')} 年度</span>
         <span class="pl-tag">👤 ${esc(plan.owner || '未指派')}</span>
         ${plan.projectName ? `<span class="pl-tag">🏢 ${esc(plan.projectName)}</span>` : ''}
+        ${plan.dingtalk && plan.dingtalk.nodeId
+          ? `<a class="pl-tag pl-tag-link" href="${esc(plan.dingtalk.docUrl || '#')}" target="_blank" rel="noopener"
+               title="本计划由钉钉文档同步而来，点此打开原文档">🔗 钉钉文档</a>` : ''}
       </div>
       ${plan.description ? `<p class="pl-desc">${esc(plan.description)}</p>` : ''}
       ${renderDetailMembers(plan)}
@@ -1264,6 +1268,16 @@ const PlanModule = (() => {
   let importMode = 'new';        // new | append | overwrite
   let importTargetId = '';       // append / overwrite 时的目标计划 id
 
+  /* 数据来源分两种，预览页之后的所有交互（改归属重解析、落盘、文案）都要按它分叉：
+       file —— 用户上传的 Excel（可 append / overwrite）
+       doc  —— 钉钉文档直读（第一版只做新建，见下）
+     之所以要这个判别位：改归属时要【重解析】，而重解析对这两种来源是两套完全不同的
+     请求（一个重传文件、一个重调文档接口）。没有它就只能靠 importFile 是否为 null 猜，
+     一旦哪天文件路径也变异步就会静默走错分支。 */
+  let importSource = 'file';     // file | doc
+  let importDocUrl = '';         // 钉钉文档链接（落盘时绑到计划上）
+  let importNodeId = '';         // 从链接里解出的 nodeId
+
   /* 读文件为 base64（去掉 data: 前缀，服务端按裸 base64 解） */
   function readFileBase64(file) {
     return new Promise((resolve, reject) => {
@@ -1292,6 +1306,31 @@ const PlanModule = (() => {
     const result = await resp.json();
     if (!resp.ok) throw new Error(result.error || '解析失败');
     return result;
+  }
+
+  /* 从钉钉文档直读并解析。与 parseImportFile 的差别只有「数据怎么来」——
+     服务端两条链在 parseDingTalkSheets 处汇合，列映射/层级还原是同一份代码。 */
+  async function parseDocSync(nodeId, docUrl, overrides) {
+    const resp = await fetch('/api/plan/doc-parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nodeId: nodeId,
+        docUrl: docUrl,
+        planName: '',
+        sheetOverrides: overrides && Object.keys(overrides).length ? overrides : null
+      })
+    });
+    const result = await resp.json();
+    if (!resp.ok) throw new Error(result.error || '读取钉钉文档失败');
+    return result;
+  }
+
+  /* 统一的「按新归属重解析」。改一次表→表单归属就要重跑一遍服务端映射，
+     前端不自己算——两条来源的差异全部收在这里，调用方只传 overrides。 */
+  function reparseImport(overrides) {
+    if (importSource === 'doc') return parseDocSync(importNodeId, importDocUrl, overrides);
+    return parseImportFile(importFile, overrides);
   }
 
   /* 各级表单的 id 前缀与生成器，落库前统一重编号，避免与已有数据撞 id */
@@ -1360,12 +1399,20 @@ const PlanModule = (() => {
       });
       // 空数据的表单保留平台的标准模板（总览 8 阶段 / 上市 5 阶段 / 交付件清单）
       keys.forEach(k => { draft[k] = p[k]; });
+      /* 文档同步来的计划，把文档绑定一起带进草稿。
+         注意不能省：不写的话这次拉完就断了，下次想增量同步无从知道「对应哪份文档」。
+         编辑态保存时该字段原样透传（plan 对象是 { ...draft } 拼的）。 */
+      if (importSource === 'doc' && importNodeId) {
+        draft.dingtalk = { docUrl: importDocUrl, nodeId: importNodeId };
+      }
       dirtyForm = reIdImportPlan(draft);
       currentPlanId = null;
       currentFormTab = 'basic';
       currentView = 'new';
       render();
-      SharedUI.toast(`已载入 ${importFileName}，请核对后点「保存计划」`, 'success');
+      SharedUI.toast(importSource === 'doc'
+        ? `已从钉钉文档载入 ${importFileName}，请核对后点「保存计划」`
+        : `已载入 ${importFileName}，请核对后点「保存计划」`, 'success');
       return;
     }
 
@@ -1471,8 +1518,22 @@ const PlanModule = (() => {
     const SRC_TEXT = {
       'platform-export': '平台导出文件（可 1:1 往返）',
       dingtalk: '钉钉多维表导出（按表头智能映射）',
+      'dingtalk-doc': '钉钉文档直读（只读拉取，不改文档）',
       generic: '通用表格（能对上的列才导入）'
     };
+    /* 钉钉文档路径独有的失败表：读接口就挂了的那些，不在 skipped 里（skipped 是
+       「读到了但接不上」）。两者含义不同，分开显示，否则用户会以为表不存在。 */
+    const failedTables = r.failedTables || [];
+    const failedHtml = failedTables.length ? `
+        <div class="pl-imp-sec"><div class="pl-imp-sec-t">读取失败的表（本次不同步）</div>
+          ${failedTables.map(t => `<div class="pl-imp-skip"><span class="pl-imp-sheet-name">「${esc(t.name)}」</span>
+            <span class="pl-imp-reason">${esc(t.error || t.reason || '读取失败')}</span></div>`).join('')}
+        </div>` : '';
+    const docBindHtml = (r.source === 'dingtalk-doc' && r.dingtalk && r.dingtalk.nodeId) ? `
+        <div class="pl-imp-sec"><div class="pl-imp-sec-t">文档绑定</div>
+          <div class="pl-imp-bind">落盘后本计划会绑定该钉钉文档（nodeId <code>${esc(r.dingtalk.nodeId)}</code>），
+            下次可对同一文档增量同步；本次共读取 ${fmtNum(r.tableCount || 0)} 张表。</div>
+        </div>` : '';
     /* 本次真正会有内容的表：覆盖提示、告警文案都按这个清单走 */
     const filledKeys = Object.keys(counts).filter(k => counts[k] > 0);
     const filled = filledKeys
@@ -1489,11 +1550,20 @@ const PlanModule = (() => {
           <span class="pl-imp-rows">共 ${fmtNum(totalRows)} 行</span>
         </div>
         ${filled ? `<div class="pl-imp-sum">将写入：${esc(filled)}</div>` : ''}
+        ${docBindHtml}
         <div class="pl-imp-sec"><div class="pl-imp-sec-t">表 → 表单 归属（可手动改）</div>${rows}</div>
         ${skippedHtml ? `<div class="pl-imp-sec"><div class="pl-imp-sec-t">跳过的表</div>${skippedHtml}</div>` : ''}
+        ${failedHtml}
         <div class="pl-imp-sec"><div class="pl-imp-sec-t">数据质量提示（不阻塞导入）</div><div class="pl-imp-diags">${diagHtml}</div></div>
         <div class="pl-imp-sec">
           <div class="pl-imp-sec-t">导入方式</div>
+          ${importSource === 'doc' ? `
+          <div class="pl-imp-modes">
+            <label class="pl-imp-mode"><input type="radio" checked disabled> 新建计划</label>
+          </div>
+          <div class="pl-imp-target"><span class="pl-imp-none">第一版文档同步只做新建计划。
+            往已有计划上合需要按钉钉记录 id 做增量比对（改了名的任务、换过位置的任务都要认得出是同一条），
+            这套比对还没做，先放开话每次同步都会把现有内容重灌一遍。</span></div>` : `
           <div class="pl-imp-modes">
             <label class="pl-imp-mode"><input type="radio" name="plImpMode" value="new" ${importMode === 'new' ? 'checked' : ''}> 新建计划（推荐）</label>
             <label class="pl-imp-mode"><input type="radio" name="plImpMode" value="append" ${importMode === 'append' ? 'checked' : ''}> 追加到已有计划（保留原内容）</label>
@@ -1502,7 +1572,7 @@ const PlanModule = (() => {
           <div class="pl-imp-target" id="plImpTargetWrap" style="display:${importMode === 'new' ? 'none' : 'block'}">
             <select class="pl-imp-sel" id="plImpTarget">${planOptions || '<option value="">（暂无计划）</option>'}</select>
             <span class="pl-imp-warn" id="plImpModeWarn">${esc(modeWarnText(filledKeys))}</span>
-          </div>
+          </div>`}
         </div>
       </div>`;
   }
@@ -1519,7 +1589,7 @@ const PlanModule = (() => {
         const hint = document.getElementById('plImpBusy');
         if (hint) hint.textContent = '按新的归属重新解析…';
         try {
-          importPreview = await parseImportFile(importFile, importOverrides);
+          importPreview = await reparseImport(importOverrides);
           renderImportModal(onApply);
         } catch (e) {
           SharedUI.toast('重新解析失败: ' + e.message, 'error');
@@ -1548,9 +1618,13 @@ const PlanModule = (() => {
   }
 
   function renderImportModal(onApply) {
+    const isDoc = importSource === 'doc';
     const body = `<div id="plImportBody">${renderImportPreview()}</div><div class="pl-imp-busy" id="plImpBusy"></div>`;
-    SharedUI.confirm('导入项目计划', body, () => {
-      if (!importPreview) { SharedUI.toast('解析未完成，请重新选择文件', 'warning'); return; }
+    SharedUI.confirm(isDoc ? '从钉钉文档同步' : '导入项目计划', body, () => {
+      if (!importPreview) {
+        SharedUI.toast(isDoc ? '还没读到内容，请重新同步' : '解析未完成，请重新选择文件', 'warning');
+        return;
+      }
       if (importMode !== 'new' && !importTargetId) { SharedUI.toast('请选择目标计划', 'warning'); return; }
       if (importMode === 'overwrite') {
         const t = getPlan(importTargetId);
@@ -1569,7 +1643,11 @@ const PlanModule = (() => {
         return;
       }
       onApply();
-    }, { confirmText: importMode === 'overwrite' ? '覆盖导入' : '导入', cancelText: '取消', confirmClass: importMode === 'overwrite' ? 'danger' : 'primary' });
+    }, {
+      confirmText: isDoc ? '同步为草稿' : (importMode === 'overwrite' ? '覆盖导入' : '导入'),
+      cancelText: '取消',
+      confirmClass: importMode === 'overwrite' ? 'danger' : 'primary'
+    });
     setTimeout(() => bindImportPreview(onApply), 0);
   }
 
@@ -1614,6 +1692,56 @@ const PlanModule = (() => {
         if (hint) hint.textContent = `✓ 已选择 ${f.name}（${Math.round(f.size / 1024)} KB）`;
       });
     }, 0);
+  }
+
+  /* 入口：贴钉钉文档链接 → 服务端直读智能表格 → 弹同一套预览
+     与「导入 Excel」共用预览/落盘，差别只在数据来源与可选的落库方式。
+     第一版只做新建：文档里没有「目标计划」这个概念，往已有计划上合需要先按
+     dtRecordId 认人做增量比对（服务端已能按 id 建树，但比对逻辑还没写），
+     这部分没落地前把 append/overwrite 放出去会变成「每次同步都重灌一遍」。 */
+  function openDocSyncDialog(defaultUrl) {
+    const body = `
+      <div class="pl-import-start">
+        <p class="pl-dec-desc">粘贴钉钉智能表格的文档链接（形如
+          <code>https://alidocs.dingtalk.com/i/nodes/&lt;nodeId&gt;</code>）。
+          平台会以<b>只读</b>方式拉取文档里的所有表格，按平台自己的计划版式落成一份新计划
+          ——<b>不会改动钉钉文档里的任何内容</b>。</p>
+        <p class="pl-dec-desc">接不上的表（发布日历 / 依赖关系 / 需求变更记录等）会跳过，
+          预览页里会列出被跳过的表名与原因。</p>
+        <div class="pl-dec-toolbar">
+          <input type="text" class="pl-imp-url" id="plDocUrl" placeholder="https://alidocs.dingtalk.com/i/nodes/…" value="${esc(defaultUrl || '')}">
+        </div>
+        <p class="pl-dec-desc">解析只读不写，下一步先给你看「哪张表导成哪个表单、多少行」，确认后才落盘。</p>
+      </div>`;
+    SharedUI.confirm('从钉钉文档同步', body, () => {
+      const inp = document.getElementById('plDocUrl');
+      const url = String((inp && inp.value) || '').trim();
+      const nodeId = parseDocNodeIdClient(url);
+      if (!nodeId) { SharedUI.toast('链接里没找到 nodeId，请检查是否为钉钉文档链接', 'warning'); return; }
+      SharedUI.toast('正在读取钉钉文档…', 'info');
+      parseDocSync(nodeId, url, {}).then(r => {
+        importPreview = r;
+        /* 文档路径没有文件名。用服务端解析出的计划名兜底，再兜底一个固定串，
+           否则预览头与 toast 会显示成上一份 Excel 的文件名（很误导）。 */
+        importFileName = (r.plan && r.plan.name) || '钉钉文档同步';
+        importDocUrl = url;
+        importNodeId = nodeId;
+        renderImportModal(applyImport);
+      }).catch(e => SharedUI.toast('读取失败: ' + e.message, 'error'));
+    }, { confirmText: '读取并预览', cancelText: '取消' });
+
+    setTimeout(() => {
+      const inp = document.getElementById('plDocUrl');
+      if (inp) inp.focus();
+    }, 0);
+  }
+
+  /* 前端也认一遍链接，只为早点给出提示（真正把关在服务端 parseDocNodeId） */
+  function parseDocNodeIdClient(s) {
+    const str = String(s || '').trim();
+    const m = str.match(/\/nodes\/([A-Za-z0-9]+)/);
+    if (m) return m[1];
+    return /^[A-Za-z0-9]{8,64}$/.test(str) ? str : '';
   }
 
   /* ==========================================================
@@ -2535,6 +2663,9 @@ const PlanModule = (() => {
       })),
       tasks, milestones, resources, members, references, aiConfig: dirtyForm.aiConfig || {}
     };
+    /* 钉钉文档绑定：只有从文档同步进来的草稿才有，编辑旧计划时是 undefined。
+       有才写、没有就不写这个 key（写 null 会让「绑没绑过」这件事变得无法区分）。 */
+    if (dirtyForm.dingtalk && dirtyForm.dingtalk.nodeId) plan.dingtalk = dirtyForm.dingtalk;
     // 合并到 state.plans
     const plans = Array.isArray(state.plans) ? state.plans.slice() : [];
     const idx = plans.findIndex(p => p.id === plan.id);
@@ -3034,9 +3165,17 @@ const PlanModule = (() => {
       el.querySelector('#plNewPlan')?.addEventListener('click', () => { dirtyForm = initFormDraft(null); currentFormTab = 'basic'; currentView = 'new'; render(); });
       // 列表页导入：默认「新建计划」，也可在预览页改成并进已有计划
       el.querySelector('#plImportPlan')?.addEventListener('click', () => {
+        importSource = 'file';
         importMode = 'new';
         importTargetId = '';
         openImportDialog();
+      });
+      // 文档同步：第一版固定「新建计划」，落库方式不给切换（理由见 openDocSyncDialog）
+      el.querySelector('#plSyncDoc')?.addEventListener('click', () => {
+        importSource = 'doc';
+        importMode = 'new';
+        importTargetId = '';
+        openDocSyncDialog();
       });
       el.querySelector('#plFilter')?.addEventListener('input', (e) => {
         filterText = e.target.value.trim();
@@ -3074,6 +3213,7 @@ const PlanModule = (() => {
       });
       // 详情页导入：默认落到「当前计划 + 追加」，用户可在预览页改成覆盖或新建
       el.querySelector('#plImportExcel')?.addEventListener('click', () => {
+        importSource = 'file';
         importMode = 'append';
         importTargetId = currentPlanId || '';
         openImportDialog();
